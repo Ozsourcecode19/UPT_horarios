@@ -1,0 +1,65 @@
+# backend/crud/periodos_academicos.py
+from sqlalchemy.orm import Session
+import models, schemas
+from typing import List, Optional
+from sqlalchemy.exc import SQLAlchemyError
+
+def get_periodo_academico(db: Session, periodo_id: int) -> Optional[models.PeriodoAcademico]:
+    """
+    Obtiene un periodo académico por su ID.
+    """
+    return db.query(models.PeriodoAcademico).filter(models.PeriodoAcademico.id == periodo_id).first()
+
+def get_periodos_academicos(db: Session, skip: int = 0, limit: int = 100) -> List[models.PeriodoAcademico]:
+    """
+    Obtiene una lista de periodos académicos con paginación.
+    """
+    return db.query(models.PeriodoAcademico).offset(skip).limit(limit).all()
+
+def create_periodo_academico(db: Session, periodo: schemas.PeriodoAcademicoCreate) -> models.PeriodoAcademico:
+    """
+    Crea un nuevo periodo académico en la base de datos.
+    """
+    db_periodo = models.PeriodoAcademico(**periodo.model_dump())
+    db.add(db_periodo)
+    db.commit()
+    db.refresh(db_periodo)
+    return db_periodo
+
+def update_periodo_academico(db: Session, periodo_id: int, periodo_update: schemas.PeriodoAcademicoUpdate) -> Optional[models.PeriodoAcademico]:
+    """
+    Actualiza un periodo académico existente.
+    """
+    db_periodo = db.query(models.PeriodoAcademico).filter(models.PeriodoAcademico.id == periodo_id).first()
+    if not db_periodo:
+        return None
+
+    try:
+        update_data = periodo_update.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_periodo, field, value)
+
+        db.commit()
+        db.refresh(db_periodo)
+        return db_periodo
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"Error al actualizar periodo académico {periodo_id}: {e}")
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error inesperado al actualizar periodo académico {periodo_id}: {e}")
+        raise
+
+def delete_periodo_academico(db: Session, periodo_id: int) -> bool:
+    """
+    Elimina un periodo académico de la base de datos.
+    Retorna True si se eliminó, False si no existía.
+    """
+    db_periodo = db.query(models.PeriodoAcademico).filter(models.PeriodoAcademico.id == periodo_id).first()
+    if not db_periodo:
+        return False
+
+    db.delete(db_periodo)
+    db.commit()
+    return True

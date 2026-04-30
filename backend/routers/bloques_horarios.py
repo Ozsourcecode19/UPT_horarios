@@ -1,0 +1,55 @@
+# backend/routers/bloques_horarios.py
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+import crud
+import schemas
+from config.database import get_db
+
+router = APIRouter(prefix="/bloques-horarios", tags=["Bloques Horarios"])
+
+@router.post("/", response_model=schemas.BloqueHorario)
+def create_bloque_horario(bloque: schemas.BloqueHorarioCreate, db: Session = Depends(get_db)):
+    """
+    Crea un nuevo bloque horario.
+    """
+    db_bloque = crud.create_bloque_horario(db, bloque=bloque)
+    return db_bloque
+
+@router.get("/{bloque_id}", response_model=schemas.BloqueHorario)
+def read_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
+    """
+    Obtiene un bloque horario por su ID.
+    """
+    db_bloque = crud.get_bloque_horario(db, bloque_id=bloque_id)
+    if db_bloque is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
+    return db_bloque
+
+@router.get("/", response_model=List[schemas.BloqueHorario])
+def read_bloques_horarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    Obtiene una lista de bloques horarios.
+    """
+    bloques = crud.get_bloques_horarios(db, skip=skip, limit=limit)
+    return bloques
+
+@router.put("/{bloque_id}", response_model=schemas.BloqueHorario)
+def update_bloque_horario(bloque_id: int, bloque_update: schemas.BloqueHorarioUpdate, db: Session = Depends(get_db)):
+    """
+    Actualiza un bloque horario existente.
+    """
+    db_bloque = crud.update_bloque_horario(db, bloque_id=bloque_id, bloque_update=bloque_update)
+    if db_bloque is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
+    return db_bloque
+
+@router.delete("/{bloque_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
+    """
+    Elimina un bloque horario.
+    """
+    deleted = crud.delete_bloque_horario(db, bloque_id=bloque_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
+    return
