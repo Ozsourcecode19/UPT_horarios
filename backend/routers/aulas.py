@@ -1,0 +1,55 @@
+# backend/routers/aulas.py
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+import crud
+import schemas
+from config.database import get_db
+
+router = APIRouter(prefix="/aulas", tags=["Aulas"])
+
+@router.post("/", response_model=schemas.Aula)
+def create_aula(aula: schemas.AulaCreate, db: Session = Depends(get_db)):
+    """
+    Crea un nuevo aula.
+    """
+    db_aula = crud.create_aula(db, aula=aula)
+    return db_aula
+
+@router.get("/{aula_id}", response_model=schemas.Aula)
+def read_aula(aula_id: int, db: Session = Depends(get_db)):
+    """
+    Obtiene un aula por su ID.
+    """
+    db_aula = crud.get_aula(db, aula_id=aula_id)
+    if db_aula is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada")
+    return db_aula
+
+@router.get("/", response_model=List[schemas.Aula])
+def read_aulas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    Obtiene una lista de aulas.
+    """
+    aulas = crud.get_aulas(db, skip=skip, limit=limit)
+    return aulas
+
+@router.put("/{aula_id}", response_model=schemas.Aula)
+def update_aula(aula_id: int, aula_update: schemas.AulaUpdate, db: Session = Depends(get_db)):
+    """
+    Actualiza un aula existente.
+    """
+    db_aula = crud.update_aula(db, aula_id=aula_id, aula_update=aula_update)
+    if db_aula is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada")
+    return db_aula
+
+@router.delete("/{aula_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_aula(aula_id: int, db: Session = Depends(get_db)):
+    """
+    Elimina un aula.
+    """
+    deleted = crud.delete_aula(db, aula_id=aula_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada")
+    return

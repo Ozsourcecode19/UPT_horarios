@@ -1,0 +1,8 @@
+# 1. Crear base de datos dedicada
+createdb -U postgres horarios_upt
+
+# 2. Conectar y ejecutar script
+sudo -u postgres psql -d horarios_upt -f schema_horarios_v2.1.sql
+
+# 3. Verificar instalación
+psql -U postgres -d horarios_upt -c "SELECT * FROM fn_diagnostico_instalacion();"
