@@ -1,18 +1,20 @@
-# backend/models/configuracion.py
-from sqlalchemy import Column, String, DateTime, Boolean
+# models/configuracion.py
+from sqlalchemy import Column, String, DateTime, Boolean # Remover 'Integer'
 from sqlalchemy.dialects.postgresql import JSONB
 from config.database import Base
-from datetime import datetime, timezone
+from datetime import datetime, timezone # Asegúrate de importar timezone
 
 class Configuracion(Base):
     __tablename__ = "configuracion"
 
-    clave = Column(String(50), primary_key=True)
+    # CORREGIDO: clave es la PRIMARY KEY, no 'id'
+    clave = Column(String(50), primary_key=True, index=True) # Clave primaria y única
     valor = Column(JSONB, nullable=False) # Almacena datos estructurados
     descripcion = Column(String) # Puede ser NULL
-    tipo_dato = Column(String(20), nullable=False) # string, integer, boolean, array, json
+    tipo_dato = Column(String(20), nullable=False) # 'string', 'integer', 'boolean', 'array', 'json'
     editable = Column(Boolean, default=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Check Constraint
-    # No se puede hacer fácilmente con JSONB en el esquema, se valida en la aplicación
+    # CORREGIDO: Uso de lambda, timezone-aware, e import explícito
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # No hay campo 'id' como columna separada si 'clave' es la PK

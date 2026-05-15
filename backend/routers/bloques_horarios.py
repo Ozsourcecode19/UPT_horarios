@@ -13,8 +13,10 @@ def create_bloque_horario(bloque: schemas.BloqueHorarioCreate, db: Session = Dep
     """
     Crea un nuevo bloque horario.
     """
-    db_bloque = crud.create_bloque_horario(db, bloque=bloque)
+    # Llamada CORRECTA: el segundo argumento se pasa posicionalmente
+    db_bloque = crud.create_bloque_horario(db, bloque) # <-- CORREGIDO
     return db_bloque
+
 
 @router.get("/{bloque_id}", response_model=schemas.BloqueHorario)
 def read_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):

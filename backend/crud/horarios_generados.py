@@ -4,7 +4,10 @@ from sqlalchemy import and_
 import models, schemas
 from typing import List, Optional
 from datetime import date, timedelta, datetime
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DBAPIError 
+from fastapi import HTTPException 
+from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
+import logging
 
 def get_horario_generado(db: Session, horario_id: int) -> Optional[models.HorarioGenerado]:
     """
@@ -26,26 +29,135 @@ def get_horarios_generados(db: Session, periodo_id: Optional[int] = None, skip: 
 def create_horario_generado(db: Session, horario: schemas.HorarioGeneradoCreate) -> models.HorarioGenerado:
     """
     Crea un nuevo horario generado.
+    Excluye campos calculados por triggers de la base de datos como 'dia_semana', 'hora_inicio', 'hora_fin'.
+    Maneja errores específicos de la base de datos relacionados con validaciones de negocio y claves foráneas.
     """
-    # CORREGIDO: Usar model_dump en lugar de dict
-    db_horario = models.HorarioGenerado(**horario.model_dump())
-    db.add(db_horario)
-    db.commit()
-    db.refresh(db_horario)
-    return db_horario
+    # Obtener el diccionario del objeto Pydantic
+    horario_data = horario.model_dump()
+    # Excluir campos que no se asignan directamente (calculados por triggers)
+    campos_automaticos = {'dia_semana', 'hora_inicio', 'hora_fin'}
+
+    # Crear un nuevo diccionario sin los campos automáticos
+    horario_data_filtrado = {k: v for k, v in horario_data.items() if k not in campos_automaticos}
+
+    try:
+        # CORREGIDO: Usar model_dump filtrado
+        db_horario = models.HorarioGenerado(**horario_data_filtrado)
+        db.add(db_horario)
+        db.commit()
+        db.refresh(db_horario)
+        return db_horario
+    except IntegrityError as e: # Este bloque maneja DBAPIError, por lo tanto e.orig SI está disponible
+        db.rollback()
+        # Acceder al error original del driver (psycopg2) - e.orig está garantizado aquí
+        orig_error = e.orig
+        # Verificar si el error original es del tipo RaiseException (función PL/pgSQL o trigger)
+        # Caso específico: sync_horario_from_bloque falla porque bloque_id no existe
+        if isinstance(orig_error, RaiseException) and 'Bloque horario' in str(orig_error) and 'no encontrado' in str(orig_error):
+             # Extraer el ID del bloque del mensaje si es posible, o usar el del objeto horario
+             # El mensaje original es: "Bloque horario 0 no encontrado" (en este caso)
+             # Podríamos intentar parsear el número, pero es más robusto usar el valor del request.
+             raise HTTPException(status_code=422, detail=f"El bloque horario con ID {horario.bloque_id} no existe. No se puede crear el horario generado.")
+        # Caso específico: fn_validar_sede_horario
+        elif isinstance(orig_error, RaiseException) and 'Inconsistencia de sede:' in str(orig_error):
+            # Extraer detalles parciales si es posible, aunque el mensaje de la BD es bastante descriptivo
+            # El mensaje original ya contiene mucha información: "Inconsistencia de sede: Aula(<NULL>), Bloque(1), Lección(<NULL>) deben coincidir"
+            raise HTTPException(status_code=422, detail=str(orig_error)) # Devolver el mensaje original de la BD
+        elif isinstance(orig_error, ForeignKeyViolation):
+            # Manejar violaciones de clave foránea específicas (esto puede capturar FKs antes del trigger si la BD lo permite)
+            # Pero el trigger sync_horario_from_bloque se ejecuta *antes* de la verificación FK estándar en el INSERT.
+            # Por lo tanto, es menos probable que llegue aquí por IDs inexistentes que causen el trigger.
+            # Sería más común para updates o si la verificación FK estándar se ejecuta antes del trigger en ciertas circunstancias.
+            error_msg_lower = str(orig_error).lower()
+            if 'horario_generado_bloque_id_fkey' in error_msg_lower:
+                raise HTTPException(status_code=422, detail=f"El bloque horario con ID {horario.bloque_id} no existe (verificación FK estándar).")
+            elif 'horario_generado_leccion_id_fkey' in error_msg_lower:
+                raise HTTPException(status_code=422, detail=f"La lección con ID {horario.leccion_id} no existe.")
+            elif 'horario_generado_aula_id_fkey' in error_msg_lower:
+                raise HTTPException(status_code=422, detail=f"El aula con ID {horario.aula_id} no existe.")
+            elif 'horario_generado_periodo_id_fkey' in error_msg_lower:
+                raise HTTPException(status_code=422, detail=f"El periodo académico con ID {horario.periodo_id} no existe.")
+            elif 'horario_generado_created_by_fkey' in error_msg_lower:
+                raise HTTPException(status_code=422, detail=f"El usuario creador con ID {horario.created_by} no existe.")
+            else:
+                # Si es una FKViolation genérica no identificada
+                raise HTTPException(status_code=500, detail="Error de integridad de base de datos (clave foránea desconocida) al crear el horario generado.")
+        elif isinstance(orig_error, UniqueViolation):
+            # Manejar violaciones de unicidad específicas si aplica
+            # Por ejemplo, si hubiera una constraint UNIQUE en (leccion_id, bloque_id) u otra combinación
+            # No parece haber una obvia en el esquema para horario_generado INSERT, pero es buena práctica.
+            # Por ejemplo, si se definiera UNIQUE(bloque_id, aula_id) y se intentara insertar:
+            raise HTTPException(status_code=409, detail="Ya existe un horario generado con la misma combinación de claves únicas.")
+        else:
+            # Si es otro tipo de IntegrityError no manejado
+            print(f"Error de integridad inesperado al crear horario generado: {e}, Error original: {orig_error}") # O usar logging
+            raise HTTPException(status_code=500, detail="Error de integridad de base de datos general al crear el horario generado.")
+    # Manejar otras excepciones DBAPIError si es necesario, aunque IntegrityError es la más común para violaciones.
+    # except OperationalError as e: # Por ejemplo, problemas de conexión durante la operación
+    #    db.rollback()
+    #    orig_error = e.orig
+    #    # Lógica específica para OperationalError si aplica
+    #    raise HTTPException(status_code=503, detail="Error de conexión con la base de datos.")
+    except SQLAlchemyError as e: # Manejar otros errores de SQLAlchemy que NO sean DBAPIError
+        db.rollback()
+        # Verificar si e es una subclase de DBAPIError antes de acceder a .orig
+        if isinstance(e, DBAPIError):
+            # Si entra aquí, es raro, porque IntegrityError ya fue capturado.
+            # Pero por si acaso, se puede manejar aquí si no coincide con IntegrityError.
+            orig_error = e.orig
+            if isinstance(orig_error, RaiseException):
+                # Verificar si es el error del trigger de sincronización
+                if 'Bloque horario' in str(orig_error) and 'no encontrado' in str(orig_error):
+                    raise HTTPException(status_code=422, detail=f"El bloque horario con ID {horario.bloque_id} no existe. No se puede crear el horario generado.")
+                # Verificar si es el error de validación de sede
+                elif 'Inconsistencia de sede:' in str(orig_error):
+                    raise HTTPException(status_code=422, detail=str(orig_error)) # Devolver el mensaje original de la BD
+                else:
+                    # Si es otro RaiseException no identificado
+                    print(f"RaiseException inesperado al crear horario generado: {orig_error}") # O usar logging
+                    raise HTTPException(status_code=500, detail="Error interno del servidor (RaiseException inesperado) al crear el horario generado.")
+            else:
+                # Si es otro tipo de DBAPIError no manejado aquí
+                print(f"Otro DBAPIError al crear horario generado: {e}, Error original: {orig_error}") # O usar logging
+                raise HTTPException(status_code=500, detail="Error de base de datos no especificado al crear el horario generado.")
+        else:
+            # Si e NO es una subclase de DBAPIError (por ejemplo, InvalidRequestError)
+            # No se debe acceder a .orig
+            print(f"Error de SQLAlchemy no relacionado con DBAPI al crear horario generado: {e}") # O usar logging
+            # Podrías lanzar un 500 genérico o un error más específico si identificas el tipo.
+            # Por ejemplo, si es InvalidRequestError:
+            if e.__class__.__name__ == 'InvalidRequestError':
+                 # Podría ser útil registrar el mensaje de la excepción original para debuggear
+                 print(f"  - Mensaje de InvalidRequestError: {e}")
+                 # Lógica específica para InvalidRequestError si se desea
+                 # Por ahora, lanzamos un 500 genérico.
+            raise HTTPException(status_code=500, detail="Error interno del servidor al crear el horario generado (problema de API SQLAlchemy).")
+    except Exception as e: # Manejar errores inesperados no relacionados con SQLAlchemy
+        db.rollback()
+        print(f"Error inesperado al crear horario generado: {e}") # O usar logging
+        raise HTTPException(status_code=500, detail="Error interno del servidor inesperado al crear el horario generado.")
 
 def update_horario_generado(db: Session, horario_id: int, horario_update: schemas.HorarioGeneradoUpdate) -> Optional[models.HorarioGenerado]:
     """
     Actualiza un horario generado existente.
+    Excluye campos calculados por triggers de la base de datos como 'dia_semana', 'hora_inicio', 'hora_fin'.
     """
     db_horario = db.query(models.HorarioGenerado).filter(models.HorarioGenerado.id == horario_id).first()
     if not db_horario:
-        return None
+        return None  # O lanzar HTTPException(404, "Horario generado no encontrado")
 
     try:
-        # CORREGIDO: Usar model_dump en lugar de dict
+        # Obtener los datos a actualizar, excluyendo los que no se enviaron
         update_data = horario_update.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
+
+        # Excluir campos que no se actualizan directamente (calculados por triggers)
+        campos_automaticos = {'dia_semana', 'hora_inicio', 'hora_fin'}
+
+        # Filtrar los campos a actualizar
+        campos_para_actualizar = {k: v for k, v in update_data.items() if k not in campos_automaticos}
+
+        # Asignar los nuevos valores al objeto recuperado
+        for field, value in campos_para_actualizar.items():
             setattr(db_horario, field, value) # Esto marca el objeto como dirty en la sesión
 
         db.commit() # Envía los cambios a la DB
@@ -97,78 +209,130 @@ def delete_horario_generado(db: Session, horario_id: int) -> bool:
 def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.FullCalendarEvent]:
     """
     Obtiene horarios en formato compatible con FullCalendar para un periodo específico.
+    Maneja posibles valores NULL de campos calculados por triggers o joins fallidos.
     """
     # Realizar joins para obtener datos necesarios
     results = db.query(
-        models.HorarioGenerado,
-        models.Materia.nombre.label('materia_nombre'),
-        models.Docente.nombre.label('docente_nombre'),
-        models.Docente.apellido.label('docente_apellido'),
-        models.Grupo.nombre.label('grupo_nombre'),
-        models.Aula.nombre.label('aula_nombre'),
-        models.Sede.nombre.label('sede_nombre'),
-        models.PeriodoAcademico.fecha_inicio.label('fecha_inicio_periodo')
+    models.HorarioGenerado,
+    models.Materia.nombre.label('materia_nombre'),
+    models.Materia.codigo.label('materia_codigo'), # Añadir código
+    models.Materia.color_hex.label('materia_color_hex'), # Añadir color
+    models.Docente.nombre.label('docente_nombre'),
+    models.Docente.apellido.label('docente_apellido'),
+    models.Grupo.nombre.label('grupo_nombre'),
+    models.Aula.nombre.label('aula_nombre'),
+    models.Sede.nombre.label('sede_nombre'),
+    models.PeriodoAcademico.fecha_inicio.label('fecha_inicio_periodo')
     ).join(
-        models.Leccion, models.HorarioGenerado.leccion_id == models.Leccion.id
+    models.Leccion, models.HorarioGenerado.leccion_id == models.Leccion.id
     ).join(
-        models.Materia, models.Leccion.materia_id == models.Materia.id
+    models.Materia, models.Leccion.materia_id == models.Materia.id
     ).join(
-        models.Docente, models.Leccion.docente_id == models.Docente.id
+    models.Docente, models.Leccion.docente_id == models.Docente.id
     ).join(
-        models.Grupo, models.Leccion.grupo_id == models.Grupo.id
+    models.Grupo, models.Leccion.grupo_id == models.Grupo.id
     ).join(
-        models.Aula, models.HorarioGenerado.aula_id == models.Aula.id
+    models.Aula, models.HorarioGenerado.aula_id == models.Aula.id
     ).join(
-        models.Sede, models.Aula.sede_id == models.Sede.id
+    models.Sede, models.Aula.sede_id == models.Sede.id
     ).join(
-        models.PeriodoAcademico, models.HorarioGenerado.periodo_id == models.PeriodoAcademico.id
+    models.PeriodoAcademico, models.HorarioGenerado.periodo_id == models.PeriodoAcademico.id
     ).filter(
-        and_(
-            models.HorarioGenerado.periodo_id == periodo_id,
-            models.HorarioGenerado.estado == 'ACTIVO' # Solo horarios activos
-        )
+    and_(
+    models.HorarioGenerado.periodo_id == periodo_id,
+    models.HorarioGenerado.estado == 'ACTIVO' # Solo horarios activos
+    )
     ).all()
 
     eventos = []
     for row in results:
         horario_gen = row.HorarioGenerado
-        materia_nombre = row.materia_nombre
-        docente_nombre = row.docente_nombre
-        docente_apellido = row.docente_apellido
-        grupo_nombre = row.grupo_nombre
-        aula_nombre = row.aula_nombre
-        sede_nombre = row.sede_nombre
-        fecha_inicio_periodo = row.fecha_inicio_periodo
+        # Manejar posibles valores NULL de los joins
+        materia_nombre = getattr(row, 'materia_nombre', 'Materia No Asignada')
+        materia_codigo = getattr(row, 'materia_codigo', '') # Puede ser ''
+        materia_color_hex = getattr(row, 'materia_color_hex', '#3B82F6') # Color por defecto
+        docente_nombre = getattr(row, 'docente_nombre', 'Docente No Asignado')
+        docente_apellido = getattr(row, 'docente_apellido', '')
+        grupo_nombre = getattr(row, 'grupo_nombre', 'Grupo No Asignado')
+        aula_nombre = getattr(row, 'aula_nombre', 'Aula No Asignada')
+        sede_nombre = getattr(row, 'sede_nombre', 'Sede No Asignada')
+        fecha_inicio_periodo = getattr(row, 'fecha_inicio_periodo', None)
 
-        # Calcular la fecha exacta del evento
-        dia_numero = horario_gen.dia_semana # 1=Lunes, ..., 7=Domingo
-        # Asumiendo que fecha_inicio_periodo es el primer día del periodo (e.g., Lunes)
-        # Ajustar si el periodo no empieza en lunes
-        fecha_evento = fecha_inicio_periodo + timedelta(days=(dia_numero - 1))
-        hora_inicio_completa = datetime.combine(fecha_evento, horario_gen.hora_inicio)
-        hora_fin_completa = datetime.combine(fecha_evento, horario_gen.hora_fin)
+        # Validar que la fecha de inicio del periodo no sea NULL
+        if fecha_inicio_periodo is None:
+            logging.warning(f"Horario ID {horario_gen.id}: fecha_inicio_periodo es NULL. Saltando.")
+            # Opcional: raise HTTPException(status_code=500, detail=f"Error interno: Periodo {periodo_id} no tiene fecha_inicio definida.")
+            continue # Saltar este horario si la fecha base es inválida
 
-        # Formatear a ISO 8601
-        start_iso = hora_inicio_completa.isoformat()
-        end_iso = hora_fin_completa.isoformat()
+        # Manejar posibles valores NULL de campos calculados por triggers
+        dia_semana = horario_gen.dia_semana
+        hora_inicio = horario_gen.hora_inicio
+        hora_fin = horario_gen.hora_fin
 
-        # Crear el evento para FullCalendar
-        evento = schemas.FullCalendarEvent(
-            id=horario_gen.id,
-            title=f"{materia_nombre} - {docente_apellido}, {docente_nombre}",
-            start=start_iso,
-            end=end_iso,
-            resourceId=f"aula_{horario_gen.aula_id}",
-            extendedProps={
-                "grupo": grupo_nombre,
-                "docente": f"{docente_apellido}, {docente_nombre}",
-                "materia": materia_nombre,
-                "materia_codigo": getattr(row.Materia, 'codigo', ''), # Manejar si codigo no está en el join
-                "backgroundColor": getattr(row.Materia, 'color_hex', '#3B82F6'),
-                "aula": aula_nombre,
-                "sede": sede_nombre,
-            }
-        )
-        eventos.append(evento)
+        # Validar campos calculados por triggers
+        if dia_semana is None or hora_inicio is None or hora_fin is None:
+            logging.warning(f"Horario ID {horario_gen.id}: campos calculados incompletos (dia_semana={dia_semana}, hora_inicio={hora_inicio}, hora_fin={hora_fin}). Saltando.")
+            # Opcional: raise HTTPException(status_code=500, detail=f"Error interno: Horario {horario_gen.id} no tiene campos calculados por trigger.")
+            continue # Saltar este horario si los campos calculados no están disponibles
 
+        # Validar rango de dia_semana (1-7)
+        if not (1 <= dia_semana <= 7):
+            logging.warning(f"Horario ID {horario_gen.id}: dia_semana ({dia_semana}) fuera de rango (1-7). Saltando.")
+            continue
+
+        try:
+            # Calcular la fecha exacta del evento
+            # Asumiendo que fecha_inicio_periodo es el primer día del periodo (e.g., Lunes)
+            # Ajustar si el periodo no empieza en lunes
+            # Usar timedelta(days=...) con el valor numérico directamente
+            fecha_evento = fecha_inicio_periodo + timedelta(days=(dia_semana - 1))
+
+            # Calcular hora de inicio y fin completa (datetime)
+            # datetime.combine(date, time) -> datetime
+            hora_inicio_completa = datetime.combine(fecha_evento, hora_inicio)
+            hora_fin_completa = datetime.combine(fecha_evento, hora_fin)
+
+            # Formatear a ISO 8601
+            start_iso = hora_inicio_completa.isoformat()
+            end_iso = hora_fin_completa.isoformat()
+
+            # Crear el evento para FullCalendar
+            evento = schemas.FullCalendarEvent(
+                id=horario_gen.id,
+                title=f"{materia_nombre} - {docente_apellido}, {docente_nombre}",
+                start=start_iso,
+                end=end_iso,
+                resourceId=f"aula_{horario_gen.aula_id}",
+                extendedProps={
+                    "grupo": grupo_nombre,
+                    "docente": f"{docente_apellido}, {docente_nombre}",
+                    "materia": materia_nombre,
+                    "materia_codigo": materia_codigo, # Usar el valor obtenido del join
+                    "backgroundColor": materia_color_hex, # Usar el color obtenido del join
+                    "aula": aula_nombre,
+                    "sede": sede_nombre,
+                    # Puedes añadir más propiedades aquí si es necesario
+                }
+            )
+            eventos.append(evento)
+        except (TypeError, ValueError) as e: # Capturar errores de cálculo de fechas/horas
+            logging.error(f"Error calculando fechas/horas para horario ID {horario_gen.id}: {e}. Datos: dia_semana={dia_semana}, hora_inicio={hora_inicio}, hora_fin={hora_fin}, fecha_inicio_periodo={fecha_inicio_periodo}. Saltando.")
+            continue # O manejar de otra manera, pero evitar que rompa el loop
+        except Exception as e: # Capturar cualquier otro error inesperado en la iteración
+            logging.error(f"Error inesperado procesando horario ID {horario_gen.id}: {e}")
+            # Opcional: raise HTTPException(status_code=500, detail="Error interno al procesar los horarios.")
+            continue # Continuar con el siguiente registro
+
+        import json
+        try:
+            # Intentar serializar el primer evento como prueba (o un par)
+            if eventos:
+                json.dumps([eventos[0].model_dump()]) # model_dump() para Pydantic v2
+                print("DEBUG: Primer evento serializable correctamente.")
+            else:
+                print("DEBUG: Lista de eventos vacía.")
+        except (TypeError, ValueError) as e_serial:
+            print(f"DEBUG ERROR: Problema serializando eventos: {e_serial}")
+            print(f"DEBUG ERROR: Datos del primer evento: {eventos[0].model_dump() if eventos else 'N/A'}")
+            
     return eventos

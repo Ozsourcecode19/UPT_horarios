@@ -1,23 +1,35 @@
 # backend/schemas/horario_generado.py
 from pydantic import BaseModel
-from datetime import datetime
+from pydantic import ConfigDict # Importar ConfigDict para from_attributes=True
+from datetime import datetime, time # Asumiendo que 'time' se usa para hora_inicio y hora_fin
 from typing import Optional
 #from .leccion import LeccionBase
 #from .aula import AulaBase
 #from .bloque_horario import BloqueHorarioBase
 
 
+
 class HorarioGeneradoBase(BaseModel):
-    leccion_id: int
-    aula_id: int
+    id: int
+    leccion_id: Optional[int]
+    aula_id: Optional[int]
     bloque_id: int
-    dia_semana: int
-    hora_inicio: str # str para representar TIME
-    hora_fin: str
-    estado: str = "ACTIVO"
-    version_horario: int = 1
+    estado: str
+    version_horario: int
     periodo_id: int
-    created_by: Optional[int] = None
+    created_by: Optional[int]
+    # --- CAMPOS CALCULADOS POR TRIGGER ---
+    # Basado en schema_horarios_v2.1.1.sql: dia_semana SMALLINT, hora_inicio/hora_fin TIME
+    # CORREGIDO: Tipos deben coincidir con el modelo SQLAlchemy y la BD
+    dia_semana: int      # Debe ser int si SmallInteger en SQLAlchemy
+    hora_inicio: time    # Debe ser time si Time en SQLAlchemy
+    hora_fin: time       # Debe ser time si Time en SQLAlchemy
+    # ---
+    created_at: datetime
+    updated_at: datetime
+
+    # Configurar el modelo para permitir objetos ORM (atributos de SQLAlchemy)
+    model_config = ConfigDict(from_attributes=True)
 
 class HorarioGeneradoCreate(HorarioGeneradoBase):
     pass
@@ -27,10 +39,7 @@ class HorarioGeneradoUpdate(BaseModel):
     # Otros campos opcionales para actualización
 
 class HorarioGenerado(HorarioGeneradoBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
+    pass # Puede incluir validaciones específicas si es necesario, pero hereda los campos de la base
     class Config:
         from_attributes = True # Permite leer datos desde objetos ORM
 
