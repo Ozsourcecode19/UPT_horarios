@@ -8,19 +8,49 @@ from fastapi import HTTPException
 def get_habilitacion_docente(db: Session, hab_id: int) -> Optional[models.HabilitacionDocente]:
     """
     Obtiene una habilitación de docente por su ID.
+    Retorna None si no se encuentra.
     """
-    return db.query(models.HabilitacionDocente).filter(models.HabilitacionDocente.id == hab_id).first()
+    # No es necesario manejar FKViolation aquí, ya que solo se consulta.
+    # SQLAlchemy puede lanzar otros errores (como DBAPIError si la conexión falla).
+    try:
+        # La relación con Docente y Materia se resuelve automáticamente si se accede a ellas
+        # y están definidas correctamente en el modelo (lazy loading o joined load).
+        return db.query(models.HabilitacionDocente).filter(models.HabilitacionDocente.id == hab_id).first()
+    except SQLAlchemyError as e:
+        # Manejar errores generales de SQLAlchemy
+        print(f"Error al obtener la habilitación docente con ID {hab_id}: {e}") # O usar logging
+        raise HTTPException(status_code=500, detail="Error interno del servidor al obtener la habilitación docente.")
+    except Exception as e:
+        # Manejar errores inesperados
+        print(f"Error inesperado al obtener la habilitación docente con ID {hab_id}: {e}") # O usar logging
+        raise HTTPException(status_code=500, detail="Error interno del servidor inesperado.")
 
-def get_habilitaciones_docente(db: Session, docente_id: Optional[int] = None, materia_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> List[models.HabilitacionDocente]:
+
+def get_habilitaciones_docente(db: Session, skip: int = 0, limit: int = 100, docente_id: Optional[int] = None, materia_id: Optional[int] = None) -> List[models.HabilitacionDocente]:
     """
-    Obtiene una lista de habilitaciones, filtradas por docente o materia si se especifica.
+    Obtiene una lista de habilitaciones de docentes con paginación y filtros opcionales.
     """
-    query = db.query(models.HabilitacionDocente)
-    if docente_id:
-        query = query.filter(models.HabilitacionDocente.docente_id == docente_id)
-    if materia_id:
-        query = query.filter(models.HabilitacionDocente.materia_id == materia_id)
-    return query.offset(skip).limit(limit).all()
+    # No es necesario manejar FKViolation aquí, ya que solo se consulta.
+    try:
+        query = db.query(models.HabilitacionDocente)
+
+        # Aplicar filtros si se proporcionan
+        if docente_id is not None:
+            query = query.filter(models.HabilitacionDocente.docente_id == docente_id)
+        if materia_id is not None:
+            query = query.filter(models.HabilitacionDocente.materia_id == materia_id)
+
+        # Aplicar paginación
+        results = query.offset(skip).limit(limit).all()
+        return results
+    except SQLAlchemyError as e:
+        # Manejar errores generales de SQLAlchemy
+        print(f"Error al obtener la lista de habilitaciones docentes: {e}") # O usar logging
+        raise HTTPException(status_code=500, detail="Error interno del servidor al obtener la lista de habilitaciones docentes.")
+    except Exception as e:
+        # Manejar errores inesperados
+        print(f"Error inesperado al obtener la lista de habilitaciones docentes: {e}") # O usar logging
+        raise HTTPException(status_code=500, detail="Error interno del servidor inesperado.")
 
 def create_habilitacion_docente(db: Session, habilitacion: schemas.HabilitacionDocenteCreate) -> models.HabilitacionDocente:
     """

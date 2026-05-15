@@ -16,6 +16,15 @@ def create_horario_generado(horario: schemas.HorarioGeneradoCreate, db: Session 
     db_horario = crud.create_horario_generado(db, horario=horario)
     return db_horario
 
+# Endpoint específico para FullCalendar
+@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent])
+def get_horarios_fullcalendar(periodo_id: int = Query(..., description="ID del periodo académico para obtener horarios"), db: Session = Depends(get_db)):
+    """
+    Obtiene horarios en formato compatible con FullCalendar para un periodo específico.
+    """
+    eventos = crud.get_horarios_para_calendario(db, periodo_id=periodo_id)
+    return eventos
+
 @router.get("/{horario_id}", response_model=schemas.HorarioGenerado)
 def read_horario_generado(horario_id: int, db: Session = Depends(get_db)):
     """
@@ -58,12 +67,3 @@ def delete_horario_generado(horario_id: int, db: Session = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Horario no encontrado")
     return
-
-# Endpoint específico para FullCalendar
-@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent])
-def get_horarios_fullcalendar(periodo_id: int = Query(..., description="ID del periodo académico para obtener horarios"), db: Session = Depends(get_db)):
-    """
-    Obtiene horarios en formato compatible con FullCalendar para un periodo específico.
-    """
-    eventos = crud.get_horarios_para_calendario(db, periodo_id=periodo_id)
-    return eventos
