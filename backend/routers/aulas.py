@@ -5,10 +5,11 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/aulas", tags=["Aulas"])
 
-@router.post("/", response_model=schemas.Aula)
+@router.post("/", response_model=schemas.Aula, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_aula(aula: schemas.AulaCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo aula.
@@ -16,7 +17,7 @@ def create_aula(aula: schemas.AulaCreate, db: Session = Depends(get_db)):
     db_aula = crud.create_aula(db, aula=aula)
     return db_aula
 
-@router.get("/{aula_id}", response_model=schemas.Aula)
+@router.get("/{aula_id}", response_model=schemas.Aula, dependencies=[Depends(get_current_active_user)])
 def read_aula(aula_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un aula por su ID.
@@ -26,7 +27,7 @@ def read_aula(aula_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada")
     return db_aula
 
-@router.get("/", response_model=List[schemas.Aula])
+@router.get("/", response_model=List[schemas.Aula], dependencies=[Depends(get_current_active_user)])
 def read_aulas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de aulas.
@@ -34,7 +35,7 @@ def read_aulas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     aulas = crud.get_aulas(db, skip=skip, limit=limit)
     return aulas
 
-@router.put("/{aula_id}", response_model=schemas.Aula)
+@router.put("/{aula_id}", response_model=schemas.Aula, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_aula(aula_id: int, aula_update: schemas.AulaUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un aula existente.
@@ -44,7 +45,7 @@ def update_aula(aula_id: int, aula_update: schemas.AulaUpdate, db: Session = Dep
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada")
     return db_aula
 
-@router.delete("/{aula_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{aula_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_aula(aula_id: int, db: Session = Depends(get_db)):
     """
     Elimina un aula.

@@ -5,10 +5,11 @@ from typing import List, Optional
 import crud 
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/horarios-generados", tags=["Horarios Generados"])
 
-@router.post("/", response_model=schemas.HorarioGenerado)
+@router.post("/", response_model=schemas.HorarioGenerado, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_horario_generado(horario: schemas.HorarioGeneradoCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo horario generado.
@@ -17,7 +18,7 @@ def create_horario_generado(horario: schemas.HorarioGeneradoCreate, db: Session 
     return db_horario
 
 # Endpoint específico para FullCalendar
-@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent])
+@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], dependencies=[Depends(get_current_active_user)])
 def get_horarios_fullcalendar(periodo_id: int = Query(..., description="ID del periodo académico para obtener horarios"), db: Session = Depends(get_db)):
     """
     Obtiene horarios en formato compatible con FullCalendar para un periodo específico.
@@ -25,7 +26,7 @@ def get_horarios_fullcalendar(periodo_id: int = Query(..., description="ID del p
     eventos = crud.get_horarios_para_calendario(db, periodo_id=periodo_id)
     return eventos
 
-@router.get("/{horario_id}", response_model=schemas.HorarioGenerado)
+@router.get("/{horario_id}", response_model=schemas.HorarioGenerado, dependencies=[Depends(get_current_active_user)])
 def read_horario_generado(horario_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un horario generado por su ID.
@@ -35,7 +36,7 @@ def read_horario_generado(horario_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Horario no encontrado")
     return db_horario
 
-@router.get("/", response_model=List[schemas.HorarioGenerado])
+@router.get("/", response_model=List[schemas.HorarioGenerado], dependencies=[Depends(get_current_active_user)])
 def read_horarios_generados(
     periodo_id: Optional[int] = Query(None, description="Filtra por ID de periodo académico"),
     skip: int = 0,
@@ -48,7 +49,7 @@ def read_horarios_generados(
     horarios = crud.get_horarios_generados(db, periodo_id=periodo_id, skip=skip, limit=limit)
     return horarios
 
-@router.put("/{horario_id}", response_model=schemas.HorarioGenerado)
+@router.put("/{horario_id}", response_model=schemas.HorarioGenerado, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_horario_generado(horario_id: int, horario_update: schemas.HorarioGeneradoUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un horario generado existente.
@@ -58,7 +59,7 @@ def update_horario_generado(horario_id: int, horario_update: schemas.HorarioGene
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Horario no encontrado")
     return db_horario
 
-@router.delete("/{horario_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{horario_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_horario_generado(horario_id: int, db: Session = Depends(get_db)):
     """
     Elimina (marca como inactivo) un horario generado.

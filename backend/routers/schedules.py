@@ -5,6 +5,7 @@ from typing import List, Optional
 import crud
 import schemas 
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 from services.scheduler import or_tools_adapter
 from services.validation import schedule_validation
 from schemas.horario_generado import ScheduleMoveRequest 
@@ -12,7 +13,7 @@ from schemas.horario_generado import ScheduleMoveRequest
 router = APIRouter(prefix="/schedules", tags=["Operaciones de Horario"])
 
 # Endpoint para disparar la generación de horarios 
-@router.post("/generate", status_code=status.HTTP_202_ACCEPTED, summary="Iniciar generación de horarios")
+@router.post("/generate", status_code=status.HTTP_202_ACCEPTED, summary="Iniciar generación de horarios", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def generate_schedule(periodo_id: int, db: Session = Depends(get_db)):
     """
     Dispara el algoritmo de generación de horarios para un periodo académico específico.
@@ -29,7 +30,7 @@ def generate_schedule(periodo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al iniciar la generación: {str(e)}")
 
 # Endpoint para obtener horarios en formato FullCalendar
-@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar")
+@router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar", dependencies=[Depends(get_current_active_user)])
 def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
     """
     Obtiene los horarios generados para un periodo académico específico
@@ -40,7 +41,7 @@ def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
     return eventos
 
 # Endpoint para validar un movimiento manual (drag & drop) 
-@router.post("/validate-move", summary="Validar movimiento de horario")
+@router.post("/validate-move", summary="Validar movimiento de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depends(get_db)): # <-- CORREGIDO: Usar ScheduleMoveRequest directamente
     """
     Valida si un movimiento (cambio de bloque o aula) de un horario existente
@@ -68,7 +69,7 @@ def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depe
 # Endpoint para actualizar manualmente un horario (después de validarlo) 
 # Opcional: Puedes combinar validación y actualización en un solo endpoint PUT,
 # o mantenerlos separados como aquí.
-@router.put("/{horario_id}", response_model=schemas.HorarioGenerado, summary="Actualizar horario manualmente")
+@router.put("/{horario_id}", response_model=schemas.HorarioGenerado, summary="Actualizar horario manualmente", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_schedule_manual(horario_id: int, update_request: schemas.HorarioGeneradoUpdate, db: Session = Depends(get_db)):
     """
     Actualiza manualmente un horario generado (por ejemplo, cambiar aula o bloque).
@@ -82,7 +83,7 @@ def update_schedule_manual(horario_id: int, update_request: schemas.HorarioGener
     return updated_horario
 
 # Endpoint para eliminar manualmente un horario (soft-delete) 
-@router.delete("/{horario_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar horario")
+@router.delete("/{horario_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_schedule(horario_id: int, db: Session = Depends(get_db)):
     """
     Elimina (marca como inactivo) un horario generado.
@@ -93,7 +94,7 @@ def delete_schedule(horario_id: int, db: Session = Depends(get_db)):
     return
 
 # Opcional: Endpoint para obtener un horario específico
-@router.get("/{horario_id}", response_model=schemas.HorarioGenerado, summary="Obtener horario por ID")
+@router.get("/{horario_id}", response_model=schemas.HorarioGenerado, summary="Obtener horario por ID", dependencies=[Depends(get_current_active_user)])
 def read_schedule(horario_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un horario generado por su ID.
@@ -104,7 +105,7 @@ def read_schedule(horario_id: int, db: Session = Depends(get_db)):
     return horario
 
 # Opcional: Endpoint para obtener lista de horarios con filtros
-@router.get("/", response_model=List[schemas.HorarioGenerado], summary="Obtener lista de horarios")
+@router.get("/", response_model=List[schemas.HorarioGenerado], summary="Obtener lista de horarios", dependencies=[Depends(get_current_active_user)])
 def read_schedules(periodo_id: Optional[int] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)): # <-- CORREGIDO: Optional[int]
     """
     Obtiene una lista de horarios generados, opcionalmente filtrada por periodo académico.

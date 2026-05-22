@@ -27,8 +27,8 @@ class UsuarioBase(BaseModel):
 
     @field_validator('rol')
     def validate_rol(cls, v):
-        if v not in ['ADMIN', 'DOCENTE', 'LECTOR']:
-            raise ValueError("Rol debe ser ADMIN, DOCENTE o LECTOR.")
+        if v not in ['ADMIN', 'JEFE-PNF', 'DOCENTE', 'LECTOR']:
+            raise ValueError("Rol debe ser ADMIN, JEFE-PNF, DOCENTE o LECTOR.")
         return v
 
 class UsuarioCreate(UsuarioBase):
@@ -54,8 +54,8 @@ class UsuarioUpdate(BaseModel):
 
     @field_validator('rol', mode='before')
     def validate_rol_update(cls, v):
-        if v is not None and v not in ['ADMIN', 'DOCENTE', 'LECTOR']:
-            raise ValueError("Rol debe ser ADMIN, DOCENTE o LECTOR.")
+        if v is not None and v not in ['ADMIN', 'JEFE-PNF', 'DOCENTE', 'LECTOR']:
+            raise ValueError("Rol debe ser ADMIN, JEFE-PNF, DOCENTE o LECTOR.")
         return v
 
 class Usuario(UsuarioBase):

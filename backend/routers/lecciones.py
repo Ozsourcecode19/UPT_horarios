@@ -5,10 +5,11 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/lecciones", tags=["Lecciones"])
 
-@router.post("/", response_model=schemas.Leccion)
+@router.post("/", response_model=schemas.Leccion, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_leccion(leccion: schemas.LeccionCreate, db: Session = Depends(get_db)):
     """
     Crea una nueva lección.
@@ -16,7 +17,7 @@ def create_leccion(leccion: schemas.LeccionCreate, db: Session = Depends(get_db)
     db_leccion = crud.create_leccion(db, leccion=leccion)
     return db_leccion
 
-@router.get("/{leccion_id}", response_model=schemas.Leccion)
+@router.get("/{leccion_id}", response_model=schemas.Leccion, dependencies=[Depends(get_current_active_user)])
 def read_leccion(leccion_id: int, db: Session = Depends(get_db)):
     """
     Obtiene una lección por su ID.
@@ -26,7 +27,7 @@ def read_leccion(leccion_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
     return db_leccion
 
-@router.get("/", response_model=List[schemas.Leccion])
+@router.get("/", response_model=List[schemas.Leccion], dependencies=[Depends(get_current_active_user)])
 def read_lecciones(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de lecciones.
@@ -34,7 +35,7 @@ def read_lecciones(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
     lecciones = crud.get_lecciones(db, skip=skip, limit=limit)
     return lecciones
 
-@router.put("/{leccion_id}", response_model=schemas.Leccion)
+@router.put("/{leccion_id}", response_model=schemas.Leccion, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_leccion(leccion_id: int, leccion_update: schemas.LeccionUpdate, db: Session = Depends(get_db)):
     """
     Actualiza una lección existente.
@@ -44,7 +45,7 @@ def update_leccion(leccion_id: int, leccion_update: schemas.LeccionUpdate, db: S
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
     return db_leccion
 
-@router.delete("/{leccion_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{leccion_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_leccion(leccion_id: int, db: Session = Depends(get_db)):
     """
     Elimina una lección.

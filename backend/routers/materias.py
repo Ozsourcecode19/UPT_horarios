@@ -5,10 +5,11 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/materias", tags=["Materias"])
 
-@router.post("/", response_model=schemas.Materia)
+@router.post("/", response_model=schemas.Materia, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_materia(materia: schemas.MateriaCreate, db: Session = Depends(get_db)):
     """
     Crea una nueva materia.
@@ -16,7 +17,7 @@ def create_materia(materia: schemas.MateriaCreate, db: Session = Depends(get_db)
     db_materia = crud.create_materia(db, materia=materia)
     return db_materia
 
-@router.get("/{materia_id}", response_model=schemas.Materia)
+@router.get("/{materia_id}", response_model=schemas.Materia, dependencies=[Depends(get_current_active_user)])
 def read_materia(materia_id: int, db: Session = Depends(get_db)):
     """
     Obtiene una materia por su ID.
@@ -26,7 +27,7 @@ def read_materia(materia_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
     return db_materia
 
-@router.get("/", response_model=List[schemas.Materia])
+@router.get("/", response_model=List[schemas.Materia], dependencies=[Depends(get_current_active_user)])
 def read_materias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de materias.
@@ -34,7 +35,7 @@ def read_materias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     materias = crud.get_materias(db, skip=skip, limit=limit)
     return materias
 
-@router.put("/{materia_id}", response_model=schemas.Materia)
+@router.put("/{materia_id}", response_model=schemas.Materia, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_materia(materia_id: int, materia_update: schemas.MateriaUpdate, db: Session = Depends(get_db)):
     """
     Actualiza una materia existente.
@@ -44,7 +45,7 @@ def update_materia(materia_id: int, materia_update: schemas.MateriaUpdate, db: S
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
     return db_materia
 
-@router.delete("/{materia_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{materia_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_materia(materia_id: int, db: Session = Depends(get_db)):
     """
     Elimina una materia.

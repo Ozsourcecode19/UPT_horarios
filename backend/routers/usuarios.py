@@ -2,43 +2,49 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from core.security import get_password_hash, get_current_active_user, require_role
+import models
+import crud
+import schemas
+from config.database import get_db
 """
 Importacion relativa "from .. import crud, schemas" causa problemas 
 Se ha decidio utilizar las importaciones absolutas
 """
-import crud
-import schemas
-from config.database import get_db
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
 @router.post("/", response_model=schemas.Usuario)
-def create_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+def create_usuario(
+    usuario: schemas.UsuarioCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["ADMIN"]))
+) -> models.Usuario:
     """
     Crea un nuevo usuario.
+    Asegura que la contraseña se almacene como hash.
     """
-    # TODO: Aquí se debe hashear la contraseña antes de pasarla a CRUD.
-    # db_usuario = crud.create_usuario(db, usuario=usuario)
-    # return db_usuario
-    # Por ahora, simulamos el hash en la capa CRUD o aquí.
-    # Supongamos que el schema UsuarioCreate no incluye el password directamente,
-    # o que la función create_usuario en CRUD ya maneja el hashing.
-    # Si el hashing se hace aquí, sería algo como:
-    # from ..utils.security import get_password_hash
-    # hashed_password = get_password_hash(usuario.password)
-    # usuario_to_create = schemas.UsuarioCreate(
-    #     username=usuario.username,
-    #     email=usuario.email,
-    #     rol=usuario.rol,
-    #     activo=usuario.activo,
-    #     password_hash=hashed_password
-    # )
-    # Pero por simplicidad y para no repetir lógica aquí, se asume que create_usuario maneja el hash.
-    db_usuario = crud.create_usuario(db, usuario=usuario)
+    # CORREGIDO: Hashear la contraseña ANTES de crear el objeto ORM
+    hash_contrasena = get_password_hash(usuario.password) # <-- Aplicar hashing aquí
+    db_usuario = models.Usuario(
+        username=usuario.username,
+        email=usuario.email,
+        password_hash=hash_contrasena, # <-- Guardar el HASH, no la contraseña plana
+        rol=usuario.rol
+        # ... otros campos ...
+    )
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
     return db_usuario
 
+
 @router.get("/{usuario_id}", response_model=schemas.Usuario)
-def read_usuario(usuario_id: int, db: Session = Depends(get_db)):
+def read_usuario(
+    usuario_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_active_user)
+):
     """
     Obtiene un usuario por su ID.
     """
@@ -48,7 +54,12 @@ def read_usuario(usuario_id: int, db: Session = Depends(get_db)):
     return db_usuario
 
 @router.get("/", response_model=List[schemas.Usuario])
-def read_usuarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_usuarios(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_active_user)
+):
     """
     Obtiene una lista de usuarios.
     """
@@ -56,7 +67,12 @@ def read_usuarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return usuarios
 
 @router.put("/{usuario_id}", response_model=schemas.Usuario)
-def update_usuario(usuario_id: int, usuario_update: schemas.UsuarioUpdate, db: Session = Depends(get_db)):
+def update_usuario(
+    usuario_id: int, 
+    usuario_update: schemas.UsuarioUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_active_user)
+):
     """
     Actualiza un usuario existente.
     """
@@ -66,7 +82,11 @@ def update_usuario(usuario_id: int, usuario_update: schemas.UsuarioUpdate, db: S
     return db_usuario
 
 @router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_usuario(usuario_id: int, db: Session = Depends(get_db)):
+def delete_usuario(
+    usuario_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["ADMIN"]))
+):
     """
     Elimina un usuario.
     """

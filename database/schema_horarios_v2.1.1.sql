@@ -26,7 +26,7 @@ CREATE TABLE usuarios (
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL DEFAULT 'LECTOR' 
-        CHECK (rol IN ('ADMIN', 'DOCENTE', 'LECTOR')),
+        CHECK (rol IN ('ADMIN', 'JEFE-PNF','DOCENTE', 'LECTOR')),
     activo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -800,7 +800,7 @@ INSERT INTO configuracion (clave, valor, descripcion, tipo_dato, editable) VALUE
 -- Hash generado con bcrypt (cost=12) para ejemplo
 INSERT INTO usuarios (username, email, password_hash, rol) VALUES
 ('admin', 'admin@upt.edu', 
- '$2b$12$KIXxPZvL8qJ9mN3oR5tY7eWvU2sA1bC3dE4fG5hI6jK7lM8nO9pQ0r', 
+ '$2b$12$GOeN2arAQiP/IXRuQcm.XOVKxA0jawSdhqnP8AGsjqNzDDBQWVs5O', 
  'ADMIN');
 
 -- Sedes de ejemplo
