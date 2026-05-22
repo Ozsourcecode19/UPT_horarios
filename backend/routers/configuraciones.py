@@ -5,10 +5,10 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
-
+from core.security import get_current_active_user, require_role
 router = APIRouter(prefix="/configuraciones", tags=["Configuración"])
 
-@router.post("/", response_model=schemas.Configuracion)
+@router.post("/", response_model=schemas.Configuracion, dependencies=[Depends(require_role(["ADMIN"]))])
 def create_configuracion(configuracion: schemas.ConfiguracionCreate, db: Session = Depends(get_db)):
     """
     Crea una nueva entrada de configuración.
@@ -16,7 +16,7 @@ def create_configuracion(configuracion: schemas.ConfiguracionCreate, db: Session
     db_configuracion = crud.create_configuracion(db, configuracion=configuracion)
     return db_configuracion
 
-@router.get("/{clave}", response_model=schemas.Configuracion)
+@router.get("/{clave}", response_model=schemas.Configuracion, dependencies=[Depends(get_current_active_user)])
 def read_configuracion(clave: str, db: Session = Depends(get_db)):
     """
     Obtiene una entrada de configuración por su clave.
@@ -26,7 +26,7 @@ def read_configuracion(clave: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Configuración no encontrada")
     return db_configuracion
 
-@router.get("/", response_model=List[schemas.Configuracion])
+@router.get("/", response_model=List[schemas.Configuracion], dependencies=[Depends(get_current_active_user)])
 def read_configuraciones(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de entradas de configuración.
@@ -34,7 +34,7 @@ def read_configuraciones(skip: int = 0, limit: int = 100, db: Session = Depends(
     configuraciones = crud.get_configuraciones(db, skip=skip, limit=limit)
     return configuraciones
 
-@router.put("/{clave}", response_model=schemas.Configuracion)
+@router.put("/{clave}", response_model=schemas.Configuracion, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_configuracion(clave: str, configuracion_update: schemas.ConfiguracionUpdate, db: Session = Depends(get_db)):
     """
     Actualiza una entrada de configuración existente.
@@ -44,7 +44,7 @@ def update_configuracion(clave: str, configuracion_update: schemas.Configuracion
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Configuración no encontrada")
     return db_configuracion
 
-@router.delete("/{clave}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{clave}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN"]))])
 def delete_configuracion(clave: str, db: Session = Depends(get_db)):
     """
     Elimina una entrada de configuración.

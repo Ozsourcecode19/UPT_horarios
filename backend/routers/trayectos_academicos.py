@@ -5,17 +5,17 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
-
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/trayectos-academicos", tags=["Trayectos Académicos"])
 
-@router.post("/", response_model=schemas.TrayectoAcademico) # O el schema de respuesta correcto
+@router.post("/", response_model=schemas.TrayectoAcademico, dependencies=[Depends(require_role(["ADMIN"]))]) # O el schema de respuesta correcto
 def create_trayecto_academico(trayecto: schemas.TrayectoAcademicoCreate, db: Session = Depends(get_db)):
     # Llamada CORRECTA: el segundo argumento se pasa posicionalmente
     db_trayecto = crud.create_trayecto_academico(db, trayecto) # <-- CORREGIDO
     return db_trayecto
 
-@router.get("/{trayecto_id}", response_model=schemas.TrayectoAcademico)
+@router.get("/{trayecto_id}", response_model=schemas.TrayectoAcademico, dependencies=[Depends(get_current_active_user)])
 def read_trayecto_academico(trayecto_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un trayecto académico por su ID.
@@ -25,7 +25,7 @@ def read_trayecto_academico(trayecto_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trayecto Académico no encontrado")
     return db_trayecto
 
-@router.get("/", response_model=List[schemas.TrayectoAcademico])
+@router.get("/", response_model=List[schemas.TrayectoAcademico], dependencies=[Depends(get_current_active_user)])
 def read_trayectos_academicos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de trayectos académicos.
@@ -33,7 +33,7 @@ def read_trayectos_academicos(skip: int = 0, limit: int = 100, db: Session = Dep
     trayectos = crud.get_trayectos_academicos(db, skip=skip, limit=limit)
     return trayectos
 
-@router.put("/{trayecto_id}", response_model=schemas.TrayectoAcademico)
+@router.put("/{trayecto_id}", response_model=schemas.TrayectoAcademico, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_trayecto_academico(trayecto_id: int, trayecto_update: schemas.TrayectoAcademicoUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un trayecto académico existente.
@@ -43,7 +43,7 @@ def update_trayecto_academico(trayecto_id: int, trayecto_update: schemas.Trayect
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trayecto Académico no encontrado")
     return db_trayecto
 
-@router.delete("/{trayecto_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{trayecto_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN"]))])
 def delete_trayecto_academico(trayecto_id: int, db: Session = Depends(get_db)):
     """
     Elimina un trayecto académico.

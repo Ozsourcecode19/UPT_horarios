@@ -5,10 +5,11 @@ from typing import List
 import crud 
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/grupos", tags=["Grupos"])
 
-@router.post("/", response_model=schemas.Grupo)
+@router.post("/", response_model=schemas.Grupo, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_grupo(grupo: schemas.GrupoCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo grupo.
@@ -16,7 +17,7 @@ def create_grupo(grupo: schemas.GrupoCreate, db: Session = Depends(get_db)):
     db_grupo = crud.create_grupo(db, grupo=grupo)
     return db_grupo
 
-@router.get("/{grupo_id}", response_model=schemas.Grupo)
+@router.get("/{grupo_id}", response_model=schemas.Grupo, dependencies=[Depends(get_current_active_user)])
 def read_grupo(grupo_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un grupo por su ID.
@@ -26,7 +27,7 @@ def read_grupo(grupo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
     return db_grupo
 
-@router.get("/", response_model=List[schemas.Grupo])
+@router.get("/", response_model=List[schemas.Grupo], dependencies=[Depends(get_current_active_user)])
 def read_grupos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de grupos.
@@ -34,7 +35,7 @@ def read_grupos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     grupos = crud.get_grupos(db, skip=skip, limit=limit)
     return grupos
 
-@router.put("/{grupo_id}", response_model=schemas.Grupo)
+@router.put("/{grupo_id}", response_model=schemas.Grupo, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_grupo(grupo_id: int, grupo_update: schemas.GrupoUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un grupo existente.
@@ -44,7 +45,7 @@ def update_grupo(grupo_id: int, grupo_update: schemas.GrupoUpdate, db: Session =
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
     return db_grupo
 
-@router.delete("/{grupo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{grupo_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_grupo(grupo_id: int, db: Session = Depends(get_db)):
     """
     Elimina un grupo.

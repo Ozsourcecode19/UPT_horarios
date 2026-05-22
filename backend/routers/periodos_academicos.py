@@ -5,10 +5,10 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
-
+from core.security import get_current_active_user, require_role
 router = APIRouter(prefix="/periodos-academicos", tags=["Periodos Académicos"])
 
-@router.post("/", response_model=schemas.PeriodoAcademico)
+@router.post("/", response_model=schemas.PeriodoAcademico, dependencies=[Depends(require_role(["ADMIN"]))])
 def create_periodo_academico(periodo: schemas.PeriodoAcademicoCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo periodo académico.
@@ -16,7 +16,7 @@ def create_periodo_academico(periodo: schemas.PeriodoAcademicoCreate, db: Sessio
     db_periodo = crud.create_periodo_academico(db, periodo=periodo)
     return db_periodo
 
-@router.get("/{periodo_id}", response_model=schemas.PeriodoAcademico)
+@router.get("/{periodo_id}", response_model=schemas.PeriodoAcademico, dependencies=[Depends(get_current_active_user)])
 def read_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un periodo académico por su ID.
@@ -26,7 +26,7 @@ def read_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo Académico no encontrado")
     return db_periodo
 
-@router.get("/", response_model=List[schemas.PeriodoAcademico])
+@router.get("/", response_model=List[schemas.PeriodoAcademico], dependencies=[Depends(get_current_active_user)])
 def read_periodos_academicos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de periodos académicos.
@@ -34,7 +34,7 @@ def read_periodos_academicos(skip: int = 0, limit: int = 100, db: Session = Depe
     periodos = crud.get_periodos_academicos(db, skip=skip, limit=limit)
     return periodos
 
-@router.put("/{periodo_id}", response_model=schemas.PeriodoAcademico)
+@router.put("/{periodo_id}", response_model=schemas.PeriodoAcademico, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_periodo_academico(periodo_id: int, periodo_update: schemas.PeriodoAcademicoUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un periodo académico existente.
@@ -44,7 +44,7 @@ def update_periodo_academico(periodo_id: int, periodo_update: schemas.PeriodoAca
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo Académico no encontrado")
     return db_periodo
 
-@router.delete("/{periodo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{periodo_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN"]))])
 def delete_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
     """
     Elimina un periodo académico.

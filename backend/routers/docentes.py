@@ -5,10 +5,11 @@ from typing import List
 import crud 
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/docentes", tags=["Docentes"])
 
-@router.post("/", response_model=schemas.Docente)
+@router.post("/", response_model=schemas.Docente, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_docente(docente: schemas.DocenteCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo docente.
@@ -16,7 +17,7 @@ def create_docente(docente: schemas.DocenteCreate, db: Session = Depends(get_db)
     db_docente = crud.create_docente(db, docente=docente)
     return db_docente
 
-@router.get("/{docente_id}", response_model=schemas.Docente)
+@router.get("/{docente_id}", response_model=schemas.Docente, dependencies=[Depends(get_current_active_user)])
 def read_docente(docente_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un docente por su ID.
@@ -26,7 +27,7 @@ def read_docente(docente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Docente no encontrado")
     return db_docente
 
-@router.get("/", response_model=List[schemas.Docente])
+@router.get("/", response_model=List[schemas.Docente], dependencies=[Depends(get_current_active_user)])
 def read_docentes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de docentes.
@@ -34,7 +35,7 @@ def read_docentes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     docentes = crud.get_docentes(db, skip=skip, limit=limit)
     return docentes
 
-@router.put("/{docente_id}", response_model=schemas.Docente)
+@router.put("/{docente_id}", response_model=schemas.Docente, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_docente(docente_id: int, docente_update: schemas.DocenteUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un docente existente.
@@ -44,7 +45,7 @@ def update_docente(docente_id: int, docente_update: schemas.DocenteUpdate, db: S
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Docente no encontrado")
     return db_docente
 
-@router.delete("/{docente_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{docente_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_docente(docente_id: int, db: Session = Depends(get_db)):
     """
     Elimina un docente.

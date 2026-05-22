@@ -5,10 +5,11 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/bloques-horarios", tags=["Bloques Horarios"])
 
-@router.post("/", response_model=schemas.BloqueHorario)
+@router.post("/", response_model=schemas.BloqueHorario, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_bloque_horario(bloque: schemas.BloqueHorarioCreate, db: Session = Depends(get_db)):
     """
     Crea un nuevo bloque horario.
@@ -18,7 +19,7 @@ def create_bloque_horario(bloque: schemas.BloqueHorarioCreate, db: Session = Dep
     return db_bloque
 
 
-@router.get("/{bloque_id}", response_model=schemas.BloqueHorario)
+@router.get("/{bloque_id}", response_model=schemas.BloqueHorario, dependencies=[Depends(get_current_active_user)])
 def read_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
     """
     Obtiene un bloque horario por su ID.
@@ -28,7 +29,7 @@ def read_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
     return db_bloque
 
-@router.get("/", response_model=List[schemas.BloqueHorario])
+@router.get("/", response_model=List[schemas.BloqueHorario], dependencies=[Depends(get_current_active_user)])
 def read_bloques_horarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de bloques horarios.
@@ -36,7 +37,7 @@ def read_bloques_horarios(skip: int = 0, limit: int = 100, db: Session = Depends
     bloques = crud.get_bloques_horarios(db, skip=skip, limit=limit)
     return bloques
 
-@router.put("/{bloque_id}", response_model=schemas.BloqueHorario)
+@router.put("/{bloque_id}", response_model=schemas.BloqueHorario, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_bloque_horario(bloque_id: int, bloque_update: schemas.BloqueHorarioUpdate, db: Session = Depends(get_db)):
     """
     Actualiza un bloque horario existente.
@@ -46,7 +47,7 @@ def update_bloque_horario(bloque_id: int, bloque_update: schemas.BloqueHorarioUp
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
     return db_bloque
 
-@router.delete("/{bloque_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{bloque_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
     """
     Elimina un bloque horario.

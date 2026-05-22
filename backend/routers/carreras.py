@@ -5,10 +5,11 @@ from typing import List
 import crud
 import schemas
 from config.database import get_db
+from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/carreras", tags=["Carreras"])
 
-@router.post("/", response_model=schemas.Carrera)
+@router.post("/", response_model=schemas.Carrera, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_carrera(carrera: schemas.CarreraCreate, db: Session = Depends(get_db)):
     """
     Crea una nueva carrera.
@@ -16,7 +17,7 @@ def create_carrera(carrera: schemas.CarreraCreate, db: Session = Depends(get_db)
     db_carrera = crud.create_carrera(db, carrera=carrera)
     return db_carrera
 
-@router.get("/{carrera_id}", response_model=schemas.Carrera)
+@router.get("/{carrera_id}", response_model=schemas.Carrera, dependencies=[Depends(get_current_active_user)])
 def read_carrera(carrera_id: int, db: Session = Depends(get_db)):
     """
     Obtiene una carrera por su ID.
@@ -26,7 +27,7 @@ def read_carrera(carrera_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrera no encontrada")
     return db_carrera
 
-@router.get("/", response_model=List[schemas.Carrera])
+@router.get("/", response_model=List[schemas.Carrera], dependencies=[Depends(get_current_active_user)])
 def read_carreras(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Obtiene una lista de carreras.
@@ -34,7 +35,7 @@ def read_carreras(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     carreras = crud.get_carreras(db, skip=skip, limit=limit)
     return carreras
 
-@router.put("/{carrera_id}", response_model=schemas.Carrera)
+@router.put("/{carrera_id}", response_model=schemas.Carrera, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_carrera(carrera_id: int, carrera_update: schemas.CarreraUpdate, db: Session = Depends(get_db)):
     """
     Actualiza una carrera existente.
@@ -44,7 +45,7 @@ def update_carrera(carrera_id: int, carrera_update: schemas.CarreraUpdate, db: S
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrera no encontrada")
     return db_carrera
 
-@router.delete("/{carrera_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{carrera_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_carrera(carrera_id: int, db: Session = Depends(get_db)):
     """
     Elimina una carrera.

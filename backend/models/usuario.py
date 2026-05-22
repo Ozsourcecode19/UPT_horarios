@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from config.database import Base
 from datetime import datetime, timezone # Importar timezone
 
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 
@@ -22,5 +23,5 @@ class Usuario(Base):
     perfil_docente = relationship("Docente", back_populates="docente_perfil", cascade="all, delete-orphan") 
     # Check Constraint
     __table_args__ = (
-        CheckConstraint(rol.in_(['ADMIN', 'DOCENTE', 'LECTOR']), name="ck_rol_usuario"),
+        CheckConstraint(rol.in_(['ADMIN', 'JEFE-PNF', 'DOCENTE', 'LECTOR']), name="ck_rol_usuario"),
     )
