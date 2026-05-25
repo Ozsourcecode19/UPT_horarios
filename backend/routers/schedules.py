@@ -1,10 +1,10 @@
 # backend/routers/schedules.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import crud
 import schemas 
-from config.database import get_db
+from config.database import get_db, SessionLocal
 from core.security import get_current_active_user, require_role
 from services.scheduler import or_tools_adapter
 from services.validation import schedule_validation
@@ -12,22 +12,37 @@ from schemas.horario_generado import ScheduleMoveRequest
 
 router = APIRouter(prefix="/schedules", tags=["Operaciones de Horario"])
 
+# Función auxiliar para ejecutar la generación de horarios en segundo plano con una sesión dedicada
+def run_generation_in_background(periodo_id: int):
+    """
+    Crea una sesión de base de datos dedicada para ejecutar el proceso pesado
+    del solver de OR-Tools en segundo plano de manera segura, cerrándola al terminar.
+    """
+    db = SessionLocal()
+    try:
+        or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id)
+    finally:
+        db.close()
+
 # Endpoint para disparar la generación de horarios 
 @router.post("/generate", status_code=status.HTTP_202_ACCEPTED, summary="Iniciar generación de horarios", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
-def generate_schedule(periodo_id: int, db: Session = Depends(get_db)):
+def generate_schedule(periodo_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Dispara el algoritmo de generación de horarios para un periodo académico específico.
     Este endpoint devuelve inmediatamente un estado 202 ACCEPTED. El proceso de generación
-    ocurre en segundo plano.
+    ocurre en segundo plano utilizando BackgroundTasks para no bloquear el hilo de ejecución principal.
     """
     try:
-        # Llama al servicio de OR-Tools para iniciar el proceso
-        # or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id)
-        # Por ahora, simulamos la aceptación de la tarea.
-        return {"message": f"Solicitud de generación para periodo {periodo_id} aceptada. Procesando...", "periodo_id": periodo_id}
+        # Registrar la tarea en segundo plano con una conexión fresca e independiente de la BD
+        background_tasks.add_task(run_generation_in_background, periodo_id)
+        return {
+            "message": f"Solicitud de generación para periodo {periodo_id} aceptada. Procesando en segundo plano...",
+            "periodo_id": periodo_id
+        }
     except Exception as e:
         # Manejo de error si no se puede iniciar la generación
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al iniciar la generación: {str(e)}")
+
 
 # Endpoint para obtener horarios en formato FullCalendar
 @router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar", dependencies=[Depends(get_current_active_user)])
@@ -40,6 +55,7 @@ def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
     eventos = crud.get_horarios_para_calendario(db, periodo_id=periodo_id)
     return eventos
 
+
 # Endpoint para validar un movimiento manual (drag & drop) 
 @router.post("/validate-move", summary="Validar movimiento de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depends(get_db)): # <-- CORREGIDO: Usar ScheduleMoveRequest directamente
@@ -47,24 +63,21 @@ def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depe
     Valida si un movimiento (cambio de bloque o aula) de un horario existente
     es posible sin violar restricciones duras (hard constraints).
     """
-    # Llama al servicio de validación
-    # validation_result = schedule_validation.validate_move(
-    #     db_session=db,
-    #     horario_id=move_request.horario_id,
-    #     nuevo_bloque_id=move_request.nuevo_bloque_id,
-    #     nueva_aula_id=move_request.nueva_aula_id
-    # )
+    # Llamada al servicio real de validación contra colisiones y disponibilidad
+    validation_result = schedule_validation.validate_move(
+        db_session=db,
+        horario_id=move_request.horario_id,
+        nuevo_bloque_id=move_request.nuevo_bloque_id,
+        nueva_aula_id=move_request.nueva_aula_id
+    )
 
-    # if not validation_result.valido:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_409_CONFLICT,
-    #         detail={"error_code": validation_result.error_code, "mensaje": validation_result.mensaje}
-    #     )
+    if not validation_result.valido:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error_code": validation_result.error_code, "mensaje": validation_result.mensaje}
+        )
 
-    # return {"valido": True, "mensaje": "El movimiento es válido."}
-
-    # Simulación temporal
-    return {"valido": True, "mensaje": "Simulación: El movimiento es válido."}
+    return {"valido": True, "mensaje": "El movimiento es válido."}
 
 # Endpoint para actualizar manualmente un horario (después de validarlo) 
 # Opcional: Puedes combinar validación y actualización en un solo endpoint PUT,
