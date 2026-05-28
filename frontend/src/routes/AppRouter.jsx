@@ -3,7 +3,12 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
-// import GestionDocentes from '../pages/GestionDocentes'; // Futuro
+import Docentes from '../pages/Docentes';
+import Materias from '../pages/Materias';
+import Aulas from '../pages/Aulas';
+import Horarios from '../pages/Horarios';
+import Settings from '../pages/Settings';
+import MainLayout from '../components/layout/MainLayout';
 
 const AppRouter = () => {
   return (
@@ -11,11 +16,17 @@ const AppRouter = () => {
       {/* Rutas Públicas */}
       <Route path="/login" element={<Login />} />
 
-      {/* Rutas Protegidas */}
+      {/* Rutas Protegidas (Usan el MainLayout) */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        {/* <Route path="/gestion-docentes" element={<GestionDocentes />} /> */}
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/docentes" element={<Docentes />} />
+          <Route path="/materias" element={<Materias />} />
+          <Route path="/aulas" element={<Aulas />} />
+          <Route path="/horarios" element={<Horarios />} />
+          <Route path="/configuracion" element={<Settings />} />
+        </Route>
       </Route>
 
       {/* Ruta 404 */}
