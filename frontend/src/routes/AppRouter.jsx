@@ -8,6 +8,7 @@ import Materias from '../pages/Materias';
 import Aulas from '../pages/Aulas';
 import Horarios from '../pages/Horarios';
 import Settings from '../pages/Settings';
+import Lecciones from '../pages/Lecciones';
 import MainLayout from '../components/layout/MainLayout';
 
 const AppRouter = () => {
@@ -24,6 +25,7 @@ const AppRouter = () => {
           <Route path="/docentes" element={<Docentes />} />
           <Route path="/materias" element={<Materias />} />
           <Route path="/aulas" element={<Aulas />} />
+          <Route path="/lecciones" element={<Lecciones />} />
           <Route path="/horarios" element={<Horarios />} />
           <Route path="/configuracion" element={<Settings />} />
         </Route>
