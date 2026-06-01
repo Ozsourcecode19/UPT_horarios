@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, Users, BookOpen, MapPin, Calendar, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, MapPin, Calendar, Settings, LogOut, Menu, X, GraduationCap } from 'lucide-react';
 
 const SidebarItem = ({ icon: Icon, label, path, active }) => (
   <Link
@@ -27,6 +27,7 @@ const MainLayout = () => {
     { label: 'Docentes', path: '/docentes', icon: Users },
     { label: 'Materias', path: '/materias', icon: BookOpen },
     { label: 'Aulas y Sedes', path: '/aulas', icon: MapPin },
+    { label: 'Grupos y Lecciones', path: '/lecciones', icon: GraduationCap },
     { label: 'Horarios', path: '/horarios', icon: Calendar },
     { label: 'Configuración', path: '/configuracion', icon: Settings },
   ];
