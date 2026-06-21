@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const LeccionesService = {
   getLecciones: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/lecciones', {
+    const response = await apiClient.get('/lecciones/', {
       params: { skip, limit }
     });
     return response.data;

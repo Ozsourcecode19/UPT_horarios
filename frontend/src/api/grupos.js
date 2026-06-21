@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const GruposService = {
   getGrupos: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/grupos', {
+    const response = await apiClient.get('/grupos/', {
       params: { skip, limit }
     });
     return response.data;

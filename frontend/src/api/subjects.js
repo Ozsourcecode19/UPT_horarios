@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const SubjectsService = {
   getSubjects: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/materias', {
+    const response = await apiClient.get('/materias/', {
       params: { skip, limit }
     });
     return response.data;
