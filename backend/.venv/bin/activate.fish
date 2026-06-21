@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/oz/Documentos/PROYECTO UPT/schedule-system-mvp/backend/.venv"
+set -gx VIRTUAL_ENV "/home/oz/Documentos/Horarios-UPTBolivar/UPT_horarios/backend/.venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

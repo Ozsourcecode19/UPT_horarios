@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # URL de conexión a la base de datos (ajustar según tu configuración)
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgresUPT@localhost:5433/horarios_upt")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgresUPT@localhost:5432/horarios_upt")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

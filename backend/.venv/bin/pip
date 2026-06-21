@@ -1,6 +1,4 @@
-#!/bin/sh
-'''exec' "/home/oz/Documentos/PROYECTO UPT/schedule-system-mvp/backend/.venv/bin/python3.11" "$0" "$@"
-' '''
+#!/home/oz/Documentos/Horarios-UPTBolivar/UPT_horarios/backend/.venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys

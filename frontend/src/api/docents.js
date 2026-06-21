@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const DocentsService = {
   getDocents: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/docentes', {
+    const response = await apiClient.get('/docentes/', {
       params: { skip, limit }
     });
     return response.data;

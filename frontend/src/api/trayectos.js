@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const TrayectosService = {
   getTrayectos: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/trayectos-academicos', {
+    const response = await apiClient.get('/trayectos-academicos/', {
       params: { skip, limit }
     });
     return response.data;

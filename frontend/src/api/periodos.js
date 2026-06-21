@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const PeriodosService = {
   getPeriodos: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/periodos-academicos', {
+    const response = await apiClient.get('/periodos-academicos/', {
       params: { skip, limit }
     });
     return response.data;

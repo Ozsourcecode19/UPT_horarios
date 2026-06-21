@@ -103,7 +103,7 @@ generate_series(1, 5) AS dia_semana, -- Lunes a Viernes
 (slot_num + (dia_semana - 1) * 10) AS orden_visual, -- Un orden visual único por sede y día
 TRUE AS activo
 FROM (
-    SELECT generate_series(0, 9) AS slot_num AS slot_offset -- 10 slots de 45 min = 7.5 horas (8:00 a 15:45)
+    SELECT g AS slot_num, g AS slot_offset FROM generate_series(0, 9) g -- 10 slots de 45 min = 7.5 horas (8:00 a 15:45)
 ) slots,
 (
     SELECT generate_series(1, 5) AS dia_semana
@@ -120,7 +120,7 @@ generate_series(1, 7) AS dia_semana, -- Lunes a Domingo
 (slot_num + (dia_semana - 1) * 4) AS orden_visual, -- Un orden visual único por sede y día
 TRUE AS activo
 FROM (
-    SELECT generate_series(0, 2) AS slot_num AS slot_offset -- 3 slots de 60 min = 3 horas (9:00 a 12:00)
+    SELECT g AS slot_num, g AS slot_offset FROM generate_series(0, 2) g -- 3 slots de 60 min = 3 horas (9:00 a 12:00)
 ) slots,
 (
     SELECT generate_series(1, 7) AS dia_semana

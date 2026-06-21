@@ -6,10 +6,12 @@ import { z } from 'zod';
 import { 
   Users, UserPlus, Search, Edit2, Trash2, Mail, MapPin, 
   Clock, CheckCircle, XCircle, AlertCircle, X, ChevronRight,
-  Database, RefreshCw, Sparkles, AlertTriangle
+  Database, RefreshCw, Sparkles, AlertTriangle, Calendar, GraduationCap
 } from 'lucide-react';
 import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
+import DocenteDisponibilidad from '../components/docentes/DocenteDisponibilidad';
+import DocenteHabilitaciones from '../components/docentes/DocenteHabilitaciones';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const docenteSchema = z.object({
@@ -53,6 +55,10 @@ const Docentes = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocente, setEditingDocente] = useState(null);
   const [deleteConfirmDocente, setDeleteConfirmDocente] = useState(null);
+  
+  // Control de Pestañas (Fase 3: Restricciones)
+  const [activeTab, setActiveTab] = useState('listado'); // 'listado', 'disponibilidad', 'habilitaciones'
+  const [selectedRestrictedDocenteId, setSelectedRestrictedDocenteId] = useState(null);
   
   // Modo Demo / Fallback local para robustez completa
   const [demoMode, setDemoMode] = useState(false);
@@ -305,13 +311,14 @@ const Docentes = () => {
         </div>
       )}
 
-      {/* ENCABEZADO Y CONTROLES DE BUSQUEDA */}
+      {/* ENCABEZADO Y CONTROLES */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión de Docentes</h2>
-          <p className="text-slate-500">Agrega, edita y da de baja la plantilla docente de la institución.</p>
+          <p className="text-slate-500">Plantilla docente, disponibilidad horaria y habilitaciones académicas.</p>
         </div>
-        <div className="flex gap-3">
+        {/* Botón contextual: sólo en la pestaña 'listado' */}
+        {activeTab === 'listado' && (
           <button 
             onClick={() => openModal()}
             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5"
@@ -319,7 +326,29 @@ const Docentes = () => {
             <UserPlus className="w-5 h-5" />
             <span>Registrar Docente</span>
           </button>
-        </div>
+        )}
+      </div>
+
+      {/* PESTAÑAS DE NAVEGACIÓN (Fase 3) */}
+      <div className="flex items-center gap-1 bg-slate-100/80 rounded-2xl p-1.5 w-full md:w-auto self-start">
+        {[
+          { id: 'listado', label: 'Plantilla Docente', icon: Users },
+          { id: 'disponibilidad', label: 'Disponibilidad Horaria', icon: Calendar },
+          { id: 'habilitaciones', label: 'Habilitaciones Académicas', icon: GraduationCap },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              activeTab === id
+                ? 'bg-white text-blue-700 shadow-md shadow-slate-200/60'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* TARJETAS DE ESTADÍSTICAS */}
@@ -367,7 +396,10 @@ const Docentes = () => {
 
       </div>
 
-      {/* BUSQUEDA Y LISTADO */}
+      {/* =====================================================
+          PESTAÑA 1: PLANTILLA DOCENTE (Listado y CRUD)
+          ===================================================== */}
+      {activeTab === 'listado' && (
       <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden">
         
         {/* Barra de Filtros */}
@@ -493,19 +525,29 @@ const Docentes = () => {
                         )}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => openModal(docente)}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                            title="Editar docente"
-                          >
+                        <div className="flex justify-end gap-1.5">
+                          {/* Editar datos básicos */}
+                          <button onClick={() => openModal(docente)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar docente">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={() => setDeleteConfirmDocente(docente)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                            title="Eliminar docente"
+                          {/* Acceso rápido: Disponibilidad */}
+                          <button
+                            onClick={() => { setSelectedRestrictedDocenteId(docente.id); setActiveTab('disponibilidad'); }}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title="Configurar disponibilidad horaria"
                           >
+                            <Calendar className="w-4 h-4" />
+                          </button>
+                          {/* Acceso rápido: Habilitaciones */}
+                          <button
+                            onClick={() => { setSelectedRestrictedDocenteId(docente.id); setActiveTab('habilitaciones'); }}
+                            className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                            title="Configurar habilitaciones académicas"
+                          >
+                            <GraduationCap className="w-4 h-4" />
+                          </button>
+                          {/* Eliminar */}
+                          <button onClick={() => setDeleteConfirmDocente(docente)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Eliminar docente">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -518,6 +560,32 @@ const Docentes = () => {
           )}
         </div>
       </div>
+      )} {/* FIN PESTAÑA LISTADO */}
+
+      {/* =====================================================
+          PESTAÑA 2: DISPONIBILIDAD HORARIA
+          ===================================================== */}
+      {activeTab === 'disponibilidad' && (
+        <DocenteDisponibilidad
+          docentes={listadoDocentes}
+          sedes={sedes}
+          initialDocenteId={selectedRestrictedDocenteId}
+          demoMode={demoMode}
+          showToast={showToast}
+        />
+      )}
+
+      {/* =====================================================
+          PESTAÑA 3: HABILITACIONES ACADÉMICAS
+          ===================================================== */}
+      {activeTab === 'habilitaciones' && (
+        <DocenteHabilitaciones
+          docentes={listadoDocentes}
+          initialDocenteId={selectedRestrictedDocenteId}
+          demoMode={demoMode}
+          showToast={showToast}
+        />
+      )}
 
       {/* MODAL REGISTRAR / EDITAR */}
       {isModalOpen && (

@@ -3,7 +3,7 @@ import apiClient from './client';
 
 const SedesService = {
   getSedes: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/sedes', {
+    const response = await apiClient.get('/sedes/', {
       params: { skip, limit }
     });
     return response.data;

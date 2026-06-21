@@ -816,6 +816,24 @@ INSERT INTO carreras (nombre, codigo, tipo_distribucion) VALUES
 ('Administración de Empresas', 'ADM-01', 'SEMESTRAL'),
 ('Educación Integral', 'EDU-01', 'CUATRIMESTRAL');
 
+-- Trayectos Académicos semilla
+INSERT INTO trayectos_academicos (carrera_id, nombre, anio_academico, orden_secuencial, estado) VALUES
+(1, 'Trayecto I (Informática)', 2026, 1, 'ACTIVO'),
+(1, 'Trayecto II (Informática)', 2026, 2, 'ACTIVO'),
+(1, 'Trayecto III (Informática)', 2026, 3, 'ACTIVO'),
+(1, 'Trayecto IV (Informática)', 2026, 4, 'ACTIVO'),
+(2, 'Trayecto I (Enfermería)', 2026, 1, 'ACTIVO'),
+(2, 'Trayecto II (Enfermería)', 2026, 2, 'ACTIVO'),
+(2, 'Trayecto III (Enfermería)', 2026, 3, 'ACTIVO'),
+(3, 'Trayecto I (Administración)', 2026, 1, 'ACTIVO'),
+(3, 'Trayecto II (Administración)', 2026, 2, 'ACTIVO'),
+(3, 'Trayecto III (Administración)', 2026, 3, 'ACTIVO'),
+(3, 'Trayecto IV (Administración)', 2026, 4, 'ACTIVO'),
+(4, 'Trayecto I (Educación)', 2026, 1, 'ACTIVO'),
+(4, 'Trayecto II (Educación)', 2026, 2, 'ACTIVO'),
+(4, 'Trayecto III (Educación)', 2026, 3, 'ACTIVO'),
+(4, 'Trayecto IV (Educación)', 2026, 4, 'ACTIVO');
+
 -- Periodos académicos de ejemplo (Año 2026)
 INSERT INTO periodos_academicos (nombre, tipo_corte, fecha_inicio, fecha_fin, anio_academico, estado) VALUES
 ('Semestre 1-2026', 'SEMESTRAL', '2026-03-01', '2026-07-31', 2026, 'ACTIVO'),
