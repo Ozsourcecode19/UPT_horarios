@@ -1,166 +1,477 @@
-Como Senior Developer en el stack React/FastAPI, he analizado la estructura actual de tus carpetas (frontend y backend) y el esquema de base de datos. La estructura que muestras en las imágenes es un buen punto de partida, pero para escalar y mantener el código a largo plazo (especialmente con la complejidad de un generador de horarios), te propongo una **Arquitectura basada en Features (Características)** combinada con **Atomic Design**.
-
-Aquí tienes la guía definitiva para estructurar y construir el frontend.
+# Guía del Proyecto Frontend — Sistema de Horarios UPT Bolívar
+**Versión:** 2.0 — Estado Real del Proyecto  
+**Fecha de actualización:** 2026-07-19  
+**Stack:** React 18 · Vite · TanStack Query · FullCalendar · Axios · FastAPI (backend)
 
 ---
 
-### 1. Estructura de Carpetas Óptima (Refactorizada)
+## 📋 Tabla de Contenidos
 
-La estructura actual mezcla lógica de API con lógica de UI. Vamos a separar responsabilidades estrictamente. Usaremos **Vite** como bundler.
+1. [Arquitectura Implementada](#1-arquitectura-implementada)
+2. [Estado de las Fases](#2-estado-de-las-fases)
+3. [Detalle por Fase Implementada](#3-detalle-por-fase-implementada)
+4. [Bugs Conocidos y Plan de Corrección](#4-bugs-conocidos-y-plan-de-corrección)
+5. [Roadmap: Del MVP al Producto Robusto](#5-roadmap-del-mvp-al-producto-robusto)
+6. [Notas para Antigravity (IA Pair Programmer)](#6-notas-para-antigravity-ia-pair-programmer)
 
-**Estructura Propuesta:**
+---
+
+## 1. Arquitectura Implementada
+
+### Estructura de Carpetas Real
 
 ```text
-frontend/
-├── public/
-── src/
-│   ├── api/                 # 🚀 Capa de comunicación con FastAPI (Axios/Fetch)
-│   │   ├── client.js        # Configuración base (interceptores, tokens)
-│   │   ├── endpoints.js     # URLs centralizadas
-│   │   ├── docents.js       # Funciones específicas (getDocents, createDocent)
-│   │   ├── schedule.js
-│   │   └── auth.js
-│   ├── assets/              # Imágenes, logos, iconos estáticos
-│   ├── components/          # 🧩 Componentes UI Reutilizables (Atomic Design)
-│   │   ├── ui/              # Botones, Inputs, Cards, Modals (puros, sin lógica de negocio)
-│   │   ├── layout/          # Sidebar, Header, MainLayout
-│   │   └── shared/          # Componentes compartidos complejos (ej. UserAvatar, StatusBadge)
-│   ├── config/              # Constantes globales (roles, colores, configs de calendario)
-│   ├── context/             # 🌍 Estado Global (AuthContext, ThemeContext)
-│   ├── features/            # 📦 Lógica específica por módulo (CRUDs complejos)
-│   │   ├── schedule/        # Todo lo relacionado al Horario
-│   │   │   ├── components/  # ScheduleGrid, TimeSlot, Legend
-│   │   │   ├── hooks/       # useGenerateSchedule, useDragDropValidation
-│   │   │   └── utils/       # Mapeo de datos SQL -> FullCalendar Events
-│   │   ├── teachers/
-│   │   └── classrooms/
-│   ├── hooks/               # 🪝 Hooks globales reutilizables (useAuth, useLocalStorage)
-│   ├── pages/               # 📄 Vistas que mapean a Rutas
-│   │   ├── Dashboard.jsx
-│   │   ├── Login.jsx
-│   │   ├── ScheduleManager.jsx
-│   │   └── Settings.jsx
-│   ├── routes/              # ️ Configuración de React Router
-│   │   ├── AppRouter.jsx
-│   │   └── ProtectedRoute.jsx
-│   ├── utils/               # Funciones helper (dateFormatters, validators)
-│   ├── App.jsx
-│   └── main.jsx
-├── tailwind.config.js
-├── vite.config.js
-└── package.json
+frontend/src/
+├── api/                        ✅ Implementado
+│   ├── client.js               ✅ Axios + interceptor JWT + redirect 401
+│   ├── auth.service.js         ✅ Login, logout, token
+│   ├── docents.js              ✅ CRUD completo
+│   ├── schedule.js             ✅ Generación, FullCalendar, validate-move, CRUD
+│   ├── periodos.js             ✅ CRUD completo
+│   ├── aulas.js                ✅ CRUD completo
+│   ├── grupos.js               ✅ CRUD completo
+│   ├── subjects.js             ✅ CRUD completo (materias)
+│   ├── bloques.js              ✅ GET bloques horarios
+│   ├── sedes.js                ✅ GET sedes
+│   ├── lecciones.js            ✅ CRUD completo
+│   ├── disponibilidades.js     ✅ CRUD disponibilidad docente
+│   ├── habilitaciones.js       ✅ CRUD habilitaciones docente-materia
+│   ├── trayectos.js            ✅ CRUD trayectos académicos
+│   └── endpoints.js            ⚠️ Archivo vacío (no utilizado aún)
+│
+├── components/
+│   ├── layout/
+│   │   └── MainLayout.jsx      ✅ Sidebar + Header + Outlet
+│   ├── docentes/
+│   │   ├── DocenteDisponibilidad.jsx  ✅ Grilla semanal de disponibilidad
+│   │   └── DocenteHabilitaciones.jsx  ✅ Habilitaciones por docente-materia
+│   └── (sin ui/ ni shared/)    ⚠️ Pendiente de organizar
+│
+├── pages/
+│   ├── Login.jsx               ✅ Implementado + JWT
+│   ├── Dashboard.jsx           ⚠️ Stats estáticas (hardcoded)
+│   ├── Docentes.jsx            ✅ CRUD + Disponibilidad + Habilitaciones (tabs)
+│   ├── Materias.jsx            ✅ CRUD completo con selector de color
+│   ├── Aulas.jsx               ✅ CRUD completo
+│   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
+│   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Modo Demo
+│   └── Settings.jsx            ⚠️ Placeholder vacío
+│
+├── routes/
+│   ├── AppRouter.jsx           ✅ React Router v6 + rutas protegidas
+│   └── ProtectedRoute.jsx      ✅ Redirección a /login si no autenticado
+│
+└── context/                    ⚠️ Directorio no creado formalmente
+    └── (AuthContext embebido en Login/ProtectedRoute)
 ```
 
-**¿Por qué esta estructura?**
-1.  **`api/` separado:** Si cambia la URL del backend o la autenticación, solo tocas una carpeta.
-2.  **`features/`:** Aquí vive la complejidad. El componente `ScheduleManager` (en pages) será simple, pero la lógica de FullCalendar y la validación de cruces vivirá en `features/schedule`.
-3.  **`components/ui/`:** Tus botones y inputs son "tontos". No saben de profesores ni horarios. Esto permite reusarlos en cualquier lado.
+### Dependencias Clave Instaladas
+
+| Paquete | Versión | Uso |
+|---|---|---|
+| `@tanstack/react-query` | v5 | Fetching, caché y estados de carga/error |
+| `@fullcalendar/react` | v6 | Calendario principal de horarios |
+| `@fullcalendar/timegrid` | v6 | Vista semanal/diaria del calendario |
+| `@fullcalendar/interaction` | v6 | Drag & Drop de bloques horarios |
+| `@fullcalendar/core/locales/es` | v6 | Localización en español |
+| `axios` | latest | Cliente HTTP con interceptores JWT |
+| `react-hook-form` | v7 | Formularios con validación |
+| `@hookform/resolvers` + `zod` | latest | Validación de esquemas en formularios |
+| `lucide-react` | latest | Íconos SVG |
 
 ---
 
-### 2. Prácticas Recomendadas (Senior Level)
+## 2. Estado de las Fases
 
-Dado que es un MVP pero con proyección de crecimiento:
+| Fase | Nombre | Estado | Observaciones |
+|---|---|---|---|
+| **Fase 1** | Esqueleto y Autenticación | ✅ **Completada** | Login JWT, rutas protegidas, MainLayout |
+| **Fase 2** | Master Data (CRUDs) | ✅ **Completada** | Docentes, Materias, Aulas, Lecciones |
+| **Fase 3** | Configuración de Restricciones | ✅ **Completada** | Disponibilidad horaria y habilitaciones académicas |
+| **Fase 4** | Integración FullCalendar | ✅ **Completada** | Vista semanal, DnD, filtros, eventos desde API |
+| **Fase 5** | Generación Automática | ✅ **Completada (botón presente)** | Botón en `Horarios.jsx`, llama a `POST /api/schedules/generate`. El backend retorna `202 Accepted` y procesa en segundo plano con OR-Tools. |
 
-1.  **Gestión de Estado Asíncrono:**
-    *   **No uses `useEffect` para fetchear datos.** Usa **React Query (TanStack Query)**. Maneja caching, reintentos, estados de carga (`isLoading`) y errores automáticamente. Es vital para el Dashboard y las tablas de gestión.
-2.  **Formularios:**
-    *   Usa **React Hook Form** + **Zod** (para validación de esquemas). Zod te permite validar que los datos que envías al backend cumplen con el tipo de datos esperado (ej. `hora_inicio` es time, `carga_maxima` es int).
-3.  **FullCalendar Integration:**
-    *   No pongas toda la lógica del calendario en un solo archivo.
-    *   Usa el hook `useCalendarApi` para controlar la vista programáticamente.
-    *   Mapea tus datos SQL (`horario_generado`) a objetos `EventInput` de FullCalendar en una función utilitaria (`features/schedule/utils/mapScheduleEvents.js`).
-4.  **Tailwind CSS:**
-    *   Usa la directiva `@apply` con moderación. Prefiere componer clases en el HTML o usar `clsx` / `tailwind-merge` para condicionales.
-    *   Configura tus colores corporativos en `tailwind.config.js` para mantener consistencia.
-5.  **Tipado (Opcional pero recomendado):**
-    *   Aunque usas `.jsx`, considera usar **JSDoc** estricto o migrar a TypeScript (`tsx`) pronto. Definir interfaces para `Docente`, `Leccion`, `BloqueHorario` evitará errores al renderizar propiedades inexistentes.
+> **⚠️ Problema activo — Horarios no se reflejan:**  
+> El botón de generación existe y la API responde correctamente, pero los horarios generados no se visualizan en el calendario. Ver [Sección 4](#4-bugs-conocidos-y-plan-de-corrección).
 
 ---
 
-### 3. Creación de la Estructura Principal
+## 3. Detalle por Fase Implementada
 
-Ejecuta estos pasos en tu terminal para preparar el entorno:
+### ✅ Fase 1: Esqueleto y Autenticación
 
-**Paso 1: Inicialización y Dependencias Clave**
-```bash
-# Crear proyecto con Vite
-npm create vite@latest frontend -- --template react
-cd frontend
+**Archivos clave:** `Login.jsx`, `AppRouter.jsx`, `ProtectedRoute.jsx`, `MainLayout.jsx`, `api/auth.service.js`, `api/client.js`
 
-# Instalar dependencias base
-npm install
-npm install -D tailwindcss postcss autoprefixer
+**Características implementadas:**
+- Login con `POST /api/token` (OAuth2 Password Flow de FastAPI)
+- Token JWT guardado en `localStorage` como `token` y el usuario como `user`
+- `ProtectedRoute` que redirige a `/login` si no hay token
+- `apiClient` con interceptor de request (inyecta `Bearer {token}`) y de response (redirect a `/login` en 401)
+- `MainLayout` con sidebar de navegación y área de contenido
 
-# Inicializar Tailwind
-npx tailwindcss init -p
+**Posibles mejoras:**
+- Implementar `AuthContext` global para evitar lecturas directas a `localStorage` dispersas en los componentes
+- Agregar refresh token para no forzar re-login cada 30 minutos
+- Añadir manejo de `403 Forbidden` en el interceptor global (actualmente solo maneja 401)
 
-# Instalar dependencias de aplicación (Router, Query, Axios, Calendar, Icons, Forms)
-npm install @tanstack/react-query axios react-router-dom @fullcalendar/react @fullcalendar/timegrid @fullcalendar/interaction @fullcalendar/daygrid lucide-react react-hook-form @hookform/resolvers zod clsx tailwind-merge
+---
+
+### ✅ Fase 2: Master Data (CRUDs)
+
+**Archivos clave:** `Docentes.jsx`, `Materias.jsx`, `Aulas.jsx`, `Lecciones.jsx`
+
+**Características implementadas:**
+- CRUD completo (Listar, Crear, Editar, Eliminar) con modales para cada entidad
+- Validación con `react-hook-form` + `zod` en todos los formularios
+- **Modo Demo automático:** Si el backend está caído, cada página activa un fallback local en `localStorage` con datos mock que persisten entre recargas
+- Notificaciones Toast (éxito, error, info, advertencia) con auto-cierre a los 4 segundos
+- Búsqueda/filtrado en tiempo real por nombre
+- Estadísticas resumen en tarjetas (conteos, promedios)
+- **Docentes:** La eliminación ahora funciona correctamente (bug corregido en esta sesión: se agregó `cascade="all, delete-orphan"` a la relación `lecciones` en el modelo SQLAlchemy)
+
+**Posibles mejoras:**
+- Paginación del servidor (actualmente se cargan 100 registros máximo con `skip/limit`)
+- Ordenamiento de columnas en tablas
+- Exportación a CSV/Excel
+
+---
+
+### ✅ Fase 3: Configuración de Restricciones
+
+**Archivos clave:** `DocenteDisponibilidad.jsx`, `DocenteHabilitaciones.jsx` (en `components/docentes/`)
+
+**Características implementadas:**
+- **Disponibilidad horaria:** Grilla semanal (Lunes–Viernes por defecto) donde se marcan bloques de disponibilidad por docente. Los datos se sincronizan con `POST/DELETE /api/disponibilidades-docentes/`
+- **Habilitaciones académicas:** Tabla de relaciones docente–materia con nivel de habilitación (BÁSICO, INTERMEDIO, AVANZADO, ESPECIALISTA). Conectado a `POST/DELETE /api/habilitaciones-docentes/`
+- Ambos sub-módulos son accesibles desde pestañas dentro de `Docentes.jsx`, con acceso rápido desde cada fila de la tabla de docentes
+
+**Posibles mejoras:**
+- Visualización "heatmap" de disponibilidad agregada (todos los docentes en una vista)
+- Validación de que un docente tiene al menos una habilitación antes de generar horarios
+
+---
+
+### ✅ Fase 4: Integración FullCalendar
+
+**Archivos clave:** `Horarios.jsx`, `api/schedule.js`
+
+**Características implementadas:**
+- Vista `timeGridWeek` (semana completa) con localización en español
+- Horario visualizado: 07:00 a 18:30, Lunes–Viernes (sin fines de semana)
+- Eventos renderizados con contenido enriquecido: nombre de materia, docente (ícono), grupo, aula
+- **Drag & Drop:** Al soltar un evento, busca el bloque horario más cercano (máximo 45 min de diferencia), llama a `POST /api/schedules/validate-move` y si hay conflicto hace `revert()` y muestra el error
+- **Filtros:** Por Aula, Docente o Grupo usando selectores en tiempo real sin recargar
+- **Modal de edición rápida:** Al hacer clic en un evento, permite cambiar aula y bloque horario con dropdown
+- **Selector de Periodo Académico:** Cambia los eventos visualizados por periodo
+- **Modo Demo:** Si el backend falla, activa eventos mock persistentes en `localStorage`
+- **Overlay de generación:** Spinner con backdrop mientras OR-Tools procesa
+
+**El mapeo de datos real (`get_horarios_para_calendario` en backend):**
+```
+HorarioGenerado + Leccion + Materia + Docente + Grupo + Aula + Sede + PeriodoAcademico
+→ FullCalendarEvent { id, title, start (ISO), end (ISO), resourceId, extendedProps }
 ```
 
-**Paso 2: Configurar Tailwind (`tailwind.config.js`)**
-Añade los colores de tu schema (ej. los colores hex de las materias) o variables globales.
+**Posibles mejoras:**
+- Vista de aulas como "recursos" (`@fullcalendar/resource-timegrid`) para ver todas las aulas en paralelo
+- Exportar el horario a PDF o imagen
+- Coloreado por grupo además de por materia
 
-**Paso 3: Crear el `api/client.js` (Axios)**
-Configura la base URL de tu FastAPI y el interceptor para el token JWT.
+---
+
+### ✅ Fase 5: Generación Automática
+
+**Archivos clave:** `Horarios.jsx` (`triggerAutoGeneration`), `api/schedule.js` (`generateSchedule`), `backend/routers/schedules.py`, `backend/services/scheduler/or_tools_adapter.py`
+
+**Características implementadas (frontend):**
+- Botón "Generación Inteligente" en la cabecera de `Horarios.jsx`
+- Llamada a `POST /api/schedules/generate?periodo_id={id}`
+- La API retorna inmediatamente `202 Accepted` (tarea en segundo plano con `BackgroundTasks` de FastAPI)
+- Overlay de "procesando" con spinner durante 3 segundos simulados, seguido de `refetchHorarios()`
+- En modo demo: genera eventos simulados tras 2.5 segundos y los inyecta en el estado local
+
+**Características implementadas (backend):**
+- `ScheduleGenerator` con Google OR-Tools CP-SAT:
+  - Variables booleanas `x[leccion_id, bloque_id, aula_id]`
+  - Restricción: cada lección asignada exactamente una vez
+  - Restricción: unicidad de docente, grupo y aula por bloque
+  - Restricción: disponibilidad horaria del docente
+  - Restricción: habilitación docente-materia
+  - Penalización suave: minimizar huecos (gaps) en la jornada del docente
+- Los resultados se guardan en `horario_generado` con estado `ACTIVO`
+
+---
+
+## 4. Bugs Conocidos y Plan de Corrección
+
+### 🔴 BUG CRÍTICO: Los horarios generados no se muestran en el calendario
+
+**Síntoma:** Se ejecuta la generación (botón funciona, API responde 202), pero el calendario sigue vacío o muestra el modo Demo.
+
+**Causa raíz probable (árbol de diagnóstico):**
+
+```
+¿El frontend está en Modo Demo?
+  └─ SÍ → El demoMode se activó porque un fetch anterior falló.
+           Solución: Desactivar con "Reconectar API" y verificar que el backend esté corriendo.
+
+¿El backend genera registros en la tabla horario_generado?
+  └─ NO → Verificar logs del servidor. OR-Tools puede no encontrar solución si:
+           a) Ninguna lección tiene disponibilidad+habilitación válida simultáneamente
+           b) La tabla lecciones está vacía para el periodo seleccionado
+           c) La columna `activo` de las lecciones filtra todos los registros
+
+¿La API GET /api/schedules/fullcalendar devuelve datos?
+  └─ NO → Revisar que el estado en horario_generado sea 'ACTIVO' (el CRUD filtra por estado)
+           Revisar que los joins no fallen (aula sin sede, leccion sin materia, etc.)
+  └─ SÍ → El frontend no recibe los datos porque:
+           a) El queryKey ['horarios', selectedPeriodoId] no coincide con el periodo generado
+           b) El refetch ocurre antes de que el background task termine (3s es insuficiente)
+```
+
+**Correcciones recomendadas:**
+
+**Fix A — Backend: Limpiar horarios anteriores antes de generar (idempotencia)**
+
+En `or_tools_adapter.py`, antes de guardar resultados, borrar los horarios previos del periodo:
+
+```python
+# En _save_results_if_feasible(), ANTES de insertar nuevos registros:
+def _clear_previous_schedules(self, periodo_id: int):
+    """Elimina horarios activos anteriores del periodo para re-generación limpia."""
+    self.db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO'
+    ).delete(synchronize_session='fetch')
+    self.db.commit()
+    self.logger.info(f"Horarios previos del periodo {periodo_id} eliminados.")
+```
+
+**Fix B — Frontend: Polling post-generación en lugar de timeout fijo**
+
+En `Horarios.jsx`, reemplazar el `setTimeout` de 3 segundos con polling:
 
 ```javascript
-import axios from 'axios';
+// En triggerAutoGeneration(), bloque else (API real):
+await ScheduleService.generateSchedule(selectedPeriodoId);
+showToast("Solicitud enviada. Verificando resultados...", "info");
 
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
-  headers: { 'Content-Type': 'application/json' },
+// Polling cada 4 segundos, máximo 5 intentos
+let attempts = 0;
+const pollInterval = setInterval(async () => {
+  attempts++;
+  await refetchHorarios();
+  if (horariosReal.length > 0 || attempts >= 5) {
+    clearInterval(pollInterval);
+    setIsGenerating(false);
+    showToast(
+      horariosReal.length > 0 
+        ? "¡Horario generado exitosamente!" 
+        : "La generación tardó más de lo esperado. Recarga manualmente.",
+      horariosReal.length > 0 ? "success" : "warning"
+    );
+  }
+}, 4000);
+```
+
+**Fix C — Backend: Verificar el trigger `trg_sync_horario_bloque`**
+
+El OR-Tools adapter guarda `dia_semana`, `hora_inicio` y `hora_fin` directamente en el modelo, pero la base de datos tiene un trigger que los sobreescribe al leer desde `BloqueHorario`. Si el trigger falla o los campos quedan `NULL`, el CRUD de FullCalendar salta esos registros (hay un `continue` explícito). Verificar en la DB:
+
+```sql
+SELECT id, dia_semana, hora_inicio, hora_fin, estado 
+FROM horario_generado 
+WHERE periodo_id = <id_periodo>
+LIMIT 10;
+```
+
+Si `dia_semana`, `hora_inicio` o `hora_fin` son `NULL`, el problema está en el trigger.
+
+---
+
+### 🟡 BUG MENOR: Dashboard con estadísticas estáticas
+
+**Síntoma:** Las tarjetas del Dashboard muestran valores hardcodeados (48 docentes, 124 materias, etc.) que no reflejan los datos reales.
+
+**Corrección:** Conectar `Dashboard.jsx` con `useQuery` para cada entidad:
+
+```javascript
+// En Dashboard.jsx
+import { useQuery } from '@tanstack/react-query';
+import DocentsService from '../api/docents';
+import SubjectsService from '../api/subjects';
+import AulasService from '../api/aulas';
+import ScheduleService from '../api/schedule';
+import PeriodosService from '../api/periodos';
+
+const { data: docentes = [] } = useQuery({
+  queryKey: ['docents'],
+  queryFn: () => DocentsService.getDocents(0, 1000),
+  retry: 0,
 });
-
-// Interceptor para inyectar token
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-export default apiClient;
+// Repetir para materias, aulas, periodos...
+// Mostrar docentes.filter(d => d.activo).length en la tarjeta
 ```
 
 ---
 
-### 4. Pasos Siguientes (Roadmap de Implementación)
+### 🟡 BUG MENOR: Botón "Generar Horario" en Dashboard no funciona
 
-Sigue este orden para integrar el Frontend con tu Backend FastAPI y tu Schema SQL:
+**Síntoma:** El botón de acción rápida "Generar Nuevo Horario" en `Dashboard.jsx` no hace nada (es un `<button>` sin `onClick`).
 
-#### Fase 1: Esqueleto y Autenticación
-1.  Configurar **React Router** en `src/routes/AppRouter.jsx`.
-2.  Crear `ProtectedRoute` para proteger rutas como `/dashboard` y `/gestion-docentes`.
-3.  Implementar `AuthContext` para manejar login/logout y guardar el JWT.
-4.  Crear la vista `Login.jsx` conectada al endpoint `POST /token` de FastAPI.
+**Corrección:** Conectar con `useNavigate` de React Router:
 
-#### Fase 2: Master Data (CRUDs Básicos)
-Antes de generar horarios, necesitas datos. Crea las vistas para gestionar las tablas maestras del SQL:
-1.  **Gestión de Sedes y Aulas:** Formularios simples.
-2.  **Gestión de Docentes:** Formulario con validación de `carga_maxima` y selección de `sede_principal`.
-3.  **Gestión de Materias:** Incluir el selector de `color_hex` (vital para el calendario).
-4.  **Gestión de Grupos y Lecciones:** Esta es la parte crítica. Debes permitir crear la relación `Leccion` (Docente + Grupo + Materia + Horas).
+```javascript
+import { useNavigate } from 'react-router-dom';
+const navigate = useNavigate();
+// En el botón:
+<button onClick={() => navigate('/horarios')}>Generar Nuevo Horario</button>
+```
 
-#### Fase 3: Configuración de Restricciones (El "Cerebro")
-Implementar las vistas para alimentar el algoritmo:
-1.  **Disponibilidad Docente:** Una interfaz tipo grilla para marcar horas disponibles/no disponibles por día.
-2.  **Habilitaciones:** Asignar qué materias puede dar cada profesor.
+---
 
-#### Fase 4: Integración FullCalendar (El MVP Core)
-1.  Crear el componente `ScheduleView.jsx`.
-2.  Conectar el hook `useQuery` para traer los datos desde `GET /api/schedules` (o la vista SQL `v_horario_fullcalendar` si la expones).
-3.  **Mapeo de Datos:** Transformar el JSON de respuesta (que viene de `v_horario_fullcalendar`) al formato `events` de FullCalendar.
-    *   *Nota:* Tu vista SQL ya devuelve `start` y `end` en formato ISO 8601, lo cual es perfecto para FullCalendar.
-4.  Implementar **Drag & Drop**:
-    *   Usar el evento `eventDrop` de FullCalendar.
-    *   Al soltar, llamar a `POST /api/schedules/validate-move` (como sugeriste en el informe técnico v2.0).
-    *   Si la API responde 200, actualizar la cache de React Query. Si responde 400 (conflicto), hacer `revert` del movimiento y mostrar error.
+### 🟡 BUG MENOR: Bug de eliminación de docentes (corregido en esta sesión)
 
-#### Fase 5: Generación Automática
-1.  Botón "Generar Horario" en el Dashboard.
-2.  Llamar a `POST /api/generate-schedule`.
-3.  Mostrar un estado de "Procesando..." (ya que OR-Tools puede tardar unos segundos).
-4.  Al finalizar, recargar la vista del calendario.
+**Estado:** ✅ Corregido el 2026-07-19.
 
-¿Quieres que profundice en el código de alguno de estos pasos, por ejemplo, cómo mapear la respuesta de la vista SQL `v_horario_fullcalendar` al formato de FullCalendar?
+**Descripción del fix:** `backend/models/docente.py` — La relación `lecciones` no tenía `cascade="all, delete-orphan"`, por lo que SQLAlchemy intentaba poner a `NULL` el campo `docente_id` de las lecciones, violando la restricción `NOT NULL` de la base de datos. Se añadió el cascade y se reforzó `delete_docente` en el CRUD con try-except y rollback.
+
+---
+
+## 5. Roadmap: Del MVP al Producto Robusto
+
+### Prioridad Alta (Bloqueantes para uso en producción)
+
+#### A. Polling / WebSocket para estado de generación
+El modelo actual (fire-and-forget + timeout fijo) es frágil. La generación puede tardar 10–60 segundos dependiendo del número de lecciones. Implementar:
+- **Opción 1 (Simple):** Polling al endpoint `GET /api/schedules/fullcalendar` hasta obtener resultados.
+- **Opción 2 (Robusto):** Añadir un endpoint `GET /api/schedules/generation-status?periodo_id={id}` que devuelva `{status: "PENDING"|"DONE"|"FAILED", count: N}` y que el frontend consulte cada 3 segundos.
+
+#### B. Control de versiones del horario
+Actualmente, re-generar un horario no limpia los anteriores, acumulando duplicados. Implementar:
+- Limpiar horarios anteriores del periodo antes de guardar (Fix A de la sección 4)
+- Guardar `version_horario` incrementalmente en `horario_generado`
+- Permitir comparar/restaurar versiones anteriores desde el frontend
+
+#### C. Validación previa a la generación
+Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 registros sin explicar por qué. Añadir:
+- Endpoint `GET /api/schedules/pre-generation-check?periodo_id={id}` que valide los prerequisitos
+- Bloquear el botón de generación y mostrar checklist si falta algo
+
+---
+
+### Prioridad Media (Mejoras de UX significativas)
+
+#### D. Vista de recursos en FullCalendar (`@fullcalendar/resource-timegrid`)
+La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo. Instalar `@fullcalendar/resource-timegrid` para mostrar cada aula como una columna vertical — la vista estándar de planificadores universitarios.
+
+```bash
+npm install @fullcalendar/resource-timegrid @fullcalendar/resource-daygrid
+```
+
+#### E. Módulo de Períodos Académicos
+No existe una página de gestión de periodos. El usuario no puede crear/editar periodos desde el frontend. Crear `Periodos.jsx` con CRUD y conectar a `api/periodos.js`.
+
+#### F. Dashboard dinámico con gráficas
+Reemplazar las tarjetas estáticas del Dashboard con:
+- Datos reales de la API (ver Bug Dashboard)
+- Gráfica de distribución de carga horaria por docente (usar `recharts` o similar)
+- Indicador de conflictos detectados en el último horario generado
+
+#### G. Módulo de Configuración
+`Settings.jsx` está vacío. Conectar con `GET/PUT /api/configuraciones/` para que el administrador pueda ajustar: días laborables, hora inicio/fin de jornada, peso de restricciones blandas del solver.
+
+---
+
+### Prioridad Baja (Pulido y escalabilidad)
+
+#### H. Migrar a TypeScript (`.tsx`)
+El proyecto usa `.jsx` sin tipos. Definir interfaces para `Docente`, `Leccion`, `BloqueHorario`, `FullCalendarEvent` reduciría errores en runtime al acceder a propiedades inexistentes.
+
+#### I. Refactorizar a estructura `features/`
+Mover la lógica pesada de `Horarios.jsx` (1116 líneas) a:
+```
+src/features/schedule/
+  ├── hooks/useScheduleGeneration.js
+  ├── hooks/useDragDropValidation.js
+  └── utils/mapScheduleEvents.js
+```
+
+#### J. Modo Oscuro
+El diseño actual usa clases de Tailwind compatibles con `dark:`. Implementar toggle con `ThemeContext` y persistencia en `localStorage`.
+
+#### K. Exportar horario a PDF / iCal
+Añadir botón de exportación en `Horarios.jsx`:
+- PDF: usar `html2canvas` + `jsPDF` para capturar el calendario
+- iCal (`.ics`): generar archivo de calendario compatible con Google Calendar / Outlook
+
+---
+
+## 6. Notas para Antigravity (IA Pair Programmer)
+
+Esta sección documenta patrones, convenciones y gotchas específicos del proyecto para acelerar el trabajo de la IA en futuras sesiones.
+
+### Patrones Establecidos
+
+**Modo Demo / Fallback:**  
+Todos los componentes de página siguen este patrón: si el `useQuery` falla (`isError`), se activa `demoMode` (estado local), se cargan datos de `MOCK_*` hardcodeados y se persiste en `localStorage`. El banner de "Modo Demo Activado" muestra un botón para reconectar. Este patrón **debe mantenerse** en cualquier componente nuevo.
+
+**Estructura de Queries:**  
+```javascript
+const { data: entityData = [], isLoading, isError } = useQuery({
+  queryKey: ['entity-name'],
+  queryFn: async () => {
+    try { return await EntityService.getEntities(); }
+    catch (err) { return MOCK_DATA; }  // Fallback silencioso
+  },
+  retry: 0  // Siempre 0 para activar demo mode rápido
+});
+```
+
+**Invalidación de caché post-mutación:**  
+```javascript
+queryClient.invalidateQueries({ queryKey: ['entity-name'] });
+```
+
+**Rutas del Backend:**  
+- Prefijo global: `/api`
+- Docentes: `/api/docentes/`
+- Materias: `/api/materias/`
+- Aulas: `/api/aulas/`
+- Grupos: `/api/grupos/`
+- Lecciones: `/api/lecciones/`
+- Periodos: `/api/periodos-academicos/`
+- Bloques: `/api/bloques-horarios/`
+- Sedes: `/api/sedes/`
+- Disponibilidades: `/api/disponibilidades-docentes/`
+- Habilitaciones: `/api/habilitaciones-docentes/`
+- Horarios FullCalendar: `GET /api/schedules/fullcalendar?periodo_id={id}`
+- Generar horario: `POST /api/schedules/generate?periodo_id={id}`
+- Validar movimiento: `POST /api/schedules/validate-move`
+
+**Roles de usuario (backend `require_role`):**  
+- `ADMIN` — acceso total
+- `JEFE-PNF` — acceso total (igual que ADMIN)
+- `DOCENTE` — solo lectura
+- `LECTOR` — solo lectura
+
+**Dependencias del Backend a verificar:**  
+- `ortools` debe estar instalado en el `.venv`: `pip install ortools`
+- Base de datos PostgreSQL en `localhost:5432`, DB `horarios_upt`, usuario `postgres`, contraseña `postgresUPT`
+- El trigger `trg_sync_horario_bloque` en PostgreSQL sincroniza `dia_semana`, `hora_inicio`, `hora_fin` en `horario_generado` al insertar
+
+### Archivos Más Críticos / Complejos
+
+| Archivo | Complejidad | Razón |
+|---|---|---|
+| `frontend/src/pages/Horarios.jsx` | 🔴 Alta (1116 líneas) | Toda la lógica de Fase 4 y 5 concentrada aquí |
+| `backend/services/scheduler/or_tools_adapter.py` | 🔴 Alta | Lógica CP-SAT con muchas variables y restricciones |
+| `backend/crud/horarios_generados.py` | 🟡 Media (338 líneas) | Manejo exhaustivo de excepciones DB |
+| `frontend/src/pages/Docentes.jsx` | 🟡 Media (762 líneas) | 3 tabs + CRUD + Disponibilidad + Habilitaciones |
+| `backend/models/docente.py` | 🟢 Baja | Modelo SQLAlchemy con cascades corregidos |
+
+### Contexto de la Última Sesión (2026-07-19)
+
+1. **Bug corregido:** Eliminación de docentes — cascada en modelo SQLAlchemy + try-except en CRUD
+2. **Fase 5 investigada:** El botón y el backend están implementados. El problema de "no se ven horarios" requiere Fix A (limpiar antes de insertar) y Fix B (polling en lugar de timeout) detallados en la Sección 4
+3. **Fase 5 pendiente de ejecutar:** La implementación de las correcciones del punto anterior estaba en progreso cuando se creó este documento

@@ -29,8 +29,9 @@ class Docente(Base):
     docente_perfil = relationship("Usuario", back_populates="perfil_docente", foreign_keys=[usuario_id])
     disponibilidades = relationship("DisponibilidadDocente", back_populates="docente", cascade="all, delete-orphan")
     habilitaciones = relationship("HabilitacionDocente", back_populates="docente", cascade="all, delete-orphan")
-    # CORRECTO: Relación con Leccion, que sí tiene FK directa (lecciones.docente_id)
-    lecciones = relationship("Leccion", back_populates="docente")
+    # CORREGIDO: Se añade cascade="all, delete-orphan" para evitar que SQLAlchemy intente
+    # poner a NULL el docente_id de las lecciones asociadas (lo cual viola la restricción NOT NULL)
+    lecciones = relationship("Leccion", back_populates="docente", cascade="all, delete-orphan")
 
     # Check Constraints
     __table_args__ = (
