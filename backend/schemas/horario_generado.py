@@ -35,7 +35,9 @@ class HorarioGeneradoCreate(HorarioGeneradoBase):
     pass
 
 class HorarioGeneradoUpdate(BaseModel):
-    estado: Optional[str]
+    estado: Optional[str] = None
+    bloque_id: Optional[int] = None
+    aula_id: Optional[int] = None
     # Otros campos opcionales para actualización
 
 class HorarioGenerado(HorarioGeneradoBase):

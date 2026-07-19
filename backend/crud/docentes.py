@@ -137,11 +137,21 @@ def delete_docente(db: Session, docente_id: int) -> bool:
     """
     Elimina un docente de la base de datos.
     Retorna True si se eliminó, False si no existía.
+    Maneja excepciones de base de datos y realiza rollback si es necesario.
     """
     db_docente = db.query(models.Docente).filter(models.Docente.id == docente_id).first()
     if not db_docente:
         return False
 
-    db.delete(db_docente)
-    db.commit()
-    return True
+    try:
+        db.delete(db_docente)
+        db.commit()
+        return True
+    except SQLAlchemyError as e:
+        db.rollback()
+        # Registra el error e informa a través de un HTTP 500
+        print(f"Error de base de datos al eliminar el docente {docente_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al intentar eliminar el docente y sus relaciones."
+        )
