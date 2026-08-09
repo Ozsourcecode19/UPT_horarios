@@ -49,7 +49,7 @@ frontend/src/
 │
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
-│   ├── Dashboard.jsx           ⚠️ Stats estáticas (hardcoded)
+│   ├── Dashboard.jsx           ✅ Stats dinámicas (useQuery) + acciones rápidas
 │   ├── Docentes.jsx            ✅ CRUD + Disponibilidad + Habilitaciones (tabs)
 │   ├── Materias.jsx            ✅ CRUD completo con selector de color
 │   ├── Aulas.jsx               ✅ CRUD completo
@@ -387,6 +387,8 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 - Gráfica de distribución de carga horaria por docente (usar `recharts` o similar)
 - Indicador de conflictos detectados en el último horario generado
 
+> **✅ Parcialmente implementado (E6):** Las tarjetas ya muestran datos reales vía `useQuery` (`['docents']`, `['subjects']`, `['aulas']`, `['periodos']`, `['dashboard-horarios', periodoVigente]`), con periodo vigente `estado='ACTIVO'` y patrón Modo Demo. Las acciones rápidas navegan con `useNavigate` a `/horarios`, `/docentes`, `/materias` y `/periodos`. Pendiente de este ítem: gráficas (recharts) e indicador de conflictos.
+
 #### G. Módulo de Configuración
 `Settings.jsx` está vacío. Conectar con `GET/PUT /api/configuraciones/` para que el administrador pueda ajustar: días laborables, hora inicio/fin de jornada, peso de restricciones blandas del solver.
 
@@ -563,3 +565,15 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
      - UI: stat cards (total/ACTIVO/PLANIFICACION/CERRADO), búsqueda, tabla (nombre + año, badge tipo de corte, vigencia formateada en `es-VE`, badge de estado con color), modal crear/editar y confirmación de cierre/reactivación.
    - **Integración:** ruta `/periodos` en `AppRouter.jsx` y ítem "Periodos" (`CalendarRange`) en el sidebar de `MainLayout.jsx`.
    - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size).
+
+### Contexto de la Sesión Actual (2026-08-09) — E6
+
+1. **E6 — Dashboard dinámico (frontend, completado):**
+   - **`src/pages/Dashboard.jsx`** reescrito: las stats hardcodeadas (`48/124/32/8`) pasan a `useQuery` reales con el patrón Modo Demo (`retry: 0`, `demo_dashboard_stats` en `localStorage`, banner "Reconectar API").
+     - Queries: `['docents']` → `data.filter(d => d.activo).length`; `['subjects']` → total; `['aulas']` → `data.filter(a => a.activa).length`; `['periodos']` → total; `['dashboard-horarios', periodoVigente?.id]` → `getSchedulesFullCalendar(periodoVigente.id).length` (deshabilitada si no hay periodo).
+     - **Periodo vigente:** el de `estado === 'ACTIVO'` con fallback al primero de la lista; su nombre se muestra como subtítulo de la tarjeta de horarios.
+     - 5 `StatCard` (grid `lg:grid-cols-5`) con skeleton en carga; se eliminó `trend` (no había histórico real).
+     - Hero de bienvenida saluda al usuario real vía `useAuth`.
+     - **Acciones rápidas** con `useNavigate`: `/horarios`, `/docentes`, `/materias` y nuevo `/periodos` (de E5); en demoMode muestran toast informativo en vez de navegar.
+     - Como las queries comparten `queryKey` con Docentes/Materias/Aulas/Periodos, sus invalidaciones post-mutación refrescan el dashboard automáticamente.
+   - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). Backend sin cambios.

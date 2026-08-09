@@ -75,10 +75,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Patrón Modo Demo (`demo_periodos`), `queryKey ['periodos']` compartido (invalidateQueries refresca selectores de Horarios/Lecciones), escrituras gateadas por rol `ADMIN` vía `useAuth`.
 - ✅ Criterio: crear/editar/desactivar periodo desde la UI. **Verificado** (`pnpm build` OK).
 
-### E6 — Dashboard dinámico (~2 h)
+### E6 — Dashboard dinámico (~2 h) ✅ COMPLETADA
 - Reemplazar stats hardcodeadas por `useQuery` reales (docentes, materias, aulas, periodos, horarios ACTIVO del periodo vigente) con patrón Modo Demo (`retry: 0`).
 - Botones de acciones rápidas → `useNavigate` a `/horarios`, `/docentes`, `/materias`.
-- ✅ Criterio: los números cambian al modificar datos.
+- Detalles: periodo vigente = `estado='ACTIVO'` (fallback primer periodo), 5 StatCards (docentes activos, materias, aulas activas, periodos, horarios del periodo vigente con subtítulo), hero saluda al usuario (`useAuth`), 4 acciones rápidas (incluye `/periodos` de E5), `trend` eliminado (sin histórico real), skeleton en carga.
+- ✅ Criterio: los números cambian al modificar datos. **Verificado** (`pnpm build` OK).
 
 ### E7 — Módulo de Configuración (Settings real) (~2–3 h)
 - Conectar `Settings.jsx` a `GET/PUT /api/configuraciones/` (JSONB `configuracion`): `dias_laborables`, `hora_inicio_jornada`, `soft_constraint_gap_weight`.
