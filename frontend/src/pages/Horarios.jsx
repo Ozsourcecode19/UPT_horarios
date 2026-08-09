@@ -187,7 +187,8 @@ const Horarios = () => {
 
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
-  const [filterType, setFilterType] = useState('aula'); // 'aula', 'docente', 'grupo', 'todos'
+  // Inicializar en 'todos' para reflejar inmediatamente todos los horarios generados de todas las aulas/docentes
+  const [filterType, setFilterType] = useState('todos'); // 'todos', 'aula', 'docente', 'grupo'
   const [filterValue, setFilterValue] = useState('');
   const [demoMode, setDemoMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -240,6 +241,18 @@ const Horarios = () => {
   }, [periodos, selectedPeriodoId]);
 
   const selectedPeriodo = periodos.find(p => p.id === Number(selectedPeriodoId));
+
+  // Sincronizar fecha activa de la grilla de FullCalendar al cambiar de período
+  useEffect(() => {
+    if (calendarRef.current && selectedPeriodo?.fecha_inicio) {
+      try {
+        const api = calendarRef.current.getApi();
+        api.gotoDate(selectedPeriodo.fecha_inicio);
+      } catch (err) {
+        console.log("Sincronizando fecha del calendario...", err);
+      }
+    }
+  }, [selectedPeriodoId, selectedPeriodo]);
 
   // 2. Aulas
   const { data: aulasReal = [], isError: isAulasError } = useQuery({
@@ -754,16 +767,34 @@ const Horarios = () => {
     } else {
       // Conexión real con API
       try {
+        // Disparar proceso en segundo plano en backend (retorna HTTP 202 Accepted)
         await ScheduleService.generateSchedule(selectedPeriodoId);
-        // Simular espera de recarga
-        setTimeout(() => {
-          refetchHorarios();
-          setIsGenerating(false);
-          showToast("Horarios generados. Recargando grilla...");
+        showToast("Procesando horarios en segundo plano con OR-Tools. Verificando resultados...", "info");
+
+        // Polling reactivo: consulta refetchHorarios cada 3 segundos (máximo 10 intentos = 30s)
+        let attempts = 0;
+        const maxAttempts = 10;
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          const result = await refetchHorarios();
+          const fetchedEvents = result?.data || [];
+
+          // Si se detectan horarios generados o se agota el número de reintentos
+          if (fetchedEvents.length > 0 || attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+
+            if (fetchedEvents.length > 0) {
+              showToast("¡Horarios generados y reflejados exitosamente en el calendario!", "success");
+            } else {
+              showToast("La generación tardó más de lo esperado o no halló una combinación factible. Verifica las lecciones/disponibilidades.", "warning");
+            }
+          }
         }, 3000);
       } catch (err) {
         setIsGenerating(false);
-        showToast("Error al iniciar generación automática", "error");
+        showToast("Error al iniciar generación automática en el servidor", "error");
       }
     }
   };
@@ -833,8 +864,9 @@ const Horarios = () => {
       )}
 
       {/* Toast de Notificaciones */}
+      {/* CORRECCIÓN DE BUG GRÁFICO: Se eleva el z-index a z-[60] para evitar que la notificación aparezca detrás del backdrop-blur de los modales (z-50) */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
+        <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
           toast.type === 'error' 
             ? 'bg-red-50 border-red-100 text-red-800' 
             : toast.type === 'warning'

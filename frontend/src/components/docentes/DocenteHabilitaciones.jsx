@@ -188,16 +188,42 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
     }
   };
 
-  // --- HANDLER DE ELIMINAR ---
-  const onDeleteHabilitacion = async (id) => {
-    if (!window.confirm("¿Está seguro de que desea retirar la habilitación para esta materia?")) return;
+  // Modal de confirmación defensiva para eliminación de habilitación
+  const [deleteModalState, setDeleteModalState] = useState({
+    isOpen: false,
+    habId: null,
+    validationData: null,
+    isLoading: false
+  });
 
+  // --- HANDLER DE ELIMINAR CON PRE-VALIDACIÓN DEFENSIVA ---
+  const onDeleteHabilitacion = async (hab) => {
     if (demoMode) {
-      setDemoHabs(prev => prev.filter(h => h.id !== id));
-      showToast("Habilitación eliminada exitosamente en Modo Demo", "info");
-    } else {
-      deleteMutation.mutate(id);
+      if (window.confirm("¿Está seguro de retirarle la habilitación a este docente en Modo Demo?")) {
+        setDemoHabs(prev => prev.filter(h => h.id !== hab.id));
+        showToast("Habilitación eliminada exitosamente en Modo Demo", "info");
+      }
+      return;
     }
+
+    setDeleteModalState({ isOpen: true, habId: hab.id, validationData: null, isLoading: true });
+    try {
+      const valRes = await HabilitacionesService.validateDelete(hab.id);
+      setDeleteModalState({ isOpen: true, habId: hab.id, validationData: valRes, isLoading: false });
+    } catch (err) {
+      showToast("Error al evaluar el impacto de la eliminación", "error");
+      setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false });
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteModalState.habId) return;
+    const habId = deleteModalState.habId;
+    deleteMutation.mutate(habId, {
+      onSettled: () => {
+        setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false });
+      }
+    });
   };
 
   // --- HANDLERS PARA EDICIÓN INLINE ---
@@ -479,7 +505,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => onDeleteHabilitacion(hab.id)}
+                                    onClick={() => onDeleteHabilitacion(hab)}
                                     className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                     title="Retirar habilitación"
                                   >
@@ -505,6 +531,117 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
           <p className="text-sm text-slate-400 mt-1 max-w-sm">
             Para ver y gestionar las asignaciones académicas (habilitaciones), elige un docente de la lista superior.
           </p>
+        </div>
+      )}
+
+      {/* MODAL DEFENSIVO DE CONFIRMACIÓN DE ELIMINACIÓN DE HABILITACIÓN */}
+      {deleteModalState.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center space-y-4">
+              {deleteModalState.isLoading ? (
+                <div className="py-8 space-y-3">
+                  <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto" />
+                  <p className="text-sm font-semibold text-slate-600">Evaluando impacto en períodos académicos...</p>
+                </div>
+              ) : (
+                <>
+                  {deleteModalState.validationData?.period_status === 'ACTIVO' ? (
+                    <div className="space-y-4">
+                      <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                        <AlertCircle className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">Habilitación en Uso (Período ACTIVO)</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed bg-red-50 p-3 rounded-2xl border border-red-100 text-left">
+                        {deleteModalState.validationData.message}
+                      </p>
+                      {deleteModalState.validationData.affected_lessons?.length > 0 && (
+                        <div className="text-left bg-slate-50 p-3 rounded-2xl text-[11px] text-slate-500">
+                          <span className="font-bold text-slate-700 block mb-1">Lecciones vinculadas afectadas:</span>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            {deleteModalState.validationData.affected_lessons.map((l, idx) => (
+                              <li key={idx}>Lección #{l.leccion_id} — {l.materia_nombre} (Período #{l.periodo_id})</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="pt-2 flex flex-col gap-2">
+                        <button
+                          onClick={() => {
+                            const habId = deleteModalState.habId;
+                            setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false });
+                            const hab = habs.find(h => h.id === habId);
+                            if (hab) startEditing(hab);
+                          }}
+                          className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-all"
+                        >
+                          Establecer 'Fecha Hasta' (Inactivar a futuro)
+                        </button>
+                        <button
+                          onClick={() => setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false })}
+                          className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-semibold text-xs transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : deleteModalState.validationData?.period_status === 'PLANIFICACION' ? (
+                    <div className="space-y-4">
+                      <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                        <AlertCircle className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">Advertencia: Período en Planificación</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed bg-amber-50 p-3 rounded-2xl border border-amber-100 text-left">
+                        {deleteModalState.validationData.message}
+                      </p>
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() => setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false })}
+                          className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-semibold text-xs transition-all"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleConfirmDelete}
+                          disabled={deleteMutation.isPending}
+                          className="py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                        >
+                          {deleteMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          <span>Confirmar y Desactivar Lecciones</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                        <ShieldCheck className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">Confirmar Eliminación</h4>
+                      <p className="text-xs text-slate-600">
+                        {deleteModalState.validationData?.message || "¿Está seguro de que desea retirar la habilitación para esta materia?"}
+                      </p>
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() => setDeleteModalState({ isOpen: false, habId: null, validationData: null, isLoading: false })}
+                          className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-semibold text-xs transition-all"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleConfirmDelete}
+                          disabled={deleteMutation.isPending}
+                          className="py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                        >
+                          {deleteMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          <span>Eliminar Habilitación</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

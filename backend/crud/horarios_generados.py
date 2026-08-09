@@ -281,11 +281,13 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
             continue
 
         try:
-            # Calcular la fecha exacta del evento
-            # Asumiendo que fecha_inicio_periodo es el primer día del periodo (e.g., Lunes)
-            # Ajustar si el periodo no empieza en lunes
-            # Usar timedelta(days=...) con el valor numérico directamente
-            fecha_evento = fecha_inicio_periodo + timedelta(days=(dia_semana - 1))
+            # Calcular el lunes de inicio para la semana del periodo
+            # fecha_inicio_periodo.weekday(): 0 = Lunes, 6 = Domingo
+            dias_hasta_lunes = fecha_inicio_periodo.weekday()
+            lunes_base = fecha_inicio_periodo - timedelta(days=dias_hasta_lunes)
+
+            # Calcular la fecha exacta de la clase segun dia_semana (1 = Lunes, 5 = Viernes)
+            fecha_evento = lunes_base + timedelta(days=(dia_semana - 1))
 
             # Calcular hora de inicio y fin completa (datetime)
             # datetime.combine(date, time) -> datetime

@@ -109,20 +109,24 @@ class ScheduleGenerator:
                 if bloque.dia_semana not in dias_disponibles:
                     continue # Saltar bloques en días no laborables
                 for aula in aulas:
+                    # Restricción de consistencia de Sede: Aula y Bloque deben pertenecer a la misma sede
+                    # (Requisito estricto del trigger PL/pgSQL fn_validar_sede_horario)
+                    if aula.sede_id != bloque.sede_id:
+                        continue
+
                     var_name = f"x_l{leccion.id}_b{bloque.id}_a{aula.id}"
-                    # CORREGIDO: Usar self.model.NewBoolVar
                     assignment_vars_local[(leccion.id, bloque.id, aula.id)] = self.model.NewBoolVar(var_name)
 
-        # CORREGIDO: Asignar el diccionario local al atributo de la instancia
+        # Asignar el diccionario local al atributo de la instancia
         self.assignment_vars = assignment_vars_local
 
         # 4. Agregar Restricciones Duras
         # a. Cada lección debe ser asignada exactamente una vez
         for leccion in lecciones:
-            # CORREGIDO: Usar self.assignment_vars
-            vars_for_lesson = [self.assignment_vars[(leccion.id, b.id, a.id)] # <-- Ahora usa self.assignment_vars
+            vars_for_lesson = [self.assignment_vars[(leccion.id, b.id, a.id)]
                                for b in bloques if b.dia_semana in dias_disponibles
-                               for a in aulas]
+                               for a in aulas
+                               if (leccion.id, b.id, a.id) in self.assignment_vars]
             if vars_for_lesson: # Evitar errores si no hay candidatos
                 self.model.AddExactlyOne(vars_for_lesson)
 
@@ -174,43 +178,56 @@ class ScheduleGenerator:
         # Cargar disponibilidades para docentes involucrados
         docente_ids_in_lecciones = {l.docente_id for l in lecciones}
         disponibilidades = self.db.query(models.DisponibilidadDocente).filter(
-            models.DisponibilidadDocente.docente_id.in_(list(docente_ids_in_lecciones)),
-            models.DisponibilidadDocente.tipo_disponibilidad == 'DISPONIBLE'
+            models.DisponibilidadDocente.docente_id.in_(list(docente_ids_in_lecciones))
         ).all()
 
-        # Crear un mapa de disponibilidad: {(docente_id, dia, hora_inicio, hora_fin): True/False}
-        disp_map = {}
+        # Agrupar disponibilidades por docente
+        disp_por_docente = {}
         for disp in disponibilidades:
-            key = (disp.docente_id, disp.dia_semana, disp.hora_inicio, disp.hora_fin)
-            disp_map[key] = True # Marcamos como disponible
+            disp_por_docente.setdefault(disp.docente_id, []).append(disp)
 
         for leccion in lecciones:
             docente_id = leccion.docente_id
+            doc_disps = disp_por_docente.get(docente_id, [])
+
+            disponibles_explicit = [d for d in doc_disps if d.tipo_disponibilidad == 'DISPONIBLE']
+            no_disponibles = [d for d in doc_disps if d.tipo_disponibilidad == 'NO_DISPONIBLE']
+
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue
-                # Verificar si el docente está disponible en el rango del bloque
+                
                 bloque_inicio = bloque.hora_inicio
-                # CORREGIDO: Acceder al valor del objeto SQLAlchemy para timedelta
                 duracion_minutos_valor = bloque.duracion_minutos
                 bloque_fin_dt = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=duracion_minutos_valor)).time()
 
-                # Buscar en el mapa de disponibilidad
-                is_available = any(
-                    # CORREGIDO: Usar valores del objeto SQLAlchemy en la comparación Python
-                    disp_key[1] == bloque.dia_semana and
-                    disp_key[2] <= bloque_inicio and
-                    disp_key[3] >= bloque_fin_dt
-                    for disp_key in disp_map.keys() if disp_key[0] == docente_id
+                # Verificar si se cruza con algún bloque NO_DISPONIBLE
+                is_blocked = any(
+                    d.dia_semana == bloque.dia_semana and
+                    d.hora_inicio <= bloque_inicio and
+                    d.hora_fin >= bloque_fin_dt
+                    for d in no_disponibles
                 )
 
+                # Si existen registros de DISPONIBLE explícitos, debe encajar en alguno
+                if disponibles_explicit:
+                    is_in_available = any(
+                        d.dia_semana == bloque.dia_semana and
+                        d.hora_inicio <= bloque_inicio and
+                        d.hora_fin >= bloque_fin_dt
+                        for d in disponibles_explicit
+                    )
+                else:
+                    is_in_available = True  # Disponible por defecto si no se han especificado franjas explícitas
+
+                is_available = (not is_blocked) and is_in_available
+
                 if not is_available:
-                    # Si no está disponible, todas las asignaciones posibles para este docente-bloque deben ser False
+                    # Si no está disponible, todas las asignaciones posibles para este docente-bloque se cancelan (0)
                     for aula in aulas:
                          var_key = (leccion.id, bloque.id, aula.id)
-                         # CORREGIDO: Usar self.assignment_vars
-                         if var_key in self.assignment_vars: # <-- Ahora usa self.assignment_vars
-                             self.model.Add(self.assignment_vars[var_key] == 0) # <-- Ahora usa self.assignment_vars
+                         if var_key in self.assignment_vars:
+                             self.model.Add(self.assignment_vars[var_key] == 0)
 
 
         # d. Cumplimiento de habilitación docente-materia (función de la DB)
@@ -302,14 +319,38 @@ class ScheduleGenerator:
                 pass # Placeholder para lógica de compactación más avanzada
 
 
+    def _clear_previous_schedules(self, periodo_id: int):
+        """
+        Elimina de manera limpia los horarios activos anteriores pertenecientes
+        al periodo académico especificado. Esto garantiza la idempotencia del
+        proceso de generación automática evitando duplicidades de datos.
+        """
+        try:
+            deleted_count = self.db.query(models.HorarioGenerado).filter(
+                models.HorarioGenerado.periodo_id == periodo_id,
+                models.HorarioGenerado.estado == 'ACTIVO'
+            ).delete(synchronize_session='fetch')
+            self.db.commit()
+            self.logger.info(f"Limpieza exitosa: {deleted_count} registros de horarios previos eliminados para el periodo {periodo_id}.")
+        except Exception as e:
+            self.db.rollback()
+            self.logger.error(f"Error al limpiar horarios previos del periodo {periodo_id}: {e}")
+            raise e
+
     # CORREGIDO: Firma de la función para aceptar CpSolverStatus
     def _save_results_if_feasible(self, status: int, periodo_id: int): # <-- CORREGIDO: cp_model.CpSolverStatus
         """
         Guarda los resultados en la base de datos si la solución es factible.
+        Antes de insertar la nueva asignación, elimina los registros anteriores del periodo.
         """
         # CORREGIDO: Comparar status con los enums de CpSolverStatus (esto es lo importante)
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]: # status es ahora CpSolverStatus
-            self.logger.info("Solución encontrada, guardando...") # Usar self.logger
+            self.logger.info("Solución factible encontrada. Limpiando horarios anteriores...")
+            
+            # Limpiar horarios anteriores del periodo activo antes de insertar nuevos registros
+            self._clear_previous_schedules(periodo_id)
+
+            self.logger.info("Guardando nueva asignación de horarios en la base de datos...")
             # CORREGIDO: Obtener los objetos de bloques y aulas, no solo IDs
             # Cargar instancias completas para facilitar el acceso a atributos
             bloques_db = {b.id: b for b in self.db.query(models.BloqueHorario).all()}

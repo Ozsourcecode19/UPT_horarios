@@ -396,8 +396,9 @@ const Aulas = () => {
       )}
 
       {/* SISTEMA DE TOAST NOTIFICACIÓN */}
+      {/* CORRECCIÓN DE BUG GRÁFICO: Se asigna z-[60] para mantener los toasts por encima del nivel z-50 de los modales y su backdrop-blur */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
+        <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
           toast.type === 'error' 
             ? 'bg-red-50 border-red-100 text-red-800' 
             : toast.type === 'warning'

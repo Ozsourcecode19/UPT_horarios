@@ -51,10 +51,19 @@ def update_habilitacion_docente(hab_id: int, habilitacion_update: schemas.Habili
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habilitación no encontrada")
     return db_habilitacion
 
+@router.get("/{hab_id}/validate-delete", dependencies=[Depends(get_current_active_user)])
+def validate_delete_habilitacion_docente(hab_id: int, db: Session = Depends(get_db)):
+    """
+    Pre-valida el impacto de eliminar una habilitación de docente.
+    Retorna el estado del período académico y las lecciones afectadas.
+    """
+    validation_info = crud.validate_delete_habilitacion(db, hab_id=hab_id)
+    return validation_info
+
 @router.delete("/{hab_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def delete_habilitacion_docente(hab_id: int, db: Session = Depends(get_db)):
     """
-    Elimina una habilitación de docente.
+    Elimina una habilitación de docente aplicando reglas defensivas de 3 niveles.
     """
     deleted = crud.delete_habilitacion_docente(db, hab_id=hab_id)
     if not deleted:

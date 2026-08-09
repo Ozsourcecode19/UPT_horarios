@@ -252,8 +252,9 @@ const Materias = () => {
       )}
 
       {/* SISTEMA DE TOAST NOTIFICACIÓN */}
+      {/* CORRECCIÓN DE BUG GRÁFICO: Se eleva la capa del Toast a z-[60] (por encima de los modales y sus backdrops z-50) para que las alertas no se difuminen ni se oculten detrás del efecto backdrop-blur-sm */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
+        <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
           toast.type === 'error' 
             ? 'bg-red-50 border-red-100 text-red-800' 
             : toast.type === 'warning'
