@@ -26,7 +26,9 @@ def run_generation_in_background(periodo_id: int):
         status_tracker.set_pending(periodo_id)
         or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id)
         count = crud.get_horarios_generados_count_activos(db, periodo_id=periodo_id)
-        status_tracker.set_done(periodo_id, count=count)
+        message = f"Solución guardada: {count} horarios." if count > 0 \
+            else "El solver no encontró una solución factible para el periodo."
+        status_tracker.set_done(periodo_id, count=count, message=message)
     except Exception as e:
         status_tracker.set_failed(periodo_id, message=str(e))
         raise
