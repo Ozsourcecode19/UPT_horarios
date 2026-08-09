@@ -1,8 +1,17 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useEffect, useContext } from 'react';
 import AuthService from '../api/auth.service';
+import { decodeJwt } from '../utils/jwt';
 
 const AuthContext = createContext(null);
+
+const buildUserFromToken = (token, fallbackUsername = '') => {
+  const payload = decodeJwt(token);
+  return {
+    username: payload?.sub || fallbackUsername,
+    role: payload?.rol || 'LECTOR',
+  };
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -10,10 +19,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Verificar si hay sesión guardada al cargar
-    const storedUser = localStorage.getItem('user');
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+    // Verificar si hay sesión guardada al cargar; el rol se decodifica del token
+    // (fuente de verdad) para no quedar con un rol obsoleto en localStorage.
+    if (token) {
+      const userInfo = buildUserFromToken(token);
+      localStorage.setItem('user', JSON.stringify(userInfo));
+      setUser(userInfo);
     }
     setLoading(false);
   }, [token]);
@@ -22,11 +33,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await AuthService.login(username, password);
       localStorage.setItem('token', data.access_token);
-      // FastAPI suele devolver el user info en el token o puedes pedirlo aparte.
-      // Aquí simulamos guardar el username como user básico
-      const userInfo = { username, role: 'ADMIN' }; // Ajustar según respuesta real
+      const userInfo = buildUserFromToken(data.access_token, username);
       localStorage.setItem('user', JSON.stringify(userInfo));
-      
+
       setToken(data.access_token);
       setUser(userInfo);
       return true;
