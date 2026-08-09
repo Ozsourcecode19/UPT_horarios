@@ -355,7 +355,7 @@ Actualmente, re-generar un horario no limpia los anteriores, acumulando duplicad
 - Guardar `version_horario` incrementalmente en `horario_generado`
 - Permitir comparar/restaurar versiones anteriores desde el frontend
 
-> **✅ Implementado (E4, backend-only):** `GET /schedules/versions?periodo_id=` lista versiones (ACTIVO/HISTORICO) y `POST /schedules/restore` restaura una versión (ACTIVO actual→HISTORICO, objetivo→ACTIVO). La generación archiva (HISTORICO) en vez de borrar e incrementa `version_horario`. Pendiente UI en `Horarios.jsx` para listar/restaurar versiones.
+> **✅ Implementado (E4 + E4b):** Backend `GET /schedules/versions?periodo_id=` (lista ACTIVO/HISTORICO) y `POST /schedules/restore` (ACTIVO actual→HISTORICO, objetivo→ACTIVO); la generación archiva (HISTORICO) en vez de borrar e incrementa `version_horario`. UI en `Horarios.jsx`: panel "Versiones del horario" con selector (badges ACTIVO/HISTORICO), botón "Restaurar versión" gateado por rol ADMIN/JEFE-PNF (`useAuth`) e invalidación de `['horarios']`/`['schedule-versions']` post-restore (Modo Demo con fallback `[]`).
 
 #### C. Validación previa a la generación
 Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 registros sin explicar por qué. Añadir:
@@ -537,3 +537,14 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
      - `POST /api/schedules/restore` body `{periodo_id, version}` → `RestoreResult` (ADMIN/JEFE-PNF; 404 si la versión no existe; no-op si ya está activa).
    - **CRUD/schemas nuevos:** `crud.get_versiones_horario`, `crud.restore_version_horario`, `schemas.HorarioVersion`, `schemas.RestoreRequest`, `schemas.RestoreResult` (exportados en `schemas/__init__.py` y `crud/__init__.py`).
    - **Verificación E2E (HTTP + BD real):** 3 generaciones → v4 ACTIVO + v1–v3 HISTORICO; restore v1 → v1 ACTIVO y `GET /schedules/fullcalendar` refleja la versión restaurada; `generation-status` → DONE con count correcto. Sin cambios en el frontend (E4 backend-only).
+
+### Contexto de la Sesión Actual (2026-08-09) — E4b
+
+1. **E4b — UI de versiones y restauración (frontend, completado):**
+   - **`api/schedule.js`:** se añadieron `getScheduleVersions(periodoId)` y `restoreScheduleVersion(periodoId, version)` (consumen `GET /schedules/versions` y `POST /schedules/restore` de E4).
+   - **`Horarios.jsx`:** nuevo panel "Versiones del horario" (visible con `!demoMode && versiones.length > 0`):
+     - `useQuery(['schedule-versions', periodoId])` con `retry: 0` y fallback `[]` (patrón Modo Demo); auto-selección de la versión ACTIVA.
+     - Selector de versiones con badge `●/○ ACTIVO/HISTORICO`, total de clases y fecha (`generado_en`).
+     - Botón **"Restaurar versión"** deshabilitado si: rol no es ADMIN/JEFE-PNF (`canRestore` vía `useAuth`), versión seleccionada ya es la ACTIVA, hay generación en curso o la mutación está pendiente.
+     - `useMutation` de restore → `onSuccess` invalida `['horarios', periodoId]` + `['schedule-versions', periodoId]`, `refetchHorarios()` y `refetchVersiones()`; `onError` muestra `detail` del backend.
+   - **Verificación:** `pnpm build` OK; E2E API — restore v2 → FullCalendar refleja la versión restaurada; DOCENTE → 403 en `POST /restore` y 200 en `GET /versions` (gateo por rol del backend como segunda barrera).

@@ -34,6 +34,23 @@ const ScheduleService = {
     return response.data;
   },
 
+  // Lista las versiones de horario de un periodo (E4b)
+  getScheduleVersions: async (periodoId) => {
+    const response = await apiClient.get('/schedules/versions', {
+      params: { periodo_id: periodoId }
+    });
+    return response.data;
+  },
+
+  // Restaura una versión de horario de un periodo (E4b)
+  restoreScheduleVersion: async (periodoId, version) => {
+    const response = await apiClient.post('/schedules/restore', {
+      periodo_id: periodoId,
+      version
+    });
+    return response.data;
+  },
+
   // Valida un movimiento tentativo de bloque u aula antes de guardarlo en la base de datos
   validateMove: async (moveData) => {
     // moveData: { horario_id: number, nuevo_bloque_id?: number, nueva_aula_id?: number }
