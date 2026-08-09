@@ -347,6 +347,8 @@ El modelo actual (fire-and-forget + timeout fijo) es frágil. La generación pue
 - **Opción 1 (Simple):** Polling al endpoint `GET /api/schedules/fullcalendar` hasta obtener resultados.
 - **Opción 2 (Robusto):** Añadir un endpoint `GET /api/schedules/generation-status?periodo_id={id}` que devuelva `{status: "PENDING"|"DONE"|"FAILED", count: N}` y que el frontend consulte cada 3 segundos.
 
+> **✅ Implementado (E1 + E3):** Existe el endpoint `generation-status` (tracker en memoria) y `Horarios.jsx` hace polling a él (10×3 s). DONE→refetch del calendario, FAILED→toast con causa, PENDING→spinner con intento visible, 404→seguir esperando.
+
 #### B. Control de versiones del horario
 Actualmente, re-generar un horario no limpia los anteriores, acumulando duplicados. Implementar:
 - Limpiar horarios anteriores del periodo antes de guardar (Fix A de la sección 4)
@@ -509,3 +511,16 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - Se revisó y validó formalmente la arquitectura de **Defensa en 3 Niveles** implementada para gestionar la eliminación de habilitaciones docentes asociadas a lecciones en el sistema.
    - Se formalizó la documentación técnica, generando el artifact del [Plan de Implementación](file:///home/oz/.gemini/antigravity-ide/brain/01f4ab69-86c5-4764-92dc-c2375e9a244c/plan_implementacion_defensa_habilitaciones.md) y del [Reporte de Implementación](file:///home/oz/.gemini/antigravity-ide/brain/01f4ab69-86c5-4764-92dc-c2375e9a244c/reporte_implementacion_defensa_habilitaciones.md).
    - Se confirmó que la lógica general del frontend y backend se mantiene intacta mientras se evitan incoherencias en las restricciones del solver OR-Tools y en las vistas de FullCalendar.
+
+### Contexto de la Sesión Actual (2026-08-09)
+
+1. **E3 — Polling por estado de generación (completado):**
+   - **`api/schedule.js`:** se añadió `ScheduleService.getGenerationStatus(periodoId)` que consulta `GET /api/schedules/generation-status?periodo_id=`.
+   - **`Horarios.jsx`:** se reemplazó el polling sobre `refetchHorarios()` por polling al tracker (10×3 s) dentro de `triggerAutoGeneration`:
+     - **PENDING** → el overlay muestra `Estado: PENDING (intento X/10)` vía el nuevo estado `genStatusText`.
+     - **DONE** → invalidación de `['horarios', periodoId]` + `refetchHorarios()`; toast success con el `count` si `>0`, o warning con el `message` del tracker si `count=0` (solver infeasible).
+     - **FAILED** → toast error con la causa real (el `message` del tracker).
+     - **404** (el tracker aún no registra la tarea) → se sigue esperando; timeout a los 10 intentos muestra warning.
+   - **Cleanup:** el intervalo se guarda en `genPollRef` (useRef) y se limpia al desmontar el componente, evitando fugas de memoria.
+   - **Backend (`routers/schedules.py`):** el mensaje de `set_done` ahora distingue `count>0` ("Solución guardada: N horarios.") de `count=0` ("El solver no encontró una solución factible para el periodo.").
+   - **Verificación:** `pnpm build` OK y `import main` OK en el backend.

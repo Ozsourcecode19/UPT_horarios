@@ -22,8 +22,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E0** — Commiteado (`73d7d77` "new adds"): fixes de Fase 4/5 (idempotencia `_clear_previous_schedules`, consistencia de sede en el solver, disponibilidad NO_DISPONIBLE, cálculo `lunes_base`, polling reactivo, defensa de habilitaciones, z-index toast) + `AGENTS.md`, `SDD.md`, `PLAN_DE_DESARROLLO.md`. Verificado manualmente (`OPTIMAL (4)`). `git status` limpio.
 - ✅ **E1** — Commiteado (`94f938e` "E1: endpoint generation-status con tracker de estado en memoria"): `services/scheduler/status_tracker.py` (PENDING/DONE/FAILED + count + timestamp, en memoria) + endpoint autenticado `GET /api/schedules/generation-status?periodo_id=` (404 si no hay estado). Criterio verificado: tras `POST /generate`, PENDING→DONE con `count > 0`.
 - ✅ **E2** — Commiteado: `GET /api/schedules/pre-generation-check?periodo_id=` (`crud.get_pre_generation_check`, schema `PreGenerationCheck`) + panel de checklist en `Horarios.jsx` que bloquea "Generación Inteligente" cuando `listo=false` (críticos en 0: lecciones/aulas/bloques/docentes con habilitación). Disponibilidad=0 es advertencia. Criterio verificado: `pnpm build` OK y backend importa OK.
+- ✅ **E3** — Polling por estado en `Horarios.jsx`: se reemplazó el polling sobre `refetchHorarios()` por polling a `GET /schedules/generation-status` (10×3 s) con `ScheduleService.getGenerationStatus`. DONE→refetch del calendario + toast (success si `count>0`, warning si `count=0`), FAILED→toast con la causa del tracker, PENDING→spinner con intento visible en el overlay, 404→seguir esperando. Cleanup del intervalo al desmontar. Tweak backend: mensaje DONE preciso cuando `count=0`. Criterio verificado: `pnpm build` OK y backend importa OK.
 
-**Pendientes:** E2–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
+**Pendientes:** E4–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
 ---
 
@@ -49,9 +50,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Frontend `Horarios.jsx`: panel de checklist con advertencias; deshabilitar "Generación Inteligente" si hay items críticos en 0 (`listo=false`). Disponibilidad=0 es solo advertencia (el solver asume disponibilidad total por defecto).
 - ✅ Criterio: periodo sin lecciones muestra warning y bloquea el botón. **Verificado** (`pnpm build` OK, backend importa OK).
 
-### E3 — Polling por estado en Horarios.jsx (~2 h)
+### E3 — Polling por estado en Horarios.jsx (~2 h) ✅ COMPLETADA
 - Reemplazar el polling sobre `refetchHorarios()` por polling a `generation-status` (10×3 s): DONE→refetch, FAILED→toast con causa, PENDING→spinner.
-- ✅ Criterio: la UI refleja el estado real de generación, no solo "hay eventos".
+- ✅ Criterio: la UI refleja el estado real de generación, no solo "hay eventos". **Verificado** (`pnpm build` OK, backend importa OK).
 
 ### E4 — Control de versiones del horario (~3 h)
 - `_clear_previous_schedules`: de borrar a marcar `estado='HISTORICO'`; nueva generación inserta con `version_horario` incrementado (la columna ya existe; no tocar schema/triggers).

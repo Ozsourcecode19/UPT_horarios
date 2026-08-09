@@ -184,6 +184,7 @@ const MOCK_HORARIOS_INICIALES = [
 const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
+  const genPollRef = useRef(null); // Ref para limpiar el polling de generación al desmontar
 
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
@@ -192,6 +193,7 @@ const Horarios = () => {
   const [filterValue, setFilterValue] = useState('');
   const [demoMode, setDemoMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [genStatusText, setGenStatusText] = useState(''); // Texto del estado mostrado en el overlay de generación
   
   // Modal de Detalle / Edición rápida
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -215,6 +217,16 @@ const Horarios = () => {
   useEffect(() => {
     localStorage.setItem('demo_horarios', JSON.stringify(demoHorarios));
   }, [demoHorarios]);
+
+  // Limpiar el polling de generación si el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (genPollRef.current) {
+        clearInterval(genPollRef.current);
+        genPollRef.current = null;
+      }
+    };
+  }, []);
 
   // --- APIS REALES Y FALLBACKS ---
 
@@ -785,31 +797,72 @@ const Horarios = () => {
       try {
         // Disparar proceso en segundo plano en backend (retorna HTTP 202 Accepted)
         await ScheduleService.generateSchedule(selectedPeriodoId);
-        showToast("Procesando horarios en segundo plano con OR-Tools. Verificando resultados...", "info");
+        showToast("Procesando horarios en segundo plano con OR-Tools. Verificando estado...", "info");
 
-        // Polling reactivo: consulta refetchHorarios cada 3 segundos (máximo 10 intentos = 30s)
+        // Polling por estado real: consulta generation-status cada 3 segundos (máximo 10 intentos = 30s)
         let attempts = 0;
         const maxAttempts = 10;
-        const pollInterval = setInterval(async () => {
+        setGenStatusText("Encolando tarea de generación...");
+
+        if (genPollRef.current) {
+          clearInterval(genPollRef.current);
+        }
+        genPollRef.current = setInterval(async () => {
           attempts++;
-          const result = await refetchHorarios();
-          const fetchedEvents = result?.data || [];
+          try {
+            const status = await ScheduleService.getGenerationStatus(selectedPeriodoId);
+            const countLabel = status.count != null ? ` · ${status.count} horarios` : '';
+            setGenStatusText(`Estado: ${status.status}${countLabel} (intento ${attempts}/${maxAttempts})`);
 
-          // Si se detectan horarios generados o se agota el número de reintentos
-          if (fetchedEvents.length > 0 || attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+            // DONE: la generación terminó, refrescar el calendario y reportar el resultado
+            if (status.status === 'DONE') {
+              clearInterval(genPollRef.current);
+              genPollRef.current = null;
+              setIsGenerating(false);
+              setGenStatusText('');
+              queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+              await refetchHorarios();
 
-            if (fetchedEvents.length > 0) {
-              showToast("¡Horarios generados y reflejados exitosamente en el calendario!", "success");
-            } else {
-              showToast("La generación tardó más de lo esperado o no halló una combinación factible. Verifica las lecciones/disponibilidades.", "warning");
+              if (status.count > 0) {
+                showToast(`¡Horarios generados exitosamente (${status.count}) y reflejados en el calendario!`, "success");
+              } else {
+                showToast(status.message || "El solver no encontró una combinación factible. Revisa lecciones, disponibilidades y habilitaciones.", "warning");
+              }
+              return;
+            }
+
+            // FAILED: la generación falló, mostrar la causa del tracker
+            if (status.status === 'FAILED') {
+              clearInterval(genPollRef.current);
+              genPollRef.current = null;
+              setIsGenerating(false);
+              setGenStatusText('');
+              showToast(status.message || "Error al generar el horario en el servidor.", "error");
+              return;
+            }
+
+            // PENDING: aún procesando; agotar intentos
+            if (attempts >= maxAttempts) {
+              clearInterval(genPollRef.current);
+              genPollRef.current = null;
+              setIsGenerating(false);
+              setGenStatusText('');
+              showToast("La generación tardó más de lo esperado. Revalida el checklist e intenta de nuevo.", "warning");
+            }
+          } catch (err) {
+            // 404 = la tarea aún no registra estado en el tracker: seguir esperando
+            if (attempts >= maxAttempts) {
+              clearInterval(genPollRef.current);
+              genPollRef.current = null;
+              setIsGenerating(false);
+              setGenStatusText('');
+              showToast("No se pudo consultar el estado de generación. Recarga la página e intenta de nuevo.", "error");
             }
           }
         }, 3000);
       } catch (err) {
         setIsGenerating(false);
+        setGenStatusText('');
         showToast("Error al iniciar generación automática en el servidor", "error");
       }
     }
@@ -910,6 +963,11 @@ const Horarios = () => {
             <p className="text-sm text-slate-500 mt-2 leading-relaxed">
               El Solver de OR-Tools está evaluando millones de combinaciones de docentes, aulas y restricciones para encontrar la planificación ideal sin colisiones.
             </p>
+            {genStatusText && (
+              <p className="text-xs font-semibold text-indigo-600 mt-3 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                {genStatusText}
+              </p>
+            )}
           </div>
         </div>
       )}
