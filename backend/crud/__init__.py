@@ -11,7 +11,7 @@ from .aulas import get_aula, get_aulas, create_aula, update_aula, delete_aula
 from .disponibilidades_docentes import get_disponibilidad_docente, get_disponibilidades_docente, create_disponibilidad_docente, update_disponibilidad_docente, delete_disponibilidad_docente
 from .habilitaciones_docentes import get_habilitacion_docente, get_habilitaciones_docente, create_habilitacion_docente, update_habilitacion_docente, delete_habilitacion_docente, validate_delete_habilitacion
 from .configuraciones import get_configuracion, get_configuraciones, create_configuracion, update_configuracion, delete_configuracion
-from .bloques_horarios import get_bloque_horario, get_bloques_horarios, create_bloque_horario, update_bloque_horario, delete_bloque_horario
+from .bloques_horarios import get_bloque_horario, get_bloques_horarios, create_bloque_horario, update_bloque_horario, delete_bloque_horario, generar_bloques_estandar
 from .lecciones import get_leccion, get_lecciones, create_leccion, update_leccion, delete_leccion
 from .horarios_generados import get_horario_generado, get_horarios_generados, create_horario_generado, update_horario_generado, delete_horario_generado, get_horarios_para_calendario, get_horarios_generados_count_activos, get_pre_generation_check, get_versiones_horario, restore_version_horario
 
@@ -29,7 +29,7 @@ __all__ = [
     "get_disponibilidad_docente", "get_disponibilidades_docente", "create_disponibilidad_docente", "update_disponibilidad_docente", "delete_disponibilidad_docente",
     "get_habilitacion_docente", "get_habilitaciones_docente", "create_habilitacion_docente", "update_habilitacion_docente", "delete_habilitacion_docente", "validate_delete_habilitacion",
     "get_configuracion", "get_configuraciones", "create_configuracion", "update_configuracion", "delete_configuracion",
-    "get_bloque_horario", "get_bloques_horarios", "create_bloque_horario", "update_bloque_horario", "delete_bloque_horario",
+    "get_bloque_horario", "get_bloques_horarios", "create_bloque_horario", "update_bloque_horario", "delete_bloque_horario", "generar_bloques_estandar",
     "get_leccion", "get_lecciones", "create_leccion", "update_leccion", "delete_leccion",
     "get_horario_generado", "get_horarios_generados", "create_horario_generado", "update_horario_generado", "delete_horario_generado",
     "get_horarios_para_calendario", "get_horarios_generados_count_activos", "get_pre_generation_check",

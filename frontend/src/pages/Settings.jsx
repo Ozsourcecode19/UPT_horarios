@@ -28,9 +28,63 @@ const WIDGETS = {
   dias_laborables: { widget: 'dias' },
   hora_inicio_jornada: { widget: 'time' },
   hora_fin_jornada: { widget: 'time' },
-  duracion_bloque_default: { widget: 'number', min: 15, max: 120 },
+  duracion_bloque_default: { widget: 'select', options: [30, 45, 60, 90, 120] },
   soft_constraint_gap_weight: { widget: 'range', min: 0, max: 100, lowLabel: 'Baja importancia', highLabel: 'Alta importancia' },
   soft_constraint_compact_weight: { widget: 'range', min: 0, max: 100, lowLabel: 'Baja preferencia', highLabel: 'Alta preferencia' },
+};
+
+// --- GRUPOS TEMÁTICOS: agrupan las claves editables por influencia de contexto ---
+const GRUPOS = [
+  {
+    id: 'jornada',
+    label: 'Jornada y calendario',
+    descripcion: 'Define cuándo puede haber clases: días laborables y ventana horaria global de la jornada académica.',
+    icon: CalendarDays,
+  },
+  {
+    id: 'bloques',
+    label: 'Estructura de bloques',
+    descripcion: 'Parámetros sobre la forma de las franjas horarias que componen el calendario.',
+    icon: Timer,
+  },
+  {
+    id: 'solver',
+    label: 'Optimización del solver',
+    descripcion: 'Preferencias de calidad del horario que el optimizador equilibra al buscar la solución.',
+    icon: Gauge,
+  },
+];
+
+// Mapeo clave -> grupo; las claves sin mapear caen en el grupo 'otros'
+const CLAVE_GRUPO = {
+  dias_laborables: 'jornada',
+  hora_inicio_jornada: 'jornada',
+  hora_fin_jornada: 'jornada',
+  duracion_bloque_default: 'bloques',
+  soft_constraint_gap_weight: 'solver',
+  soft_constraint_compact_weight: 'solver',
+};
+
+// Nota explicativa corta por grupo (pie del grupo)
+const GRUPO_NOTAS = {
+  jornada: (
+    <>
+      La ventana de jornada (<span className="font-semibold">hora_inicio_jornada</span>–<span className="font-semibold">hora_fin_jornada</span>)
+      filtra los bloques que el solver y la grilla de disponibilidad consideran (hora de inicio + duración dentro del rango). Esto recorta los bloques fuera de la ventana, incluidos los <span className="font-semibold">15:00–20:00</span> de la sede virtual: sube <span className="font-semibold">hora_fin_jornada</span> a <span className="font-semibold">20:00:00</span> para mostrarlos todos. <span className="font-semibold">dias_laborables</span> limita en qué días se programan clases.
+    </>
+  ),
+  bloques: (
+    <>
+      <span className="font-semibold">duracion_bloque_default</span> pre-selecciona la duración del generador de{' '}
+      <span className="font-semibold">grilla estándar</span> en{' '}
+      <span className="font-semibold">Bloques Horarios</span>. La duración de cada bloque la define el propio bloque.
+    </>
+  ),
+  solver: (
+    <>
+      Los pesos equilibran la calidad del horario: <span className="font-semibold">gap</span> penaliza huecos libres en la jornada del docente y <span className="font-semibold">compact</span> prefiere bloques consecutivos. Valores más altos aumentan la prioridad de esa preferencia.
+    </>
+  ),
 };
 
 const DIAS_SEMANA = [
@@ -71,6 +125,11 @@ const buildZodSchema = (configs) => {
       schema[c.clave] = z.array(z.number()).min(1, 'Selecciona al menos un día laborable');
     } else if (w.widget === 'time') {
       schema[c.clave] = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato de hora inválido (HH:MM)');
+    } else if (w.widget === 'select') {
+      schema[c.clave] = z.coerce.number().int().refine(
+        v => (w.options || []).includes(v),
+        'Valor no permitido'
+      );
     } else if (w.widget === 'number' || w.widget === 'range' || c.tipo_dato === 'integer') {
       schema[c.clave] = z.coerce.number().int().min(w.min ?? 0).max(w.max ?? 999).optional();
     } else if (c.tipo_dato === 'boolean') {
@@ -86,7 +145,7 @@ const buildZodSchema = (configs) => {
 const buildPayload = (clave, value) => {
   const w = WIDGETS[clave] || {};
   if (w.widget === 'time') return toTimeDb(value);
-  if (w.widget === 'range' || w.widget === 'number') return Number(value);
+  if (w.widget === 'range' || w.widget === 'number' || w.widget === 'select') return Number(value);
   return value;
 };
 
@@ -140,6 +199,22 @@ const Settings = () => {
   const configs = demoMode ? demoConfigs : configsReal;
   const editables = configs.filter(c => c.editable);
   const readonlys = configs.filter(c => !c.editable);
+
+  // Agrupa las claves editables por tema (GRUPOS), preservando el orden definido
+  const groupedEditables = useMemo(() => {
+    const byGroup = {};
+    for (const c of editables) {
+      const g = CLAVE_GRUPO[c.clave] || 'otros';
+      (byGroup[g] = byGroup[g] || []).push(c);
+    }
+    const groups = GRUPOS
+      .filter(g => byGroup[g.id])
+      .map(g => ({ ...g, items: byGroup[g.id] }));
+    if (byGroup['otros']) {
+      groups.push({ id: 'otros', label: 'Otros parámetros', descripcion: 'Claves de configuración sin tema asignado.', icon: Layers, items: byGroup['otros'] });
+    }
+    return groups;
+  }, [editables]);
 
   const defaultValues = useMemo(() => buildDefaultValues(configs), [configs]);
   const zodSchema = useMemo(() => buildZodSchema(configs), [configs]);
@@ -255,6 +330,21 @@ const Settings = () => {
           </div>
         );
       }
+      case 'select':
+        return (
+          <div>
+            <select
+              disabled={!isAdmin}
+              {...register(cfg.clave, { valueAsNumber: true })}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {(w.options || []).map(opt => (
+                <option key={opt} value={opt}>{opt} minutos</option>
+              ))}
+            </select>
+            {error && <span className="text-xs text-red-500 font-medium mt-1 block">{error.message}</span>}
+          </div>
+        );
       case 'number':
         return (
           <div>
@@ -297,6 +387,7 @@ const Settings = () => {
     if (widget === 'dias') return <CalendarDays className="w-5 h-5 text-blue-600" />;
     if (widget === 'time') return <Clock className="w-5 h-5 text-indigo-600" />;
     if (widget === 'range') return <Gauge className="w-5 h-5 text-purple-600" />;
+    if (widget === 'select') return <Timer className="w-5 h-5 text-amber-600" />;
     if (widget === 'number') return <Timer className="w-5 h-5 text-amber-600" />;
     return <Layers className="w-5 h-5 text-slate-500" />;
   };
@@ -416,26 +507,52 @@ const Settings = () => {
                   ))}
                 </div>
               ) : (
-                <form onSubmit={handleSubmit(handleSave)} className="space-y-6">
-                  {editables.map(cfg => {
-                    const w = WIDGETS[cfg.clave] || { widget: 'text' };
-                    return (
-                      <div key={cfg.clave} className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0">
-                            {widgetIcon(w.widget)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-700 capitalize">
-                              {cfg.clave.split('_').join(' ')}
-                            </p>
-                            {cfg.descripcion && <p className="text-xs text-slate-400">{cfg.descripcion}</p>}
-                          </div>
+                <form onSubmit={handleSubmit(handleSave)} className="space-y-8">
+                  {groupedEditables.map(group => (
+                    <div key={group.id} className="space-y-3">
+                      {/* Cabecera del grupo temático */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                          <group.icon className="w-5 h-5 text-white" />
                         </div>
-                        {renderField(cfg)}
+                        <div>
+                          <p className="text-base font-bold text-slate-800">{group.label}</p>
+                          {group.descripcion && <p className="text-xs text-slate-400">{group.descripcion}</p>}
+                        </div>
                       </div>
-                    );
-                  })}
+
+                      {/* Campos del grupo */}
+                      <div className="space-y-3">
+                        {group.items.map(cfg => {
+                          const w = WIDGETS[cfg.clave] || { widget: 'text' };
+                          return (
+                            <div key={cfg.clave} className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2.5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0">
+                                  {widgetIcon(w.widget)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-700 capitalize">
+                                    {cfg.clave.split('_').join(' ')}
+                                  </p>
+                                  {cfg.descripcion && <p className="text-xs text-slate-400">{cfg.descripcion}</p>}
+                                </div>
+                              </div>
+                              {renderField(cfg)}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Nota explicativa del grupo */}
+                      {GRUPO_NOTAS[group.id] && (
+                        <div className="p-4 bg-amber-50/50 border border-amber-100/60 rounded-2xl flex gap-3">
+                          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 leading-relaxed">{GRUPO_NOTAS[group.id]}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
 
                   {/* Claves de solo lectura */}
                   {readonlys.length > 0 && (
@@ -456,25 +573,6 @@ const Settings = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* Nota sobre claves que aún no afectan al solver */}
-                  <div className="p-4 bg-amber-50/50 border border-amber-100/60 rounded-2xl flex gap-3">
-                    <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-800 leading-relaxed">
-                      Nota: <span className="font-semibold">hora_inicio_jornada</span> y{' '}
-                      <span className="font-semibold">hora_fin_jornada</span> definen la ventana de jornada: el
-                      solver y la grilla de disponibilidad solo usan bloques dentro de ese rango (hora de inicio +
-                      duración). Esto también recorta los bloques fuera de la ventana, incluidos los{' '}
-                      <span className="font-semibold">15:00–20:00</span> de la sede virtual: sube{' '}
-                      <span className="font-semibold">hora_fin_jornada</span> a{' '}
-                      <span className="font-semibold">20:00:00</span> para mostrarlos todos. La clave{' '}
-                      <span className="font-semibold">duracion_bloque_default</span> se guarda pero aún no afecta la
-                      generación (la duración la define cada bloque). El solver también usa{' '}
-                      <span className="font-semibold">dias_laborables</span>,{' '}
-                      <span className="font-semibold">soft_constraint_gap_weight</span> y{' '}
-                      <span className="font-semibold">soft_constraint_compact_weight</span>.
-                    </p>
-                  </div>
 
                   {isAdmin && (
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">

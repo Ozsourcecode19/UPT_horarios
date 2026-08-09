@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, Users, BookOpen, MapPin, Calendar, Settings, LogOut, Menu, X, GraduationCap, CalendarRange } from 'lucide-react';
+import { Calendar, LogOut, Menu, X } from 'lucide-react';
+import { NAVIGATION, getRouteMeta, isRoleAllowed } from '../../config/navigation';
 
-const SidebarItem = ({ icon: Icon, label, path, active }) => (
+const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick }) => (
   <Link
     to={path}
+    onClick={onClick}
     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
       active
         ? 'bg-blue-600/10 text-blue-600 font-semibold shadow-[0_0_15px_rgba(37,99,235,0.1)]'
         : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-    }`}
+    } ${sub ? 'ml-4 py-2.5 text-sm' : ''}`}
   >
-    <Icon className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+    <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
     <span>{label}</span>
   </Link>
 );
@@ -22,24 +24,47 @@ const MainLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navigation = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Docentes', path: '/docentes', icon: Users },
-    { label: 'Materias', path: '/materias', icon: BookOpen },
-    { label: 'Aulas y Sedes', path: '/aulas', icon: MapPin },
-    { label: 'Grupos y Lecciones', path: '/lecciones', icon: GraduationCap },
-    { label: 'Periodos', path: '/periodos', icon: CalendarRange },
-    { label: 'Horarios', path: '/horarios', icon: Calendar },
-    { label: 'Configuración', path: '/configuracion', icon: Settings },
-  ];
+  const closeSidebar = () => setSidebarOpen(false);
+
+  // Filtrado por rol: cada ítem e hijo declara los roles que pueden verlo
+  const navigation = NAVIGATION
+    .map(section => ({
+      ...section,
+      items: section.items
+        .filter(item => isRoleAllowed(item.roles, user?.role))
+        .map(item => ({
+          ...item,
+          children: item.children?.filter(child => isRoleAllowed(child.roles, user?.role)),
+        }))
+        .filter(item => !item.children || item.children.length > 0),
+    }))
+    .filter(section => section.items.length > 0);
+
+  const isItemActive = (item) => {
+    if (item.children) {
+      return (
+        location.pathname === item.path ||
+        location.pathname.startsWith(item.path + '/') ||
+        item.children.some(child => location.pathname === child.path)
+      );
+    }
+    return location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+  };
+
+  const isChildActive = (path) => location.pathname === path;
+
+  // Título y breadcrumb desde la configuración central de navegación
+  const routeMeta = getRouteMeta(location.pathname);
+  const pageTitle = routeMeta?.label || 'Dashboard';
+  const sectionLabel = routeMeta?.seccion || 'INICIO';
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
@@ -59,19 +84,43 @@ const MainLayout = () => {
               UPT Horarios
             </span>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600">
+          <button onClick={closeSidebar} className="lg:hidden text-slate-400 hover:text-slate-600">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {navigation.map((item) => (
-            <SidebarItem
-              key={item.path}
-              {...item}
-              active={location.pathname.startsWith(item.path)}
-            />
+        {/* Navigation por secciones (flujo de trabajo) */}
+        <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
+          {navigation.map((section) => (
+            <div key={section.seccion}>
+              <p className="px-4 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {section.seccion}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <div key={item.path}>
+                    <SidebarItem
+                      {...item}
+                      active={isItemActive(item)}
+                      onClick={closeSidebar}
+                    />
+                    {item.children && (
+                      <div className="mt-1 space-y-1">
+                        {item.children.map((child) => (
+                          <SidebarItem
+                            key={child.path}
+                            {...child}
+                            active={isChildActive(child.path)}
+                            sub
+                            onClick={closeSidebar}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
@@ -87,7 +136,7 @@ const MainLayout = () => {
               </p>
               <p className="text-xs text-slate-500 truncate">{user?.role || 'Administrador'}</p>
             </div>
-            <button 
+            <button
               onClick={logout}
               className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               title="Cerrar sesión"
@@ -103,15 +152,23 @@ const MainLayout = () => {
         {/* Header */}
         <header className="h-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-2xl font-bold text-slate-800 capitalize">
-              {location.pathname.split('/')[1] || 'Dashboard'}
-            </h1>
+            <div>
+              {/* Breadcrumb en rutas hijas */}
+              {routeMeta?.isChild && (
+                <p className="text-xs font-semibold text-slate-400 mb-0.5">
+                  {sectionLabel} <span className="text-slate-300">/</span> {routeMeta.parentLabel}
+                </p>
+              )}
+              <h1 className="text-2xl font-bold text-slate-800 capitalize leading-none">
+                {pageTitle}
+              </h1>
+            </div>
           </div>
         </header>
 

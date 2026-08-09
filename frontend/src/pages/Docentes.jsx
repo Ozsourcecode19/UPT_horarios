@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,8 +11,7 @@ import {
 } from 'lucide-react';
 import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
-import DocenteDisponibilidad from '../components/docentes/DocenteDisponibilidad';
-import DocenteHabilitaciones from '../components/docentes/DocenteHabilitaciones';
+import DocenteTabs from '../components/docentes/DocenteTabs';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const docenteSchema = z.object({
@@ -49,16 +49,13 @@ const MOCK_SEDES = [
 
 const Docentes = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocente, setEditingDocente] = useState(null);
   const [deleteConfirmDocente, setDeleteConfirmDocente] = useState(null);
-  
-  // Control de Pestañas (Fase 3: Restricciones)
-  const [activeTab, setActiveTab] = useState('listado'); // 'listado', 'disponibilidad', 'habilitaciones'
-  const [selectedRestrictedDocenteId, setSelectedRestrictedDocenteId] = useState(null);
   
   // Modo Demo / Fallback local para robustez completa
   const [demoMode, setDemoMode] = useState(false);
@@ -318,39 +315,17 @@ const Docentes = () => {
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión de Docentes</h2>
           <p className="text-slate-500">Plantilla docente, disponibilidad horaria y habilitaciones académicas.</p>
         </div>
-        {/* Botón contextual: sólo en la pestaña 'listado' */}
-        {activeTab === 'listado' && (
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5"
-          >
-            <UserPlus className="w-5 h-5" />
-            <span>Registrar Docente</span>
-          </button>
-        )}
+        <button 
+          onClick={() => openModal()}
+          className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <UserPlus className="w-5 h-5" />
+          <span>Registrar Docente</span>
+        </button>
       </div>
 
-      {/* PESTAÑAS DE NAVEGACIÓN (Fase 3) */}
-      <div className="flex items-center gap-1 bg-slate-100/80 rounded-2xl p-1.5 w-full md:w-auto self-start">
-        {[
-          { id: 'listado', label: 'Plantilla Docente', icon: Users },
-          { id: 'disponibilidad', label: 'Disponibilidad Horaria', icon: Calendar },
-          { id: 'habilitaciones', label: 'Habilitaciones Académicas', icon: GraduationCap },
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === id
-                ? 'bg-white text-blue-700 shadow-md shadow-slate-200/60'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* PESTAÑAS DE NAVEGACIÓN (Plantilla / Disponibilidad / Habilitaciones) */}
+      <DocenteTabs />
 
       {/* TARJETAS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -398,9 +373,8 @@ const Docentes = () => {
       </div>
 
       {/* =====================================================
-          PESTAÑA 1: PLANTILLA DOCENTE (Listado y CRUD)
+          PLANTILLA DOCENTE (Listado y CRUD)
           ===================================================== */}
-      {activeTab === 'listado' && (
       <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden">
         
         {/* Barra de Filtros */}
@@ -533,7 +507,7 @@ const Docentes = () => {
                           </button>
                           {/* Acceso rápido: Disponibilidad */}
                           <button
-                            onClick={() => { setSelectedRestrictedDocenteId(docente.id); setActiveTab('disponibilidad'); }}
+                            onClick={() => navigate(`/docentes/disponibilidad?docente=${docente.id}`)}
                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                             title="Configurar disponibilidad horaria"
                           >
@@ -541,7 +515,7 @@ const Docentes = () => {
                           </button>
                           {/* Acceso rápido: Habilitaciones */}
                           <button
-                            onClick={() => { setSelectedRestrictedDocenteId(docente.id); setActiveTab('habilitaciones'); }}
+                            onClick={() => navigate(`/docentes/habilitaciones?docente=${docente.id}`)}
                             className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                             title="Configurar habilitaciones académicas"
                           >
@@ -561,32 +535,6 @@ const Docentes = () => {
           )}
         </div>
       </div>
-      )} {/* FIN PESTAÑA LISTADO */}
-
-      {/* =====================================================
-          PESTAÑA 2: DISPONIBILIDAD HORARIA
-          ===================================================== */}
-      {activeTab === 'disponibilidad' && (
-        <DocenteDisponibilidad
-          docentes={listadoDocentes}
-          sedes={sedes}
-          initialDocenteId={selectedRestrictedDocenteId}
-          demoMode={demoMode}
-          showToast={showToast}
-        />
-      )}
-
-      {/* =====================================================
-          PESTAÑA 3: HABILITACIONES ACADÉMICAS
-          ===================================================== */}
-      {activeTab === 'habilitaciones' && (
-        <DocenteHabilitaciones
-          docentes={listadoDocentes}
-          initialDocenteId={selectedRestrictedDocenteId}
-          demoMode={demoMode}
-          showToast={showToast}
-        />
-      )}
 
       {/* MODAL REGISTRAR / EDITAR */}
       {isModalOpen && (

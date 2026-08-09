@@ -55,3 +55,19 @@ class BloqueHorario(BloqueHorarioBase):
         json_encoders = {
             time: lambda v: v.strftime('%H:%M:%S')
         }
+
+class BloqueGenerarRequest(BaseModel):
+    sede_id: int
+    duracion_minutos: int = 45
+    overwrite: bool = False
+
+    @field_validator('duracion_minutos')
+    def validate_duracion_generar(cls, v):
+        if v not in [30, 45, 60, 90, 120]:
+            raise ValueError("duracion_minutos debe ser 30, 45, 60, 90 o 120.")
+        return v
+
+class BloqueGenerarResult(BaseModel):
+    creados: int
+    omitidos: int
+    duracion_minutos: int

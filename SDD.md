@@ -379,6 +379,7 @@ sequenceDiagram
 | CRUD | `/usuarios/` | Público (endpoints sin dependencia de rol) | Gestión de usuarios. |
 | CRUD | `/sedes/`, `/carreras/`, `/trayectos-academicos/`, `/periodos-academicos/` | Escritura: ADMIN (algunos ADMIN/JEFE-PNF); Lectura: autenticados | Datos maestros académicos. |
 | CRUD | `/docentes/`, `/materias/`, `/aulas/`, `/grupos/`, `/lecciones/`, `/bloques-horarios/`, `/habilitaciones-docentes/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Datos maestros y restricciones. |
+| POST | `/bloques-horarios/estandar` | ADMIN/JEFE-PNF | Genera la grilla estándar L-V 08:00–16:00 de una sede. Idempotente: omite bloques existentes (`creados`/`omitidos`); `overwrite` renumera `orden_visual`. |
 | POST/PUT/DELETE | `/disponibilidades-docentes/` | ADMIN/JEFE-PNF/**DOCENTE** | Disponibilidad (el docente gestiona la suya). |
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
 | POST | `/schedules/generate?periodo_id=` | ADMIN/JEFE-PNF | Dispara generación asíncrona (202). |
