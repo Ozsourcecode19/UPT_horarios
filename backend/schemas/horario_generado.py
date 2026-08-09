@@ -83,3 +83,25 @@ class PreGenerationCheck(BaseModel):
     listo: bool = False
     class Config:
         from_attributes = True
+
+# Schema para listar las versiones de horario de un periodo (E4)
+class HorarioVersion(BaseModel):
+    version_horario: int
+    estado: str  # ACTIVO | HISTORICO | ...
+    total: int
+    generado_en: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+# Schema para solicitar el restore de una versión de horario (E4)
+class RestoreRequest(BaseModel):
+    periodo_id: int
+    version: int
+
+# Schema con el resultado de un restore de versión (E4)
+class RestoreResult(BaseModel):
+    periodo_id: int
+    version_horario: int
+    total_activos: int
+    class Config:
+        from_attributes = True

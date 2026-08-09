@@ -424,3 +424,100 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         lecciones_sin_disponibilidad=lecciones_sin_disponibilidad,
         listo=listo,
     )
+
+
+def get_versiones_horario(db: Session, periodo_id: int) -> List[schemas.HorarioVersion]:
+    """
+    Devuelve las versiones de horario generadas para un periodo académico,
+    agrupadas por version_horario y estado, con el total de registros y la
+    fecha de la última generación (E4 - control de versiones).
+    """
+    from sqlalchemy import func
+    resultados = db.query(
+        models.HorarioGenerado.version_horario,
+        models.HorarioGenerado.estado,
+        func.count(models.HorarioGenerado.id).label('total'),
+        func.max(models.HorarioGenerado.created_at).label('generado_en')
+    ).filter(
+        models.HorarioGenerado.periodo_id == periodo_id
+    ).group_by(
+        models.HorarioGenerado.version_horario,
+        models.HorarioGenerado.estado
+    ).order_by(
+        models.HorarioGenerado.version_horario.desc()
+    ).all()
+
+    return [
+        schemas.HorarioVersion(
+            version_horario=version,
+            estado=estado,
+            total=total,
+            generado_en=generado_en
+        )
+        for version, estado, total, generado_en in resultados
+    ]
+
+
+def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optional[schemas.RestoreResult]:
+    """
+    Restaura una versión de horario para un periodo académico: la versión
+    objetivo pasa a estado ACTIVO y la versión ACTIVO actual pasa a HISTORICO.
+    Devuelve None si la versión objetivo no existe para el periodo.
+    """
+    from sqlalchemy import func
+
+    # Verificar que la versión objetivo exista en el periodo
+    target_count = db.query(
+        func.count(models.HorarioGenerado.id)
+    ).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.version_horario == version
+    ).scalar() or 0
+
+    if target_count == 0:
+        return None
+
+    # Si la versión objetivo ya es la ACTIVA actual, no se necesita cambiar nada
+    activo_version = db.query(models.HorarioGenerado.version_horario).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO'
+    ).first()
+    if activo_version is not None and activo_version[0] == version:
+        total_activos = db.query(func.count(models.HorarioGenerado.id)).filter(
+            models.HorarioGenerado.periodo_id == periodo_id,
+            models.HorarioGenerado.estado == 'ACTIVO'
+        ).scalar() or 0
+        return schemas.RestoreResult(
+            periodo_id=periodo_id,
+            version_horario=version,
+            total_activos=total_activos,
+        )
+
+    try:
+        # La versión ACTIVO actual pasa a HISTORICO
+        db.query(models.HorarioGenerado).filter(
+            models.HorarioGenerado.periodo_id == periodo_id,
+            models.HorarioGenerado.estado == 'ACTIVO'
+        ).update({'estado': 'HISTORICO'}, synchronize_session='fetch')
+
+        # La versión objetivo pasa a ACTIVO
+        db.query(models.HorarioGenerado).filter(
+            models.HorarioGenerado.periodo_id == periodo_id,
+            models.HorarioGenerado.version_horario == version
+        ).update({'estado': 'ACTIVO'}, synchronize_session='fetch')
+
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise
+
+    total_activos = db.query(func.count(models.HorarioGenerado.id)).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO'
+    ).scalar() or 0
+
+    return schemas.RestoreResult(
+        periodo_id=periodo_id,
+        version_horario=version,
+        total_activos=total_activos,
+    )

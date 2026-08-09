@@ -13,7 +13,7 @@ from .habilitacion_docente import HabilitacionDocente, HabilitacionDocenteCreate
 from .configuracion import Configuracion, ConfiguracionCreate, ConfiguracionUpdate
 from .bloque_horario import BloqueHorario, BloqueHorarioCreate, BloqueHorarioUpdate
 from .leccion import Leccion, LeccionCreate, LeccionUpdate
-from .horario_generado import HorarioGenerado, HorarioGeneradoCreate, HorarioGeneradoUpdate, FullCalendarEvent, GenerationStatus, PreGenerationCheck
+from .horario_generado import HorarioGenerado, HorarioGeneradoCreate, HorarioGeneradoUpdate, FullCalendarEvent, GenerationStatus, PreGenerationCheck, HorarioVersion, RestoreRequest, RestoreResult
 
 __all__ = [
     "Usuario", "UsuarioCreate", "UsuarioUpdate",
@@ -30,5 +30,5 @@ __all__ = [
     "Configuracion", "ConfiguracionCreate", "ConfiguracionUpdate",
     "BloqueHorario", "BloqueHorarioCreate", "BloqueHorarioUpdate",
     "Leccion", "LeccionCreate", "LeccionUpdate",
-    "HorarioGenerado", "HorarioGeneradoCreate", "HorarioGeneradoUpdate", "FullCalendarEvent", "GenerationStatus", "PreGenerationCheck",
+    "HorarioGenerado", "HorarioGeneradoCreate", "HorarioGeneradoUpdate", "FullCalendarEvent", "GenerationStatus", "PreGenerationCheck", "HorarioVersion", "RestoreRequest", "RestoreResult",
 ]
