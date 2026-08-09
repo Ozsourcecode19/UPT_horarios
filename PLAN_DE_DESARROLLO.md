@@ -69,9 +69,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 ## Fase B · Módulos pendientes (frontend)
 
-### E5 — Página de gestión de Periodos (~2 h)
+### E5 — Página de gestión de Periodos (~2 h) ✅ COMPLETADA
 - `src/pages/Periodos.jsx` (react-hook-form + zod) conectado a `api/periodos.js`; ruta `/periodos` + item en sidebar del `MainLayout`.
-- ✅ Criterio: crear/editar/desactivar periodo desde la UI.
+- Backend sin cambios (endpoints `periodos_academicos` ya listos). "Desactivar" = `PUT` con `estado='CERRADO'` (sin borrado físico para no romper FKs con lecciones/horarios).
+- Patrón Modo Demo (`demo_periodos`), `queryKey ['periodos']` compartido (invalidateQueries refresca selectores de Horarios/Lecciones), escrituras gateadas por rol `ADMIN` vía `useAuth`.
+- ✅ Criterio: crear/editar/desactivar periodo desde la UI. **Verificado** (`pnpm build` OK).
 
 ### E6 — Dashboard dinámico (~2 h)
 - Reemplazar stats hardcodeadas por `useQuery` reales (docentes, materias, aulas, periodos, horarios ACTIVO del periodo vigente) con patrón Modo Demo (`retry: 0`).
