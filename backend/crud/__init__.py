@@ -9,7 +9,7 @@ from .docentes import get_docente, get_docentes, create_docente, update_docente,
 from .materias import get_materia, get_materias, create_materia, update_materia, delete_materia
 from .aulas import get_aula, get_aulas, create_aula, update_aula, delete_aula
 from .disponibilidades_docentes import get_disponibilidad_docente, get_disponibilidades_docente, create_disponibilidad_docente, update_disponibilidad_docente, delete_disponibilidad_docente
-from .habilitaciones_docentes import get_habilitacion_docente, get_habilitaciones_docente, create_habilitacion_docente, update_habilitacion_docente, delete_habilitacion_docente
+from .habilitaciones_docentes import get_habilitacion_docente, get_habilitaciones_docente, create_habilitacion_docente, update_habilitacion_docente, delete_habilitacion_docente, validate_delete_habilitacion
 from .configuraciones import get_configuracion, get_configuraciones, create_configuracion, update_configuracion, delete_configuracion
 from .bloques_horarios import get_bloque_horario, get_bloques_horarios, create_bloque_horario, update_bloque_horario, delete_bloque_horario
 from .lecciones import get_leccion, get_lecciones, create_leccion, update_leccion, delete_leccion
@@ -27,7 +27,7 @@ __all__ = [
     "get_materia", "get_materias", "create_materia", "update_materia", "delete_materia",
     "get_aula", "get_aulas", "create_aula", "update_aula", "delete_aula",
     "get_disponibilidad_docente", "get_disponibilidades_docente", "create_disponibilidad_docente", "update_disponibilidad_docente", "delete_disponibilidad_docente",
-    "get_habilitacion_docente", "get_habilitaciones_docente", "create_habilitacion_docente", "update_habilitacion_docente", "delete_habilitacion_docente",
+    "get_habilitacion_docente", "get_habilitaciones_docente", "create_habilitacion_docente", "update_habilitacion_docente", "delete_habilitacion_docente", "validate_delete_habilitacion",
     "get_configuracion", "get_configuraciones", "create_configuracion", "update_configuracion", "delete_configuracion",
     "get_bloque_horario", "get_bloques_horarios", "create_bloque_horario", "update_bloque_horario", "delete_bloque_horario",
     "get_leccion", "get_lecciones", "create_leccion", "update_leccion", "delete_leccion",

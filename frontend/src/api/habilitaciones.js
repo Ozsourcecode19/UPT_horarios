@@ -20,6 +20,11 @@ const HabilitacionesService = {
     return response.data;
   },
 
+  validateDelete: async (id) => {
+    const response = await apiClient.get(`/habilitaciones-docentes/${id}/validate-delete`);
+    return response.data;
+  },
+
   deleteHabilitacion: async (id) => {
     const response = await apiClient.delete(`/habilitaciones-docentes/${id}`);
     return response.data;

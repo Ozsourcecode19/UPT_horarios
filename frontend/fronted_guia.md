@@ -474,4 +474,34 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 1. **Bug corregido:** Eliminación de docentes — cascada en modelo SQLAlchemy + try-except en CRUD
 2. **Fase 5 investigada:** El botón y el backend están implementados. El problema de "no se ven horarios" requiere Fix A (limpiar antes de insertar) y Fix B (polling en lugar de timeout) detallados en la Sección 4
-3. **Fase 5 pendiente de ejecutar:** La implementación de las correcciones del punto anterior estaba en progreso cuando se creó este documento
+3. **Fase 5 completada:** La implementación de las correcciones de sincronización e idempotencia se completó exitosamente.
+
+### Contexto de la Sesión Actual (2026-07-25)
+
+1. **Fase 5 solucionada y probada al 100%:** Se corrigió el problema de "Horarios no se ven reflejados" al disparar la generación automática:
+   - **Backend (`or_tools_adapter.py`):**
+     - Se añadió `_clear_previous_schedules(periodo_id)` para garantizar **idempotencia** eliminando horarios previos activos antes de insertar nuevos resultados.
+     - **Fix Crítico de Sede:** Se añadió la condición `if aula.sede_id != bloque.sede_id: continue` al instanciar las variables de decisión `x[leccion, bloque, aula]`, evitando que el solver viole el trigger PL/pgSQL `fn_validar_sede_horario()` de PostgreSQL.
+     - **Fix de Disponibilidades:** Se ajustó el filtro de disponibilidad para interpretar adecuadamente franjas `NO_DISPONIBLE` y considerar disponibilidad por defecto cuando no hay restricciones explícitas.
+   - **Frontend (`Horarios.jsx`):** Se implementó una estrategia de **polling reactivo** (hasta 10 intentos cada 3s) sobre `refetchHorarios()`, garantizando la actualización automática de FullCalendar e invalidación de caché en React Query tras concluir el proceso asíncrono.
+   - **Verificación Práctica:** Se ejecutó la prueba automatizada directa contra la base de datos real `horarios_upt`, logrando un estado de solver `OPTIMAL (4)`, persistencia limpia idempotente de 1 horario activo y mapeo transparente al formato `FullCalendarEvent`.
+
+2. **Optimización de la Vista de FullCalendar:**
+   - **Cálculo de fechas en backend (`crud/horarios_generados.py`):** Se corrigió `fecha_evento` calculando `lunes_base = fecha_inicio_periodo - timedelta(days=fecha_inicio_periodo.weekday())`. Esto resolvió el problema donde períodos iniciados en fin de semana (ej. domingo `2026-03-01`) proyectaban las clases sobre fines de semana, siendo ocultadas por `weekends={false}`.
+   - **Filtros predeterminados en frontend (`Horarios.jsx`):** Se cambió el estado inicial de `filterType` a `'todos'`, asegurando que todos los eventos generados sean visibles de inmediato sin requerir desmarcar filtros de aula.
+   - **Navegación dinámica:** Se implementó un `useEffect` que invoca `api.gotoDate(selectedPeriodo.fecha_inicio)` al cambiar de período para mantener la grilla siempre enfocada en la semana correcta.
+
+3. **Control Defensivo en Eliminación de Habilitaciones Docentes (Revision.md):**
+   - **Backend (`crud/habilitaciones_docentes.py` y `routers/habilitaciones_docentes.py`):**
+     - Se añadió `validate_delete_habilitacion` y el endpoint `GET /{hab_id}/validate-delete` para diagnosticar lecciones afectadas y estado de períodos.
+     - En períodos `ACTIVO`, se retorna HTTP 409 `HABILITACION_EN_USO` bloqueando borrados directos y sugiriendo `fecha_hasta`.
+     - En períodos `PLANIFICACION`, se permite la eliminación inactivando automáticamente las lecciones vinculadas (`activo = False`).
+   - **Frontend (`DocenteHabilitaciones.jsx`):**
+     - Se integró `validateDelete` en `HabilitacionesService` y un modal de confirmación defensiva que despliega advertencias dinámicas e instructivos según el período.
+
+### Contexto de la Sesión Actual (2026-08-01)
+
+1. **Verificación e Integración de la Solución Defensiva de Revision.md:**
+   - Se revisó y validó formalmente la arquitectura de **Defensa en 3 Niveles** implementada para gestionar la eliminación de habilitaciones docentes asociadas a lecciones en el sistema.
+   - Se formalizó la documentación técnica, generando el artifact del [Plan de Implementación](file:///home/oz/.gemini/antigravity-ide/brain/01f4ab69-86c5-4764-92dc-c2375e9a244c/plan_implementacion_defensa_habilitaciones.md) y del [Reporte de Implementación](file:///home/oz/.gemini/antigravity-ide/brain/01f4ab69-86c5-4764-92dc-c2375e9a244c/reporte_implementacion_defensa_habilitaciones.md).
+   - Se confirmó que la lógica general del frontend y backend se mantiene intacta mientras se evitan incoherencias en las restricciones del solver OR-Tools y en las vistas de FullCalendar.
