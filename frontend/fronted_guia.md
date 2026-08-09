@@ -55,6 +55,7 @@ frontend/src/
 │   ├── Aulas.jsx               ✅ CRUD completo
 │   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
 │   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Modo Demo
+│   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
 │   └── Settings.jsx            ⚠️ Placeholder vacío
 │
 ├── routes/
@@ -378,6 +379,8 @@ npm install @fullcalendar/resource-timegrid @fullcalendar/resource-daygrid
 #### E. Módulo de Períodos Académicos
 No existe una página de gestión de periodos. El usuario no puede crear/editar periodos desde el frontend. Crear `Periodos.jsx` con CRUD y conectar a `api/periodos.js`.
 
+> **✅ Implementado (E5):** `src/pages/Periodos.jsx` con react-hook-form + zod, búsqueda, stat cards (total/ACTIVO/PLANIFICACION/CERRADO), badges por estado y tipo de corte, modal de crear/editar y confirmación de cierre/reactivación. Ruta `/periodos` + ítem en el sidebar (`CalendarRange`). "Desactivar" = `PUT estado='CERRADO'` (sin borrado físico). Escrituras gateadas por rol `ADMIN` vía `useAuth`; otros roles ven "Solo lectura". Invalidación del `queryKey ['periodos']` compartido (refresca selectores de Horarios/Lecciones).
+
 #### F. Dashboard dinámico con gráficas
 Reemplazar las tarjetas estáticas del Dashboard con:
 - Datos reales de la API (ver Bug Dashboard)
@@ -548,3 +551,15 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
      - Botón **"Restaurar versión"** deshabilitado si: rol no es ADMIN/JEFE-PNF (`canRestore` vía `useAuth`), versión seleccionada ya es la ACTIVA, hay generación en curso o la mutación está pendiente.
      - `useMutation` de restore → `onSuccess` invalida `['horarios', periodoId]` + `['schedule-versions', periodoId]`, `refetchHorarios()` y `refetchVersiones()`; `onError` muestra `detail` del backend.
    - **Verificación:** `pnpm build` OK; E2E API — restore v2 → FullCalendar refleja la versión restaurada; DOCENTE → 403 en `POST /restore` y 200 en `GET /versions` (gateo por rol del backend como segunda barrera).
+
+### Contexto de la Sesión Actual (2026-08-09) — E5
+
+1. **E5 — Página de gestión de Periodos (frontend, completado):**
+   - **`src/pages/Periodos.jsx`** (nuevo, patrón de `Materias.jsx`): CRUD completo sobre `/api/periodos-academicos/` sin cambios de backend.
+     - Schema zod: `nombre` (1–50), `tipo_corte` (SEMESTRAL/TRIMESTRAL/CUATRIMESTRAL/ANUAL), `anio_academico` (1990–2100), `fecha_inicio`/`fecha_fin` (input `date`, `superRefine` `fecha_fin >= fecha_inicio`), `estado` (ACTIVO/CERRADO/PLANIFICACION/ARCHIVADO).
+     - **"Desactivar" = `PUT estado='CERRADO'`** (botón "Cerrar periodo" con confirmación) y "Reactivar" = `estado='ACTIVO'`. Sin borrado físico para no romper FKs con lecciones/grupos/horarios.
+     - Escrituras (Añadir/Editar/Cerrar/Reactivar) gateadas por rol **ADMIN** vía `useAuth` (el backend responde 403 a otros roles); DOCENTE/LECTOR ven la tabla en modo "Solo lectura".
+     - Modo Demo con `demo_periodos` en `localStorage` y banner "Reconectar API"; `useQuery(['periodos'], retry: 0)`; `invalidateQueries(['periodos'])` tras cada mutación (key compartido con Horarios/Lecciones, sus selectores se refrescan automáticamente).
+     - UI: stat cards (total/ACTIVO/PLANIFICACION/CERRADO), búsqueda, tabla (nombre + año, badge tipo de corte, vigencia formateada en `es-VE`, badge de estado con color), modal crear/editar y confirmación de cierre/reactivación.
+   - **Integración:** ruta `/periodos` en `AppRouter.jsx` y ítem "Periodos" (`CalendarRange`) en el sidebar de `MainLayout.jsx`.
+   - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size).
