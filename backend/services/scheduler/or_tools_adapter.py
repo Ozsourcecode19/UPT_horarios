@@ -50,6 +50,18 @@ class ScheduleGenerator:
             }
         return config_dict
 
+    def _parse_hora_jornada(self, clave: str, default: time) -> time:
+        """
+        Parsea una clave de hora de jornada desde la config a un objeto time.
+        Devuelve el default si el valor está ausente o es inválido.
+        """
+        raw = self.config.get(clave)
+        try:
+            horas, minutos, _ = str(raw).split(":")
+            return time(hour=int(horas), minute=int(minutos))
+        except (ValueError, TypeError):
+            return default
+
     def start_generation(self, periodo_academico_id: int):
         """
         Inicia la generación de horarios para un periodo académico específico.
@@ -93,6 +105,18 @@ class ScheduleGenerator:
         bloques = self.db.query(models.BloqueHorario).filter(
             models.BloqueHorario.activo == True
         ).all()
+
+        # Ventana de jornada: solo se consideran bloques dentro de
+        # [hora_inicio_jornada, hora_fin_jornada] (hora de inicio + duracion).
+        hora_inicio_jornada = self._parse_hora_jornada("hora_inicio_jornada", time(7, 0))
+        hora_fin_jornada = self._parse_hora_jornada("hora_fin_jornada", time(15, 0))
+        if hora_fin_jornada <= hora_inicio_jornada:
+            hora_inicio_jornada, hora_fin_jornada = time(7, 0), time(15, 0)
+        bloques = [
+            b for b in bloques
+            if b.hora_inicio >= hora_inicio_jornada
+            and (datetime.combine(date.min, b.hora_inicio) + timedelta(minutes=b.duracion_minutos)).time() <= hora_fin_jornada
+        ]
 
         # 2. Definir dominios (días, horas, aulas)
         # Obtener IDs relevantes
