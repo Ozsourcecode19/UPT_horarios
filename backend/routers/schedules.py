@@ -67,6 +67,16 @@ def get_generation_status(periodo_id: int):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No hay estado de generación registrado para el periodo {periodo_id}. Dispara POST /schedules/generate primero.")
     return schemas.GenerationStatus(**tracker_status)
 
+# Endpoint para consultar el checklist de prerequisitos antes de generar horarios
+@router.get("/pre-generation-check", response_model=schemas.PreGenerationCheck, summary="Checklist de prerequisitos para generar horarios", dependencies=[Depends(get_current_active_user)])
+def get_pre_generation_check(periodo_id: int, db: Session = Depends(get_db)):
+    """
+    Devuelve un checklist con los prerequisitos para generar el horario de un
+    periodo académico (lecciones activas, docentes con disponibilidad/habilitación,
+    aulas y bloques). El campo 'listo' indica si la generación tiene sentido.
+    """
+    return crud.get_pre_generation_check(db, periodo_id=periodo_id)
+
 # Endpoint para obtener horarios en formato FullCalendar
 @router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar", dependencies=[Depends(get_current_active_user)])
 def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):

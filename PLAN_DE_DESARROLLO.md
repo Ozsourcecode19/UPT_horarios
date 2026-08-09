@@ -21,6 +21,7 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 **Ejecuciones del plan:**
 - ✅ **E0** — Commiteado (`73d7d77` "new adds"): fixes de Fase 4/5 (idempotencia `_clear_previous_schedules`, consistencia de sede en el solver, disponibilidad NO_DISPONIBLE, cálculo `lunes_base`, polling reactivo, defensa de habilitaciones, z-index toast) + `AGENTS.md`, `SDD.md`, `PLAN_DE_DESARROLLO.md`. Verificado manualmente (`OPTIMAL (4)`). `git status` limpio.
 - ✅ **E1** — Commiteado (`94f938e` "E1: endpoint generation-status con tracker de estado en memoria"): `services/scheduler/status_tracker.py` (PENDING/DONE/FAILED + count + timestamp, en memoria) + endpoint autenticado `GET /api/schedules/generation-status?periodo_id=` (404 si no hay estado). Criterio verificado: tras `POST /generate`, PENDING→DONE con `count > 0`.
+- ✅ **E2** — Commiteado: `GET /api/schedules/pre-generation-check?periodo_id=` (`crud.get_pre_generation_check`, schema `PreGenerationCheck`) + panel de checklist en `Horarios.jsx` que bloquea "Generación Inteligente" cuando `listo=false` (críticos en 0: lecciones/aulas/bloques/docentes con habilitación). Disponibilidad=0 es advertencia. Criterio verificado: `pnpm build` OK y backend importa OK.
 
 **Pendientes:** E2–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
@@ -44,9 +45,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ Criterio: tras `POST /generate`, el endpoint pasa de PENDING a DONE con `count > 0`. **Verificado** (commit `94f938e`).
 
 ### E2 — Pre-generation-check (~2 h)
-- Backend: `GET /api/schedules/pre-generation-check?periodo_id=` → checklist `{lecciones_activas, docentes_con_disponibilidad, docentes_con_habilitacion, aulas, bloques}`.
-- Frontend `Horarios.jsx`: panel de checklist con advertencias; deshabilitar "Generación Inteligente" si hay items críticos en 0.
-- ✅ Criterio: periodo sin lecciones muestra warning y bloquea el botón.
+- Backend: `GET /api/schedules/pre-generation-check?periodo_id=` → checklist `{lecciones_activas, docentes_con_disponibilidad, docentes_con_habilitacion, aulas, bloques}` + campos extra `lecciones_sin_habilitacion`, `lecciones_sin_disponibilidad` y booleano `listo` (`crud.get_pre_generation_check`).
+- Frontend `Horarios.jsx`: panel de checklist con advertencias; deshabilitar "Generación Inteligente" si hay items críticos en 0 (`listo=false`). Disponibilidad=0 es solo advertencia (el solver asume disponibilidad total por defecto).
+- ✅ Criterio: periodo sin lecciones muestra warning y bloquea el botón. **Verificado** (`pnpm build` OK, backend importa OK).
 
 ### E3 — Polling por estado en Horarios.jsx (~2 h)
 - Reemplazar el polling sobre `refetchHorarios()` por polling a `generation-status` (10×3 s): DONE→refetch, FAILED→toast con causa, PENDING→spinner.

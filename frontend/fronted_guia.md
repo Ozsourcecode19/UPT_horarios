@@ -358,6 +358,8 @@ Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 reg
 - Endpoint `GET /api/schedules/pre-generation-check?periodo_id={id}` que valide los prerequisitos
 - Bloquear el botón de generación y mostrar checklist si falta algo
 
+> **✅ Implementado (E2):** El endpoint devuelve `{lecciones_activas, docentes_con_disponibilidad, docentes_con_habilitacion, aulas, bloques, lecciones_sin_habilitacion, lecciones_sin_disponibilidad, listo}`. `Horarios.jsx` muestra un panel de checklist y deshabilita "Generación Inteligente" cuando `listo=false` (críticos en 0).
+
 ---
 
 ### Prioridad Media (Mejoras de UX significativas)
@@ -447,6 +449,8 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 - Habilitaciones: `/api/habilitaciones-docentes/`
 - Horarios FullCalendar: `GET /api/schedules/fullcalendar?periodo_id={id}`
 - Generar horario: `POST /api/schedules/generate?periodo_id={id}`
+- Estado de generación: `GET /api/schedules/generation-status?periodo_id={id}`
+- Checklist previo: `GET /api/schedules/pre-generation-check?periodo_id={id}`
 - Validar movimiento: `POST /api/schedules/validate-move`
 
 **Roles de usuario (backend `require_role`):**  

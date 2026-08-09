@@ -70,3 +70,16 @@ class GenerationStatus(BaseModel):
     timestamp: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+# Schema para el checklist previo a la generación de horarios
+class PreGenerationCheck(BaseModel):
+    lecciones_activas: int = 0
+    docentes_con_disponibilidad: int = 0
+    docentes_con_habilitacion: int = 0
+    aulas: int = 0
+    bloques: int = 0
+    lecciones_sin_habilitacion: int = 0
+    lecciones_sin_disponibilidad: int = 0
+    listo: bool = False
+    class Config:
+        from_attributes = True

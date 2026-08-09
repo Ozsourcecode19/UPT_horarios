@@ -348,3 +348,79 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
             print(f"DEBUG ERROR: Datos del primer evento: {eventos[0].model_dump() if eventos else 'N/A'}")
             
     return eventos
+
+
+def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerationCheck:
+    """
+    Genera un checklist con los prerequisitos para poder generar el horario
+    de un periodo académico. Refleja los mismos filtros que usa el solver
+    en or_tools_adapter (lecciones activas, aulas activas, bloques activos).
+    """
+    from sqlalchemy import func
+
+    # Docentes que tienen lecciones activas en el periodo
+    docentes_periodo = db.query(
+        func.distinct(models.Leccion.docente_id)
+    ).filter(
+        models.Leccion.periodo_id == periodo_id,
+        models.Leccion.activo == True  # noqa: E712
+    ).all()
+    docente_ids = {row[0] for row in docentes_periodo}
+
+    docentes_con_disponibilidad = 0
+    docentes_con_habilitacion = 0
+    if docente_ids:
+        docentes_con_disponibilidad = db.query(
+            func.count(func.distinct(models.DisponibilidadDocente.docente_id))
+        ).filter(models.DisponibilidadDocente.docente_id.in_(docente_ids)).scalar() or 0
+
+        docentes_con_habilitacion = db.query(
+            func.count(func.distinct(models.HabilitacionDocente.docente_id))
+        ).filter(models.HabilitacionDocente.docente_id.in_(docente_ids)).scalar() or 0
+
+    # Lecciones activas del periodo y parejas (docente, materia) habilitadas
+    lecciones_activas = db.query(models.Leccion).filter(
+        models.Leccion.periodo_id == periodo_id,
+        models.Leccion.activo == True  # noqa: E712
+    ).all()
+
+    # Parejas (docente_id, materia_id) con habilitación en la tabla
+    parejas_habilitadas = set(db.query(
+        models.HabilitacionDocente.docente_id,
+        models.HabilitacionDocente.materia_id
+    ).all())
+
+    # Docentes con al menos una disponibilidad registrada
+    docentes_con_disp = set(db.query(
+        func.distinct(models.DisponibilidadDocente.docente_id)
+    ).all())
+    docentes_con_disp = {row[0] for row in docentes_con_disp}
+
+    lecciones_sin_habilitacion = 0
+    lecciones_sin_disponibilidad = 0
+    for leccion in lecciones_activas:
+        if (leccion.docente_id, leccion.materia_id) not in parejas_habilitadas:
+            lecciones_sin_habilitacion += 1
+        if leccion.docente_id not in docentes_con_disp:
+            lecciones_sin_disponibilidad += 1
+
+    aulas = db.query(models.Aula).filter(models.Aula.activa == True).count()  # noqa: E712
+    bloques = db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True).count()  # noqa: E712
+
+    listo = (
+        len(lecciones_activas) > 0
+        and aulas > 0
+        and bloques > 0
+        and docentes_con_habilitacion > 0
+    )
+
+    return schemas.PreGenerationCheck(
+        lecciones_activas=len(lecciones_activas),
+        docentes_con_disponibilidad=docentes_con_disponibilidad,
+        docentes_con_habilitacion=docentes_con_habilitacion,
+        aulas=aulas,
+        bloques=bloques,
+        lecciones_sin_habilitacion=lecciones_sin_habilitacion,
+        lecciones_sin_disponibilidad=lecciones_sin_disponibilidad,
+        listo=listo,
+    )

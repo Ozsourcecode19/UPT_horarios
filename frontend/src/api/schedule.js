@@ -18,6 +18,14 @@ const ScheduleService = {
     return response.data;
   },
 
+  // Obtiene el checklist de prerequisitos para la generación de un periodo
+  getPreGenerationCheck: async (periodoId) => {
+    const response = await apiClient.get('/schedules/pre-generation-check', {
+      params: { periodo_id: periodoId }
+    });
+    return response.data;
+  },
+
   // Valida un movimiento tentativo de bloque u aula antes de guardarlo en la base de datos
   validateMove: async (moveData) => {
     // moveData: { horario_id: number, nuevo_bloque_id?: number, nueva_aula_id?: number }
