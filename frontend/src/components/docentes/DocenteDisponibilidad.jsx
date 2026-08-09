@@ -130,31 +130,68 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
 
   const dias = diasLaborables.map(id => ({ id, nombre: DIAS_NOMBRES[id] || `Día ${id}` }));
 
+  // Ventana de jornada según la configuración: la grilla solo muestra bloques
+  // dentro de [hora_inicio_jornada, hora_fin_jornada] (hora de inicio + duración),
+  // igual que el solver.
+  const ventanaJornada = React.useMemo(() => {
+    if (demoMode) return { inicio: '07:00:00', fin: '15:00:00' };
+    const normalizar = v => {
+      if (typeof v !== 'string') return null;
+      const parts = v.split(':').map(Number);
+      if (parts.length < 2 || parts[0] < 0 || parts[0] > 23 || parts[1] < 0 || parts[1] > 59) return null;
+      return `${String(parts[0]).padStart(2, '0')}:${String(parts[1]).padStart(2, '0')}:${parts[2] != null ? String(parts[2]).padStart(2, '0') : '00'}`;
+    };
+    const inicio = normalizar(configsReal.find(c => c.clave === 'hora_inicio_jornada')?.valor) || '07:00:00';
+    const fin = normalizar(configsReal.find(c => c.clave === 'hora_fin_jornada')?.valor) || '15:00:00';
+    return { inicio, fin: fin > inicio ? fin : '15:00:00' };
+  }, [configsReal, demoMode]);
+
+  // Bloques activos de la sede seleccionada (modo real)
+  const bloquesSede = React.useMemo(() => {
+    if (demoMode) return [];
+    return bloquesList.filter(b => b.sede_id === Number(selectedSedeId) && b.activo);
+  }, [bloquesList, selectedSedeId, demoMode]);
+
+  // Calcular hora_fin de un bloque sumando su duración
+  const calcularFin = (b) => {
+    const [h, m, s] = b.hora_inicio.split(':').map(Number);
+    const date = new Date();
+    date.setHours(h, m + b.duracion_minutos, s || 0);
+    return date.toTimeString().split(' ')[0];
+  };
+
+  // Motivo si la grilla queda vacía (solo modo real): la sede no tiene bloques
+  // o los bloques caen fuera de la ventana de jornada.
+  const motivoSinBloques = React.useMemo(() => {
+    if (demoMode) return null;
+    if (bloquesSede.length === 0) return 'sin_bloques';
+    const dentroVentana = bloquesSede.some(b => b.hora_inicio >= ventanaJornada.inicio && calcularFin(b) <= ventanaJornada.fin);
+    return dentroVentana ? null : 'fuera_ventana';
+  }, [demoMode, bloquesSede, ventanaJornada]);
+
   // Filtrar bloques por la sede seleccionada, y extraer los rangos horarios únicos ordenados
   const timeSlots = React.useMemo(() => {
-    const sedeFiltered = bloquesList.filter(b => b.sede_id === Number(selectedSedeId) && b.activo);
-    
-    if (sedeFiltered.length === 0) {
-      return FALLBACK_BLOQUES_TIME;
+    // Modo demo: fallback de contingencia (mock)
+    if (demoMode) return FALLBACK_BLOQUES_TIME;
+
+    const dentroVentana = bloquesSede.filter(b =>
+      b.hora_inicio >= ventanaJornada.inicio && calcularFin(b) <= ventanaJornada.fin
+    );
+
+    if (dentroVentana.length === 0) {
+      return [];
     }
 
-    // Obtener rangos únicos de hora_inicio y hora_fin
     const uniqueTimes = [];
     const seen = new Set();
 
-    sedeFiltered.forEach(b => {
-      const key = `${b.hora_inicio}-${b.hora_inicio}`; // En BD el bloque tiene hora_inicio y duracion
+    dentroVentana.forEach(b => {
+      const key = b.hora_inicio;
       if (!seen.has(key)) {
         seen.add(key);
-        // Calcular hora_fin sumando duracion
-        const [h, m, s] = b.hora_inicio.split(':').map(Number);
-        const date = new Date();
-        date.setHours(h, m + b.duracion_minutos, s || 0);
-        const horaFinStr = date.toTimeString().split(' ')[0];
-
         uniqueTimes.push({
           start: b.hora_inicio,
-          end: horaFinStr,
+          end: calcularFin(b),
           label: `Bloque (${b.hora_inicio.slice(0, 5)})`
         });
       }
@@ -162,7 +199,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
 
     // Ordenar por hora de inicio
     return uniqueTimes.sort((a, b) => a.start.localeCompare(b.start));
-  }, [bloquesList, selectedSedeId]);
+  }, [demoMode, bloquesSede, ventanaJornada]);
 
   // --- QUERIES: OBTENER DISPONIBILIDADES DEL DOCENTE ---
   const { data: dispsReal = [], isLoading: isLoadingDisps } = useQuery({
@@ -427,6 +464,17 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
 
           {/* GRILLA DE DISPONIBILIDAD */}
           <div className="bg-white border border-slate-100 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden">
+            <div className="px-6 py-2.5 bg-slate-50/60 border-b border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold">Ventana de jornada:</span>{' '}
+                {ventanaJornada.inicio.slice(0, 5)} – {ventanaJornada.fin.slice(0, 5)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold">Días:</span> {dias.length}
+              </span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left">
                 <thead>
@@ -443,6 +491,23 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                       <td colSpan={dias.length + 1} className="py-12 text-center text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500 mb-2" />
                         <span>Cargando grilla horaria...</span>
+                      </td>
+                    </tr>
+                  ) : timeSlots.length === 0 ? (
+                    <tr>
+                      <td colSpan={dias.length + 1} className="py-12 px-6 text-center">
+                        <AlertTriangle className="w-8 h-8 mx-auto text-amber-500 mb-2" />
+                        <p className="text-sm font-semibold text-slate-600">
+                          {motivoSinBloques === 'fuera_ventana'
+                            ? 'La sede no tiene bloques dentro de la ventana de jornada'
+                            : 'La sede seleccionada no tiene bloques horarios configurados'}
+                        </p>
+                        {motivoSinBloques === 'fuera_ventana' && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            Ventana actual: {ventanaJornada.inicio.slice(0, 5)} – {ventanaJornada.fin.slice(0, 5)}. Ajusta{' '}
+                            <span className="font-semibold">hora_fin_jornada</span> en Configuración para ampliarla.
+                          </p>
+                        )}
                       </td>
                     </tr>
                   ) : (

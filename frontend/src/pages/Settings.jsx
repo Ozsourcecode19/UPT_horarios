@@ -461,10 +461,16 @@ const Settings = () => {
                   <div className="p-4 bg-amber-50/50 border border-amber-100/60 rounded-2xl flex gap-3">
                     <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-800 leading-relaxed">
-                      Nota: las claves <span className="font-semibold">hora_inicio_jornada</span>,{' '}
-                      <span className="font-semibold">hora_fin_jornada</span> y{' '}
-                      <span className="font-semibold">duracion_bloque_default</span> se guardan, pero el solver
-                      actualmente solo usa <span className="font-semibold">dias_laborables</span>,{' '}
+                      Nota: <span className="font-semibold">hora_inicio_jornada</span> y{' '}
+                      <span className="font-semibold">hora_fin_jornada</span> definen la ventana de jornada: el
+                      solver y la grilla de disponibilidad solo usan bloques dentro de ese rango (hora de inicio +
+                      duración). Esto también recorta los bloques fuera de la ventana, incluidos los{' '}
+                      <span className="font-semibold">15:00–20:00</span> de la sede virtual: sube{' '}
+                      <span className="font-semibold">hora_fin_jornada</span> a{' '}
+                      <span className="font-semibold">20:00:00</span> para mostrarlos todos. La clave{' '}
+                      <span className="font-semibold">duracion_bloque_default</span> se guarda pero aún no afecta la
+                      generación (la duración la define cada bloque). El solver también usa{' '}
+                      <span className="font-semibold">dias_laborables</span>,{' '}
                       <span className="font-semibold">soft_constraint_gap_weight</span> y{' '}
                       <span className="font-semibold">soft_constraint_compact_weight</span>.
                     </p>
