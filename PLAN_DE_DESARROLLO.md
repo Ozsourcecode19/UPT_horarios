@@ -81,10 +81,12 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Detalles: periodo vigente = `estado='ACTIVO'` (fallback primer periodo), 5 StatCards (docentes activos, materias, aulas activas, periodos, horarios del periodo vigente con subtítulo), hero saluda al usuario (`useAuth`), 4 acciones rápidas (incluye `/periodos` de E5), `trend` eliminado (sin histórico real), skeleton en carga.
 - ✅ Criterio: los números cambian al modificar datos. **Verificado** (`pnpm build` OK).
 
-### E7 — Módulo de Configuración (Settings real) (~2–3 h)
+### E7 — Módulo de Configuración (Settings real) (~2–3 h) ✅ COMPLETADA
 - Conectar `Settings.jsx` a `GET/PUT /api/configuraciones/` (JSONB `configuracion`): `dias_laborables`, `hora_inicio_jornada`, `soft_constraint_gap_weight`.
-- Verificar que `or_tools_adapter` ya lee la config (si usa defaults hardcodeados, corregir lectura).
-- ✅ Criterio: cambiar un peso en la UI y ver su efecto en una regeneración.
+- Nuevo `api/configuraciones.js` (`getConfiguraciones`/`getConfiguracion`/`updateConfiguracion`). Formulario mapeado con react-hook-form + zod desde los datos de la API: `dias_laborables` (7 checkboxes), horas inicio/fin (`type="time"`), `duracion_bloque_default` (15–120), gap/compact weight (sliders 0–100); `version_sistema`/`timezone_default` solo lectura. Guardado por clave (`PUT`) + `invalidateQueries(['configuraciones'])`; gateo por rol `ADMIN` (`useAuth`); patrón Modo Demo (`demo_configuraciones`).
+- Verificación: `or_tools_adapter` ya lee la config (`_load_config_from_db`), sin tocar el solver. `hora_inicio_jornada`/`hora_fin_jornada`/`duracion_bloque_default` se guardan pero aún no afectan a la generación (nota visible en la UI).
+- Fix (misma ejecución): la grilla de disponibilidad (`DocenteDisponibilidad.jsx`) pasa de días fijos L–S a días dinámicos según `dias_laborables` (consulta `['configuraciones']`, sanitizado 1–7, default `[1,2,3,4,5]`), para que el docente configure solo los días que el solver considera (y se habilite el caso Domingo=7, antes invisible).
+- ✅ Criterio: cambiar un peso en la UI y ver su efecto en una regeneración. **Verificado** (`pnpm build` OK; `soft_constraint_gap_weight`/`compact_weight`/`dias_laborables` son los que consume el solver).
 
 ## Fase C · Visualización avanzada
 

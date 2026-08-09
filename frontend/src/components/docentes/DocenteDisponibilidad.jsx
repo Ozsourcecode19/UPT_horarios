@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import DisponibilidadesService from '../../api/disponibilidades';
 import BloquesService from '../../api/bloques';
+import ConfiguracionesService from '../../api/configuraciones';
 
 // 18 bloques estándar de 45 minutos (fallback de contingencia)
 const FALLBACK_BLOQUES_TIME = [
@@ -29,14 +30,19 @@ const FALLBACK_BLOQUES_TIME = [
   { start: "19:45:00", end: "20:30:00", label: "Bloque 18" }
 ];
 
-const DIAS = [
-  { id: 1, nombre: 'Lunes' },
-  { id: 2, nombre: 'Martes' },
-  { id: 3, nombre: 'Miércoles' },
-  { id: 4, nombre: 'Jueves' },
-  { id: 5, nombre: 'Viernes' },
-  { id: 6, nombre: 'Sábado' }
-];
+// Nombres de los días de la semana (1=Lunes, 7=Domingo)
+const DIAS_NOMBRES = {
+  1: 'Lunes',
+  2: 'Martes',
+  3: 'Miércoles',
+  4: 'Jueves',
+  5: 'Viernes',
+  6: 'Sábado',
+  7: 'Domingo'
+};
+
+// Días laborables por defecto si no hay configuración (Lun-Vie)
+const DIAS_LABORABLES_DEFAULT = [1, 2, 3, 4, 5];
 
 const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = null, demoMode = false, showToast = () => {} }) => {
   const queryClient = useQueryClient();
@@ -92,6 +98,37 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
   });
 
   const bloquesList = demoMode ? [] : bloquesReal;
+
+  // --- QUERIES: OBTENER CONFIGURACIÓN (días laborables) ---
+  const { data: configsReal = [] } = useQuery({
+    queryKey: ['configuraciones'],
+    queryFn: async () => {
+      try {
+        return await ConfiguracionesService.getConfiguraciones();
+      } catch (err) {
+        console.warn("Error cargando configuración, usando días laborables por defecto.");
+        return [];
+      }
+    },
+    enabled: !demoMode,
+    retry: 0
+  });
+
+  // Días laborables según la configuración (el solver solo genera en estos días).
+  // La grilla muestra exactamente esos días para que el docente configure lo que tiene efecto.
+  const diasLaborables = React.useMemo(() => {
+    if (demoMode) return DIAS_LABORABLES_DEFAULT;
+    const cfg = configsReal.find(c => c.clave === 'dias_laborables');
+    const raw = Array.isArray(cfg?.valor) ? cfg.valor : [];
+    const sanitized = raw
+      .map(Number)
+      .filter(n => Number.isInteger(n) && n >= 1 && n <= 7)
+      .filter((n, i, arr) => arr.indexOf(n) === i)
+      .sort((a, b) => a - b);
+    return sanitized.length > 0 ? sanitized : DIAS_LABORABLES_DEFAULT;
+  }, [configsReal, demoMode]);
+
+  const dias = diasLaborables.map(id => ({ id, nombre: DIAS_NOMBRES[id] || `Día ${id}` }));
 
   // Filtrar bloques por la sede seleccionada, y extraer los rangos horarios únicos ordenados
   const timeSlots = React.useMemo(() => {
@@ -282,7 +319,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
   // --- ESTADÍSTICAS RÁPIDAS ---
   const noDispCount = disps.filter(d => d.tipo_disponibilidad === 'NO_DISPONIBLE').length;
   const prefCount = disps.filter(d => d.tipo_disponibilidad === 'PREFERENCIA').length;
-  const totalSlots = timeSlots.length * DIAS.length;
+  const totalSlots = timeSlots.length * dias.length;
   const dispPercent = totalSlots > 0 ? Math.round(((totalSlots - noDispCount) / totalSlots) * 100) : 100;
 
   return (
@@ -395,7 +432,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
                     <th className="py-4 px-6 w-40 sticky left-0 bg-slate-50 z-10 border-r border-slate-100">Bloque Horario</th>
-                    {DIAS.map(d => (
+                    {dias.map(d => (
                       <th key={d.id} className="py-4 px-4 text-center min-w-[120px]">{d.nombre}</th>
                     ))}
                   </tr>
@@ -403,7 +440,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {isLoadingBloques && !demoMode ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={dias.length + 1} className="py-12 text-center text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500 mb-2" />
                         <span>Cargando grilla horaria...</span>
                       </td>
@@ -422,7 +459,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                         </td>
 
                         {/* Celdas para cada día */}
-                        {DIAS.map(dia => {
+                        {dias.map(dia => {
                           const existing = disps.find(d => 
                             d.dia_semana === dia.id && 
                             d.hora_inicio.slice(0, 5) === slot.start.slice(0, 5)

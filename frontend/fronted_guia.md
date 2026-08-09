@@ -37,6 +37,7 @@ frontend/src/
 │   ├── disponibilidades.js     ✅ CRUD disponibilidad docente
 │   ├── habilitaciones.js       ✅ CRUD habilitaciones docente-materia
 │   ├── trayectos.js            ✅ CRUD trayectos académicos
+│   ├── configuraciones.js      ✅ GET/PUT configuración del sistema (E7)
 │   └── endpoints.js            ⚠️ Archivo vacío (no utilizado aún)
 │
 ├── components/
@@ -56,7 +57,7 @@ frontend/src/
 │   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
 │   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Modo Demo
 │   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
-│   └── Settings.jsx            ⚠️ Placeholder vacío
+│   └── Settings.jsx            ✅ Configuración del optimizador (E7)
 │
 ├── routes/
 │   ├── AppRouter.jsx           ✅ React Router v6 + rutas protegidas
@@ -392,6 +393,8 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 #### G. Módulo de Configuración
 `Settings.jsx` está vacío. Conectar con `GET/PUT /api/configuraciones/` para que el administrador pueda ajustar: días laborables, hora inicio/fin de jornada, peso de restricciones blandas del solver.
 
+> **✅ Implementado (E7):** `Settings.jsx` conectado a `GET/PUT /api/configuraciones/` vía el nuevo `api/configuraciones.js`. Formulario mapeado (react-hook-form + zod): `dias_laborables` (7 checkboxes), `hora_inicio_jornada`/`hora_fin_jornada` (`type="time"`), `duracion_bloque_default` (número 15–120), `soft_constraint_gap_weight`/`soft_constraint_compact_weight` (sliders 0–100); `version_sistema`/`timezone_default` solo lectura. Guardado por clave con `PUT` + `invalidateQueries(['configuraciones'])`; gateo por rol `ADMIN`; patrón Modo Demo. Nota: `or_tools_adapter` solo consume `dias_laborables`, `gap_weight` y `compact_weight` (las claves de horas/duración se guardan sin efecto).
+
 ---
 
 ### Prioridad Baja (Pulido y escalabilidad)
@@ -576,4 +579,24 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
      - Hero de bienvenida saluda al usuario real vía `useAuth`.
      - **Acciones rápidas** con `useNavigate`: `/horarios`, `/docentes`, `/materias` y nuevo `/periodos` (de E5); en demoMode muestran toast informativo en vez de navegar.
      - Como las queries comparten `queryKey` con Docentes/Materias/Aulas/Periodos, sus invalidaciones post-mutación refrescan el dashboard automáticamente.
+   - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). Backend sin cambios.
+
+### Contexto de la Sesión Actual (2026-08-09) — E7
+
+1. **E7 — Módulo de Configuración (Settings real, completado):**
+   - **`src/api/configuraciones.js`** (nuevo): `getConfiguraciones()`, `getConfiguracion(clave)` y `updateConfiguracion(clave, { valor })` contra `/api/configuraciones/`.
+   - **`src/pages/Settings.jsx`** reescrito (mantiene el layout de pestañas; "Algoritmo" funcional, Seguridad/BD/Notificaciones como "Módulo pendiente"):
+     - `useQuery(['configuraciones'], retry: 0)` + patrón Modo Demo (`demo_configuraciones` en `localStorage`, banner "Reconectar API").
+     - Formulario mapeado (react-hook-form + zod dinámico desde la API) con widgets por clave:
+       - `dias_laborables` → 7 checkboxes (Lun–Dom, toggle con `setValue`).
+       - `hora_inicio_jornada` / `hora_fin_jornada` → `input type="time"` (convierte `HH:MM:SS` ↔ `HH:MM`).
+       - `duracion_bloque_default` → número (15–120).
+       - `soft_constraint_gap_weight` / `soft_constraint_compact_weight` → sliders 0–100.
+       - `version_sistema` / `timezone_default` → panel de solo lectura.
+     - Guardado: `Promise.all` de `PUT` por clave (solo `editable=true`) + `invalidateQueries(['configuraciones'])` + toast; botón "Descartar cambios" si hay cambios (`isDirty`).
+     - Gateo por rol `ADMIN` vía `useAuth`: no-admin lee pero con inputs deshabilitados y aviso (backend 403 en `PUT` como segunda barrera).
+     - Nota informativa en la UI: `hora_inicio_jornada`/`hora_fin_jornada`/`duracion_bloque_default` se guardan pero el solver solo usa `dias_laborables`, `soft_constraint_gap_weight` y `soft_constraint_compact_weight` (verificado en `or_tools_adapter._load_config_from_db`).
+   - **Fix asociado — grilla de disponibilidad según `dias_laborables` (`DocenteDisponibilidad.jsx`):**
+     - Antes: la constante `DIAS` era fija (Lun–Sábado), así que un docente podía marcar restricciones en días que el solver ignora, y el Domingo (7) no era configurable aunque `dias_laborables` lo incluyera.
+     - Ahora: la grilla consulta `['configuraciones']` (mismo key de E7), deriva `diasLaborables` de `dias_laborables` (sanitizado a enteros 1–7 únicos, fallback `[1,2,3,4,5]`) y renderiza solo esos días. `totalSlots` y el `colSpan` de la fila de carga se ajustan dinámicamente.
    - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). Backend sin cambios.
