@@ -18,9 +18,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Fase 4: FullCalendar `timeGridWeek` (L–V 07:00–18:30), drag & drop validado (`validate-move`), filtros.
 - Fase 5: Generación OR-Tools CP-SAT asíncrona (`POST /generate` → 202, `BackgroundTasks`).
 
-**Trabajo SIN commitear** (~421 líneas / 13 archivos): fixes de Fase 4/5 (idempotencia `_clear_previous_schedules`, consistencia de sede en el solver, disponibilidad NO_DISPONIBLE, cálculo `lunes_base`, polling reactivo, defensa de habilitaciones, z-index toast). Verificado manualmente (`OPTIMAL (4)`).
+**Ejecuciones del plan:**
+- ✅ **E0** — Commiteado (`73d7d77` "new adds"): fixes de Fase 4/5 (idempotencia `_clear_previous_schedules`, consistencia de sede en el solver, disponibilidad NO_DISPONIBLE, cálculo `lunes_base`, polling reactivo, defensa de habilitaciones, z-index toast) + `AGENTS.md`, `SDD.md`, `PLAN_DE_DESARROLLO.md`. Verificado manualmente (`OPTIMAL (4)`). `git status` limpio.
+- ✅ **E1** — Commiteado (`94f938e` "E1: endpoint generation-status con tracker de estado en memoria"): `services/scheduler/status_tracker.py` (PENDING/DONE/FAILED + count + timestamp, en memoria) + endpoint autenticado `GET /api/schedules/generation-status?periodo_id=` (404 si no hay estado). Criterio verificado: tras `POST /generate`, PENDING→DONE con `count > 0`.
 
-**Pendientes:** roadmap SDD (6 items), bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
+**Pendientes:** E2–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
 ---
 
@@ -36,10 +38,10 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 ## Fase A · Robustez de generación (backend-first)
 
-### E1 — Endpoint `GET /api/schedules/generation-status` (~1–2 h)
+### E1 — Endpoint `GET /api/schedules/generation-status` (~1–2 h) ✅ COMPLETADA
 - Backend: tracker de estado PENDING/DONE/FAILED + `count` + timestamp en `services/scheduler/status_tracker.py` (en memoria; se pierde al reiniciar, aceptable con 1 worker). `run_generation_in_background` actualiza el tracker.
 - Router `schedules.py`: nuevo endpoint autenticado que consulta el tracker.
-- ✅ Criterio: tras `POST /generate`, el endpoint pasa de PENDING a DONE con `count > 0`.
+- ✅ Criterio: tras `POST /generate`, el endpoint pasa de PENDING a DONE con `count > 0`. **Verificado** (commit `94f938e`).
 
 ### E2 — Pre-generation-check (~2 h)
 - Backend: `GET /api/schedules/pre-generation-check?periodo_id=` → checklist `{lecciones_activas, docentes_con_disponibilidad, docentes_con_habilitacion, aulas, bloques}`.
@@ -96,6 +98,6 @@ Refactor `Horarios.jsx` → `features/schedule/`, exportación PDF/iCal, modo os
 ---
 
 ## Riesgos a vigilar
-- El tracker en memoria de E1 se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
+- El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
 - Cualquier cambio en `database/schema_horarios_v2.1.1.sql` debe conservar los triggers PL/pgSQL.
 - Los tests (E9/E10) no deben requerir la BD real con triggers.
