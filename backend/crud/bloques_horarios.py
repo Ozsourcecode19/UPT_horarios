@@ -9,6 +9,73 @@ from models.bloque_horario import BloqueHorario # Asumiendo que el modelo se lla
 from models.sede import Sede # Importar el modelo Sede para habilitar la validacion por sede
 from schemas.bloque_horario import BloqueHorarioCreate 
 from schemas.bloque_horario import BloqueHorarioUpdate
+from datetime import date, datetime, time, timedelta
+
+
+def generar_bloques_estandar(db: Session, sede_id: int, duracion_minutos: int, overwrite: bool = False):
+    """
+    Genera la grilla estándar de bloques horarios (Lunes-Viernes, 08:00-16:00)
+    para una sede, omitiendo los bloques que ya existen con la misma tripleta
+    (sede_id, dia_semana, hora_inicio). Devuelve (creados, omitidos).
+    """
+    sede = db.query(Sede).filter(Sede.id == sede_id).first()
+    if not sede:
+        raise HTTPException(status_code=404, detail=f"La sede con ID {sede_id} no existe.")
+
+    DIA_INICIO, DIA_FIN = 1, 5
+    HORA_INICIO, HORA_FIN = time(8, 0), time(16, 0)
+
+    existentes = db.query(BloqueHorario).filter(BloqueHorario.sede_id == sede_id).all()
+
+    if overwrite:
+        # Renumerar orden_visual (1..n por día según hora) para toda la sede
+        por_dia = {}
+        for b in sorted(existentes, key=lambda x: (x.dia_semana, x.hora_inicio)):
+            por_dia.setdefault(b.dia_semana, []).append(b)
+        for _, bloques in por_dia.items():
+            for idx, b in enumerate(bloques, start=1):
+                if b.orden_visual != idx:
+                    b.orden_visual = idx
+
+    # Orden base por día = cantidad de bloques existentes de la sede
+    base_orden = {}
+    for b in existentes:
+        base_orden[b.dia_semana] = base_orden.get(b.dia_semana, 0) + 1
+
+    nuevos = []
+    creados = omitidos = 0
+    for dia in range(DIA_INICIO, DIA_FIN + 1):
+        hora = HORA_INICIO
+        orden = base_orden.get(dia, 0)
+        while hora < HORA_FIN:
+            fin = (datetime.combine(date.today(), hora) + timedelta(minutes=duracion_minutos)).time()
+            if fin > HORA_FIN:
+                break
+            existe = next((b for b in existentes if b.dia_semana == dia and b.hora_inicio == hora), None)
+            if existe:
+                omitidos += 1
+            else:
+                orden += 1
+                nuevos.append(BloqueHorario(
+                    sede_id=sede_id,
+                    dia_semana=dia,
+                    hora_inicio=hora,
+                    duracion_minutos=duracion_minutos,
+                    orden_visual=orden,
+                    activo=True,
+                ))
+                creados += 1
+            hora = fin
+
+    if nuevos:
+        db.add_all(nuevos)
+        db.commit()
+        for b in nuevos:
+            db.refresh(b)
+    else:
+        db.commit()
+
+    return creados, omitidos, duracion_minutos
 
 
 def get_bloque_horario(db: Session, bloque_id: int) -> Optional[models.BloqueHorario]:

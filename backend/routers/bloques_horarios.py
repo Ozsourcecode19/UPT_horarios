@@ -9,6 +9,24 @@ from core.security import get_current_active_user, require_role
 
 router = APIRouter(prefix="/bloques-horarios", tags=["Bloques Horarios"])
 
+@router.post("/estandar", response_model=schemas.BloqueGenerarResult, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def generar_bloques_estandar(req: schemas.BloqueGenerarRequest, db: Session = Depends(get_db)):
+    """
+    Genera la grilla estándar de bloques (L-V, 08:00-16:00) para una sede.
+    Idempotente: omite los bloques que ya existen en el mismo día y hora.
+    """
+    creados, omitidos, duracion = crud.generar_bloques_estandar(
+        db,
+        sede_id=req.sede_id,
+        duracion_minutos=req.duracion_minutos,
+        overwrite=req.overwrite,
+    )
+    return schemas.BloqueGenerarResult(
+        creados=creados,
+        omitidos=omitidos,
+        duracion_minutos=duracion,
+    )
+
 @router.post("/", response_model=schemas.BloqueHorario, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def create_bloque_horario(bloque: schemas.BloqueHorarioCreate, db: Session = Depends(get_db)):
     """

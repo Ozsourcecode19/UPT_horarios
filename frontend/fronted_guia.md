@@ -31,7 +31,7 @@ frontend/src/
 │   ├── aulas.js                ✅ CRUD completo
 │   ├── grupos.js               ✅ CRUD completo
 │   ├── subjects.js             ✅ CRUD completo (materias)
-│   ├── bloques.js              ✅ GET bloques horarios
+│   ├── bloques.js              ✅ CRUD completo (GET/POST/PUT/DELETE bloques horarios)
 │   ├── sedes.js                ✅ GET sedes
 │   ├── lecciones.js            ✅ CRUD completo
 │   ├── disponibilidades.js     ✅ CRUD disponibilidad docente
@@ -40,27 +40,34 @@ frontend/src/
 │   ├── configuraciones.js      ✅ GET/PUT configuración del sistema (E7)
 │   └── endpoints.js            ⚠️ Archivo vacío (no utilizado aún)
 │
+├── config/
+│   └── navigation.js            ✅ Fuente única de navegación (secciones, roles, hijos)
+│
 ├── components/
 │   ├── layout/
-│   │   └── MainLayout.jsx      ✅ Sidebar + Header + Outlet
+│   │   └── MainLayout.jsx      ✅ Sidebar por secciones/rol + Header + breadcrumb + Outlet
 │   ├── docentes/
 │   │   ├── DocenteDisponibilidad.jsx  ✅ Grilla semanal de disponibilidad
-│   │   └── DocenteHabilitaciones.jsx  ✅ Habilitaciones por docente-materia
+│   │   ├── DocenteHabilitaciones.jsx  ✅ Habilitaciones por docente-materia
+│   │   └── DocenteTabs.jsx            ✅ Pestañas compartidas (Plantilla/Disponibilidad/Habilitaciones)
 │   └── (sin ui/ ni shared/)    ⚠️ Pendiente de organizar
 │
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
 │   ├── Dashboard.jsx           ✅ Stats dinámicas (useQuery) + acciones rápidas
-│   ├── Docentes.jsx            ✅ CRUD + Disponibilidad + Habilitaciones (tabs)
+│   ├── Docentes.jsx            ✅ CRUD Plantilla Docente (listado)
+│   ├── DocenteDisponibilidadPage.jsx    ✅ Sub-ruta /docentes/disponibilidad (Modo Demo)
+│   ├── DocenteHabilitacionesPage.jsx    ✅ Sub-ruta /docentes/habilitaciones (Modo Demo)
 │   ├── Materias.jsx            ✅ CRUD completo con selector de color
 │   ├── Aulas.jsx               ✅ CRUD completo
 │   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
-│   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Modo Demo
+│   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Stepper de flujo + Modo Demo
 │   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
+│   ├── BloquesHorarios.jsx     ✅ Gestión de bloques horarios (CRUD por sede, Modo Demo, roles)
 │   └── Settings.jsx            ✅ Configuración del optimizador (E7)
 │
 ├── routes/
-│   ├── AppRouter.jsx           ✅ React Router v6 + rutas protegidas
+│   ├── AppRouter.jsx           ✅ React Router v6 + rutas protegidas + sub-rutas de Docentes
 │   └── ProtectedRoute.jsx      ✅ Redirección a /login si no autenticado
 │
 └── context/                    ⚠️ Directorio no creado formalmente
@@ -613,3 +620,50 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - **Estado vacío + hint de ventana (`DocenteDisponibilidad.jsx`):** si una sede no tiene bloques (o todos caen fuera de la ventana) la grilla muestra un mensaje explícito (`sin_bloques`/`fuera_ventana`) en vez del fallback ficticio — antes, una sede vacía (p. ej. `EV-004` con 0 bloques) mostraba `FALLBACK_BLOQUES_TIME` (18 filas 07:00–20:30) × 5 días = **90 celdas engañosas**. Además, header de la grilla con hint "Ventana de jornada: HH:MM–HH:MM" y "Días: N".
    - **Conteo visible = duración × ventana (no bug):** con `hora_fin_jornada=12:00:00`, las sedes físicas (45') muestran `5 × 5 = 25` bloques y una sede flexible de 60' (p. ej. `AA-003`) muestra `4 × 5 = 20`, porque solo caben enteros los que terminan antes de las 12:00. Para `5 × 5 = 25` en bloques de 60' hay que subir `hora_fin_jornada` a `13:00:00`.
    - **Verificación:** `pnpm build` OK + `python -c "import main"` OK. E2E pendiente: con `hora_fin_jornada=12:00` la grilla y el solver usan solo bloques hasta las 11:45.
+
+### Contexto de la Sesión Actual (2026-08-09) — Extensión: UI de gestión de bloques horarios
+
+1. **Incongruencia resuelta:** los bloques se definían solo a nivel de BD (seeds SQL) sin forma de modificarlos desde la UI, mientras la vista de Configuración exponía `hora_fin_jornada`/`duracion_bloque_default` que parecían controlar la estructura. Ahora existe gestión directa.
+2. **`src/pages/BloquesHorarios.jsx` (nuevo, ruta `/bloques`, sidebar "Bloques Horarios" con icono `Clock`):**
+   - Queries `['bloques']` + `['sedes']`; patrón Modo Demo completo (`demo_bloques_horarios` en `localStorage`, banner "Reconectar API", auto-activación si el backend falla, MOCK generado por sede/día/hora).
+   - Filtros: selector de sede (default primera), toggle "Solo activos"; tabla ordenada por día→hora con Fin calculado y badges de duración/estado.
+   - Modal (react-hook-form + zod) con `sede_id`, `dia_semana` (1–7), `hora_inicio` (`type="time"` → `HH:MM:SS`), `duracion_minutos` (**select 30/45/60/90/120**, alineado con CHECK de BD y Pydantic), `orden_visual`, `activo`.
+   - Acciones: crear/editar, **desactivar/activar** (accion principal), eliminar con confirmación y advertencia del `ON DELETE CASCADE` de `horario_generado.bloque_id`.
+   - Errores 409 (duplicado sede/día/hora) mostrados desde `err.response.data.detail`; `invalidateQueries(['bloques'])` tras cada mutación (reflejo inmediato en la grilla de disponibilidad y Horarios).
+   - Gateo por rol: escrituras solo `ADMIN`/`JEFE-PNF` (`useAuth`); no-admin lee con badge "Solo lectura" (backend 403 como segunda barrera).
+3. **`src/api/bloques.js`:** `getBloques` (limit 1000) + `createBloque`/`updateBloque`/`deleteBloque` contra el CRUD ya existente en `/bloques-horarios/`.
+4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
+5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente: crear un bloque para `EV-004` (sede virtual sin bloques) y verlo aparecer en la grilla de disponibilidad tras invalidación.
+
+### Contexto de la Sesión Actual (2026-08-09) — E8: Reorganización de la navegación
+
+1. **Config central de navegación — `src/config/navigation.js` (nuevo):** arreglo `NAVIGATION` con 5 secciones que reflejan el flujo de trabajo, cada ítem declara `label`, `path`, `icon`, `roles` (o `'*'`) y `children`:
+   - **INICIO**: Dashboard.
+   - **PLANIFICACIÓN** (contexto: cuándo/dónde): Periodos, Bloques Horarios, Aulas y Sedes.
+   - **CATÁLOGO** (recursos: quién/qué): Docentes (+ hijas Disponibilidad/Habilitaciones), Materias, Grupos y Lecciones.
+   - **HORARIOS**: Horarios.
+   - **SISTEMA**: Configuración (solo ADMIN).
+   - Helpers `getRouteMeta(pathname)` (para header/breadcrumb) e `isRoleAllowed(roles, role)`.
+2. **`MainLayout.jsx` reescrito:** sidebar renderiza las secciones con cabecera (mayúsculas) y sub-ítems anidados bajo Docentes; cada sección/ítem se filtra por `user.role`. Active state por segmento (padre Docentes activo en sub-rutas, hijos con match exacto) reemplazando el `startsWith` frágil. El header muestra el título desde `getRouteMeta` (ya no `pathname.split('/')[1]`) y breadcrumb `Sección › Padre › Hijo` en sub-rutas.
+3. **Rutas hijas — `AppRouter.jsx`:** `/docentes/disponibilidad` → `DocenteDisponibilidadPage.jsx` y `/docentes/habilitaciones` → `DocenteHabilitacionesPage.jsx` (ambas nuevas, patrón Modo Demo completo: query `['docents']`/`['sedes']` con `retry:0` + fallback MOCK + banner "Reconectar API" + toasts). Reciben `initialDocenteId` vía `?docente=`.
+4. **`Docentes.jsx` simplificado:** solo listado/CRUD; las pestañas Disponibilidad/Habilitaciones pasaron a ser `DocenteTabs.jsx` (componente compartido con `Link`) y los accesos rápidos de cada fila navegan con `useNavigate` a `/docentes/disponibilidad?docente={id}` y `/docentes/habilitaciones?docente={id}`.
+5. **Stepper de flujo — `Horarios.jsx`:** componente `FlowStepper` entre la cabecera y los filtros con 4 pasos enlazados (1 Planificación → 2 Recursos → 3 Restricciones → 4 Generar). Marca ✓ cada paso completado según el `pre-generation-check` (E2): `bloques>0 && aulas>0`, `lecciones_activas>0`, `docentes_con_disponibilidad>0 && docentes_con_habilitacion>0`; el paso 4 es el actual. En Modo Demo los pasos solo navegan sin marcar ✓.
+6. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). Backend sin cambios.
+
+### Contexto de la Sesión Actual (2026-08-09) — Configuración "Algoritmo" agrupada por tema
+
+1. **`Settings.jsx`:** la pestaña "Algoritmo" dejó de listar las claves planas. Se agrupan por influencia de contexto con 3 grupos temáticos (constantes `GRUPOS`, `CLAVE_GRUPO` y `GRUPO_NOTAS`, patrón análogo a `WIDGETS`):
+   - **Jornada y calendario**: `dias_laborables`, `hora_inicio_jornada`, `hora_fin_jornada`.
+   - **Estructura de bloques**: `duracion_bloque_default`.
+   - **Optimización del solver**: `soft_constraint_gap_weight`, `soft_constraint_compact_weight`.
+2. Cada grupo se renderiza como `<section>` con cabecera (ícono en box degradado + título + descripción), sus tarjetas de campo y una **nota explicativa propia al pie** (ventana de jornada, duración como pre-selección del generador, pesos). Se eliminó el recuadro ámbar global único. Las claves sin mapear en `CLAVE_GRUPO` caen en un grupo fallback "Otros parámetros" para no romper ante claves futuras.
+3. El bloque "Información del sistema (solo lectura)" (`version_sistema`, `timezone_default`) permanece al final. El agrupamiento es un `useMemo` (`groupedEditables`) sobre `editables`; `handleSave`/`reset`/`isDirty`/gateo por rol intactos.
+4. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). Backend sin cambios.
+
+### Contexto de la Sesión Actual (2026-08-09) — Generador de grilla estándar (Opción C)
+
+1. **Backend — `POST /api/bloques-horarios/estandar`** (`schemas.BloqueGenerarRequest`/`BloqueGenerarResult` + `crud.generar_bloques_estandar`): genera los bloques **Lunes–Viernes de 08:00 a 16:00** para una sede con la duración indicada (`30/45/60/90/120`, validada por Pydantic). **Idempotente**: omite los bloques cuya tripleta `(sede_id, dia_semana, hora_inicio)` ya existe y devuelve `{creados, omitidos, duracion_minutos}`. `overwrite` (opcional) renumera `orden_visual` (1..n por día según hora) en toda la sede antes de insertar; sin él, los nuevos bloques continúan la numeración existente. Protegido con `require_role(["ADMIN", "JEFE-PNF"])`.
+2. **Frontend — `BloquesHorarios.jsx`:** botón **"Generar grilla"** (solo `isWritable`) en el encabezado que abre un **modal de confirmación dedicado** (desacoplado de `confirmAction`, que exige un bloque concreto). El modal tiene select de duración pre-seleccionado con `duracion_bloque_default` (query `['configuraciones']`, fallback 45) y checkbox "Renumerar orden visual". Tras ejecutar muestra toast `X creados, Y omitidos` + `invalidateQueries(['bloques'])`. En Modo Demo simula la grilla localmente (`generarSimulacionDemo`, espejo del backend) sobre `demo_bloques_horarios`.
+3. **`src/api/bloques.js`:** nuevo `generateBloquesEstandar(payload)` → `POST /bloques-horarios/estandar`.
+4. **`Settings.jsx`:** `duracion_bloque_default` cambia de widget numérico (15–120) a **select 30/45/60/90/120** (alineado con el CHECK de BD); nota del grupo "Estructura de bloques" actualizada: ahora pre-selecciona la duración del generador.
+5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size) + `python -c "import main"` OK. E2E pendiente: ejecutar el endpoint 2 veces sobre la misma sede (2ª con `creados=0`).

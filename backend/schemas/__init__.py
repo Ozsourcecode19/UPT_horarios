@@ -11,7 +11,7 @@ from .aula import Aula, AulaCreate, AulaUpdate
 from .disponibilidad_docente import DisponibilidadDocente, DisponibilidadDocenteCreate, DisponibilidadDocenteUpdate
 from .habilitacion_docente import HabilitacionDocente, HabilitacionDocenteCreate, HabilitacionDocenteUpdate
 from .configuracion import Configuracion, ConfiguracionCreate, ConfiguracionUpdate
-from .bloque_horario import BloqueHorario, BloqueHorarioCreate, BloqueHorarioUpdate
+from .bloque_horario import BloqueHorario, BloqueHorarioCreate, BloqueHorarioUpdate, BloqueGenerarRequest, BloqueGenerarResult
 from .leccion import Leccion, LeccionCreate, LeccionUpdate
 from .horario_generado import HorarioGenerado, HorarioGeneradoCreate, HorarioGeneradoUpdate, FullCalendarEvent, GenerationStatus, PreGenerationCheck, HorarioVersion, RestoreRequest, RestoreResult
 
@@ -28,7 +28,7 @@ __all__ = [
     "DisponibilidadDocente", "DisponibilidadDocenteCreate", "DisponibilidadDocenteUpdate",
     "HabilitacionDocente", "HabilitacionDocenteCreate", "HabilitacionDocenteUpdate",
     "Configuracion", "ConfiguracionCreate", "ConfiguracionUpdate",
-    "BloqueHorario", "BloqueHorarioCreate", "BloqueHorarioUpdate",
+    "BloqueHorario", "BloqueHorarioCreate", "BloqueHorarioUpdate", "BloqueGenerarRequest", "BloqueGenerarResult",
     "Leccion", "LeccionCreate", "LeccionUpdate",
     "HorarioGenerado", "HorarioGeneradoCreate", "HorarioGeneradoUpdate", "FullCalendarEvent", "GenerationStatus", "PreGenerationCheck", "HorarioVersion", "RestoreRequest", "RestoreResult",
 ]

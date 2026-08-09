@@ -23,6 +23,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
 - Credenciales con valores por defecto (inseguras en prod): `DATABASE_URL=postgresql://postgres:postgresUPT@localhost:5432/horarios_upt` y `SECRET_KEY=your_secret_key_here` en `backend/config/database.py` y `backend/core/security.py`.
 - CORS solo permite `http://localhost:3000`.
 - Los PDFs de `docs/` están vacíos (0 bytes); no son una fuente válida.
+- **Cada función nueva de `crud/*.py` debe exportarse en `crud/__init__.py`** (import + `__all__`). El router accede vía `crud.<func>`, y si no se exporta falla con `AttributeError` solo en runtime (HTTP 500) aunque `import main` pase.
 
 ## Arquitectura
 
