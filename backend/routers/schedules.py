@@ -7,6 +7,7 @@ import schemas
 from config.database import get_db, SessionLocal
 from core.security import get_current_active_user, require_role
 from services.scheduler import or_tools_adapter
+from services.scheduler import status_tracker
 from services.validation import schedule_validation
 from schemas.horario_generado import ScheduleMoveRequest 
 
@@ -17,10 +18,18 @@ def run_generation_in_background(periodo_id: int):
     """
     Crea una sesión de base de datos dedicada para ejecutar el proceso pesado
     del solver de OR-Tools en segundo plano de manera segura, cerrándola al terminar.
+    Actualiza el tracker de estado (PENDING -> DONE/FAILED) para que el frontend
+    pueda consultar el progreso de la generación.
     """
     db = SessionLocal()
     try:
+        status_tracker.set_pending(periodo_id)
         or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id)
+        count = crud.get_horarios_generados_count_activos(db, periodo_id=periodo_id)
+        status_tracker.set_done(periodo_id, count=count)
+    except Exception as e:
+        status_tracker.set_failed(periodo_id, message=str(e))
+        raise
     finally:
         db.close()
 
@@ -43,6 +52,20 @@ def generate_schedule(periodo_id: int, background_tasks: BackgroundTasks, db: Se
         # Manejo de error si no se puede iniciar la generación
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al iniciar la generación: {str(e)}")
 
+
+# Endpoint para consultar el estado de la generación de horarios en segundo plano
+@router.get("/generation-status", response_model=schemas.GenerationStatus, summary="Consultar estado de generación de horarios", dependencies=[Depends(get_current_active_user)])
+def get_generation_status(periodo_id: int):
+    """
+    Consulta el estado de una generación de horarios previamente solicitada
+    mediante POST /schedules/generate para el periodo académico indicado.
+    Devuelve el estado actual (PENDING, DONE o FAILED), el número de horarios
+    generados (si aplica) y un mensaje informativo.
+    """
+    tracker_status = status_tracker.get_status(periodo_id)
+    if tracker_status is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No hay estado de generación registrado para el periodo {periodo_id}. Dispara POST /schedules/generate primero.")
+    return schemas.GenerationStatus(**tracker_status)
 
 # Endpoint para obtener horarios en formato FullCalendar
 @router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar", dependencies=[Depends(get_current_active_user)])

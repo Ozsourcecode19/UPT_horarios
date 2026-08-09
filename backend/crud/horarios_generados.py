@@ -26,6 +26,16 @@ def get_horarios_generados(db: Session, periodo_id: Optional[int] = None, skip: 
     # query = query.filter(models.HorarioGenerado.estado == 'ACTIVO')
     return query.offset(skip).limit(limit).all()
 
+def get_horarios_generados_count_activos(db: Session, periodo_id: int) -> int:
+    """
+    Cuenta los horarios generados con estado ACTIVO para un periodo académico.
+    """
+    from sqlalchemy import func
+    return db.query(func.count(models.HorarioGenerado.id)).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO'
+    ).scalar() or 0
+
 def create_horario_generado(db: Session, horario: schemas.HorarioGeneradoCreate) -> models.HorarioGenerado:
     """
     Crea un nuevo horario generado.

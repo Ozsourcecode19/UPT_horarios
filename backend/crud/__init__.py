@@ -13,7 +13,7 @@ from .habilitaciones_docentes import get_habilitacion_docente, get_habilitacione
 from .configuraciones import get_configuracion, get_configuraciones, create_configuracion, update_configuracion, delete_configuracion
 from .bloques_horarios import get_bloque_horario, get_bloques_horarios, create_bloque_horario, update_bloque_horario, delete_bloque_horario
 from .lecciones import get_leccion, get_lecciones, create_leccion, update_leccion, delete_leccion
-from .horarios_generados import get_horario_generado, get_horarios_generados, create_horario_generado, update_horario_generado, delete_horario_generado, get_horarios_para_calendario
+from .horarios_generados import get_horario_generado, get_horarios_generados, create_horario_generado, update_horario_generado, delete_horario_generado, get_horarios_para_calendario, get_horarios_generados_count_activos
 
 # Lista útil para pruebas o inicialización
 __all__ = [
@@ -32,5 +32,5 @@ __all__ = [
     "get_bloque_horario", "get_bloques_horarios", "create_bloque_horario", "update_bloque_horario", "delete_bloque_horario",
     "get_leccion", "get_lecciones", "create_leccion", "update_leccion", "delete_leccion",
     "get_horario_generado", "get_horarios_generados", "create_horario_generado", "update_horario_generado", "delete_horario_generado",
-    "get_horarios_para_calendario",
+    "get_horarios_para_calendario", "get_horarios_generados_count_activos",
 ]
