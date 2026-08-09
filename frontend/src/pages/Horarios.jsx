@@ -10,7 +10,7 @@ import {
   Calendar, Sparkles, RefreshCw, AlertTriangle, Trash2, 
   Settings, Clock, Users, CheckCircle, X, ChevronRight, 
   Info, Plus, Edit2, MapPin, GraduationCap, ArrowRight,
-  AlertCircle, Database
+  AlertCircle, Database, History
 } from 'lucide-react';
 
 import ScheduleService from '../api/schedule';
@@ -19,6 +19,7 @@ import AulasService from '../api/aulas';
 import DocentsService from '../api/docents';
 import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
+import { useAuth } from '../context/AuthContext';
 
 // --- CONFIGURACIÓN MOCK PARA MODO DEMO ---
 const MOCK_PERIODOS = [
@@ -185,6 +186,9 @@ const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
   const genPollRef = useRef(null); // Ref para limpiar el polling de generación al desmontar
+  const { user } = useAuth();
+  // Solo ADMIN/JEFE-PNF pueden restaurar versiones (el backend también responde 403)
+  const canRestore = ['ADMIN', 'JEFE-PNF'].includes(user?.role);
 
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
@@ -194,6 +198,7 @@ const Horarios = () => {
   const [demoMode, setDemoMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genStatusText, setGenStatusText] = useState(''); // Texto del estado mostrado en el overlay de generación
+  const [selectedVersion, setSelectedVersion] = useState(null); // Versión seleccionada para restaurar (E4b)
   
   // Modal de Detalle / Edición rápida
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -348,6 +353,48 @@ const Horarios = () => {
     retry: 0
   });
   const canGenerate = demoMode ? true : (preCheck ? preCheck.listo : true);
+
+  // 8. Versiones de horario del periodo (E4b) - patrón Modo Demo con fallback a lista vacía
+  const { data: versiones = [], refetch: refetchVersiones } = useQuery({
+    queryKey: ['schedule-versions', selectedPeriodoId],
+    queryFn: async () => {
+      if (!selectedPeriodoId) return [];
+      try {
+        return await ScheduleService.getScheduleVersions(selectedPeriodoId);
+      } catch (err) {
+        return [];
+      }
+    },
+    enabled: !demoMode && !!selectedPeriodoId,
+    retry: 0
+  });
+
+  // Auto-seleccionar la versión ACTIVA al cargar versiones
+  useEffect(() => {
+    if (!selectedVersion && versiones.length > 0) {
+      const activa = versiones.find(v => v.estado === 'ACTIVO');
+      setSelectedVersion(activa ? activa.version_horario : versiones[0].version_horario);
+    }
+  }, [versiones]);
+
+  // Mutación para restaurar una versión de horario (E4b)
+  const restoreVersionMutation = useMutation({
+    mutationFn: async ({ version }) => {
+      return await ScheduleService.restoreScheduleVersion(selectedPeriodoId, version);
+    },
+    onSuccess: () => {
+      showToast("Versión restaurada correctamente. El calendario refleja el horario restaurado.", "success");
+      queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+      queryClient.invalidateQueries({ queryKey: ['schedule-versions', selectedPeriodoId] });
+      refetchHorarios();
+      refetchVersiones();
+    },
+    onError: (err) => {
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : "No se pudo restaurar la versión seleccionada.";
+      showToast(msg, "error");
+    }
+  });
 
   // Activar modo demo automáticamente si falla el fetch de horarios
   useEffect(() => {
@@ -1120,6 +1167,74 @@ const Horarios = () => {
             <p className="mt-4 text-xs text-emerald-700 flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4" />
               Todo listo para la generación inteligente.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* PANEL DE VERSIONES DEL HORARIO (E4b) */}
+      {!demoMode && versiones.length > 0 && (
+        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5 text-slate-500" />
+              <h3 className="font-bold text-sm text-slate-700">Versiones del horario</h3>
+              {!canRestore && (
+                <span className="text-[10px] font-semibold text-slate-400">Solo ADMIN/JEFE-PNF pueden restaurar</span>
+              )}
+            </div>
+            <button
+              onClick={() => refetchVersiones()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Actualizar</span>
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Seleccionar versión</label>
+              <select
+                value={selectedVersion || ''}
+                onChange={(e) => setSelectedVersion(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
+              >
+                {versiones.map(v => (
+                  <option key={`${v.version_horario}-${v.estado}`} value={v.version_horario}>
+                    {v.estado === 'ACTIVO' ? '● ' : '○ '}v{v.version_horario} — {v.estado} · {v.total} clase(s) · {v.generado_en ? new Date(v.generado_en).toLocaleString('es-ES') : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:self-end">
+              <button
+                onClick={() => restoreVersionMutation.mutate({ version: Number(selectedVersion) })}
+                disabled={!canRestore || restoreVersionMutation.isPending || isGenerating || !selectedVersion || versiones.find(v => v.version_horario === Number(selectedVersion))?.estado === 'ACTIVO'}
+                title={!canRestore ? 'Requiere rol ADMIN o JEFE-PNF' : undefined}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {restoreVersionMutation.isPending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <History className="w-4 h-4" />
+                )}
+                <span>{restoreVersionMutation.isPending ? 'Restaurando...' : 'Restaurar versión'}</span>
+              </button>
+            </div>
+          </div>
+
+          {versiones.find(v => v.version_horario === Number(selectedVersion))?.estado === 'ACTIVO' && (
+            <p className="mt-3 text-xs text-emerald-700 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4" />
+              Esta es la versión ACTIVA actual del periodo.
+            </p>
+          )}
+          {!canRestore && (
+            <p className="mt-3 text-xs text-amber-700 flex items-center gap-1.5">
+              <Info className="w-4 h-4" />
+              Tu rol no tiene permisos para restaurar versiones (solo ADMIN o JEFE-PNF).
             </p>
           )}
         </div>
