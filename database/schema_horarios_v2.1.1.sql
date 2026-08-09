@@ -239,7 +239,7 @@ CREATE TABLE horario_generado (
     hora_inicio TIME NOT NULL,
     hora_fin TIME NOT NULL,
     estado VARCHAR(20) DEFAULT 'ACTIVO' 
-        CHECK (estado IN ('ACTIVO', 'INACTIVO', 'BORRADOR', 'ELIMINADO')),
+        CHECK (estado IN ('ACTIVO', 'INACTIVO', 'BORRADOR', 'ELIMINADO', 'HISTORICO')),
     version_horario INT DEFAULT 1 CHECK (version_horario > 0),
     periodo_id INT NOT NULL REFERENCES periodos_academicos(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

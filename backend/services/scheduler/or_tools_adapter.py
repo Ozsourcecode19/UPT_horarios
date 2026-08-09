@@ -7,7 +7,7 @@ from ortools.sat.python import cp_model # Importar cp_model para CpSolverStatus,
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 from datetime import date, datetime, timedelta, time, timezone # Importar timezone y time
-from sqlalchemy import tuple_ # Importar tuple_ para consultas IN de tuplas
+from sqlalchemy import tuple_, func # Importar tuple_ para consultas IN de tuplas y func para agregados
 import logging
 import models # Importa modelos para consultas
 
@@ -319,23 +319,34 @@ class ScheduleGenerator:
                 pass # Placeholder para lógica de compactación más avanzada
 
 
-    def _clear_previous_schedules(self, periodo_id: int):
+    def _archive_previous_schedules(self, periodo_id: int):
         """
-        Elimina de manera limpia los horarios activos anteriores pertenecientes
-        al periodo académico especificado. Esto garantiza la idempotencia del
-        proceso de generación automática evitando duplicidades de datos.
+        Archiva los horarios ACTIVO anteriores del periodo académico marcándolos
+        como HISTORICO (en lugar de eliminarlos). Esto garantiza la idempotencia
+        de la generación y habilita el control de versiones del horario.
         """
         try:
-            deleted_count = self.db.query(models.HorarioGenerado).filter(
+            archived_count = self.db.query(models.HorarioGenerado).filter(
                 models.HorarioGenerado.periodo_id == periodo_id,
                 models.HorarioGenerado.estado == 'ACTIVO'
-            ).delete(synchronize_session='fetch')
+            ).update({'estado': 'HISTORICO'}, synchronize_session='fetch')
             self.db.commit()
-            self.logger.info(f"Limpieza exitosa: {deleted_count} registros de horarios previos eliminados para el periodo {periodo_id}.")
+            self.logger.info(f"Archivado exitoso: {archived_count} horarios ACTIVO previos marcados como HISTORICO para el periodo {periodo_id}.")
         except Exception as e:
             self.db.rollback()
-            self.logger.error(f"Error al limpiar horarios previos del periodo {periodo_id}: {e}")
+            self.logger.error(f"Error al archivar horarios previos del periodo {periodo_id}: {e}")
             raise e
+
+    def _next_version_horario(self, periodo_id: int) -> int:
+        """
+        Calcula la siguiente versión de horario para un periodo académico.
+        Usa el máximo version_horario existente (incluye versiones archivadas)
+        y suma 1; si no hay registros, devuelve la versión 1.
+        """
+        max_version = self.db.query(func.max(models.HorarioGenerado.version_horario)).filter(
+            models.HorarioGenerado.periodo_id == periodo_id
+        ).scalar()
+        return (max_version or 0) + 1
 
     # CORREGIDO: Firma de la función para aceptar CpSolverStatus
     def _save_results_if_feasible(self, status: int, periodo_id: int): # <-- CORREGIDO: cp_model.CpSolverStatus
@@ -345,12 +356,14 @@ class ScheduleGenerator:
         """
         # CORREGIDO: Comparar status con los enums de CpSolverStatus (esto es lo importante)
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]: # status es ahora CpSolverStatus
-            self.logger.info("Solución factible encontrada. Limpiando horarios anteriores...")
+            self.logger.info("Solución factible encontrada. Archivando horarios anteriores...")
             
-            # Limpiar horarios anteriores del periodo activo antes de insertar nuevos registros
-            self._clear_previous_schedules(periodo_id)
+            # Archivar horarios ACTIVO anteriores del periodo antes de insertar la nueva versión
+            self._archive_previous_schedules(periodo_id)
 
-            self.logger.info("Guardando nueva asignación de horarios en la base de datos...")
+            # Calcular la siguiente versión de horario para el periodo
+            version_horario = self._next_version_horario(periodo_id)
+            self.logger.info(f"Guardando nueva asignación de horarios (versión {version_horario}) en la base de datos...")
             # CORREGIDO: Obtener los objetos de bloques y aulas, no solo IDs
             # Cargar instancias completas para facilitar el acceso a atributos
             bloques_db = {b.id: b for b in self.db.query(models.BloqueHorario).all()}
@@ -387,7 +400,7 @@ class ScheduleGenerator:
                         hora_inicio=hora_inicio_valor,
                         hora_fin=hora_fin_valor,
                         estado='ACTIVO',
-                        version_horario=1,
+                        version_horario=version_horario,
                         periodo_id=periodo_id,
                         created_at=now_utc,
                         updated_at=now_utc,

@@ -355,6 +355,8 @@ Actualmente, re-generar un horario no limpia los anteriores, acumulando duplicad
 - Guardar `version_horario` incrementalmente en `horario_generado`
 - Permitir comparar/restaurar versiones anteriores desde el frontend
 
+> **✅ Implementado (E4, backend-only):** `GET /schedules/versions?periodo_id=` lista versiones (ACTIVO/HISTORICO) y `POST /schedules/restore` restaura una versión (ACTIVO actual→HISTORICO, objetivo→ACTIVO). La generación archiva (HISTORICO) en vez de borrar e incrementa `version_horario`. Pendiente UI en `Horarios.jsx` para listar/restaurar versiones.
+
 #### C. Validación previa a la generación
 Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 registros sin explicar por qué. Añadir:
 - Endpoint `GET /api/schedules/pre-generation-check?periodo_id={id}` que valide los prerequisitos
@@ -524,3 +526,14 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - **Cleanup:** el intervalo se guarda en `genPollRef` (useRef) y se limpia al desmontar el componente, evitando fugas de memoria.
    - **Backend (`routers/schedules.py`):** el mensaje de `set_done` ahora distingue `count>0` ("Solución guardada: N horarios.") de `count=0` ("El solver no encontró una solución factible para el periodo.").
    - **Verificación:** `pnpm build` OK y `import main` OK en el backend.
+
+### Contexto de la Sesión Actual (2026-08-09) — E4
+
+1. **E4 — Control de versiones del horario (backend-only, completado):**
+   - **Archivado en vez de borrado:** `_clear_previous_schedules` pasó a `_archive_previous_schedules` en `or_tools_adapter.py`: marca los `ACTIVO` previos como `estado='HISTORICO'` en lugar de eliminarlos. Para ello se amplió el CHECK de `horario_generado` con `'HISTORICO'` (`database/actualizaciones/upgrade_estado_historico.sql`, ya aplicado a la BD; el schema base también se actualizó). Los triggers PL/pgSQL no se tocaron.
+   - **Versión incremental:** nuevo `_next_version_horario(periodo_id)` calcula `max(version_horario)+1` del periodo; la generación inserta con esa versión (antes hardcodeaba `1`).
+   - **Nuevos endpoints** en `routers/schedules.py` (declarados antes de `/{horario_id}`):
+     - `GET /api/schedules/versions?periodo_id=` → `List[HorarioVersion]` (autenticado; 404 si no hay versiones).
+     - `POST /api/schedules/restore` body `{periodo_id, version}` → `RestoreResult` (ADMIN/JEFE-PNF; 404 si la versión no existe; no-op si ya está activa).
+   - **CRUD/schemas nuevos:** `crud.get_versiones_horario`, `crud.restore_version_horario`, `schemas.HorarioVersion`, `schemas.RestoreRequest`, `schemas.RestoreResult` (exportados en `schemas/__init__.py` y `crud/__init__.py`).
+   - **Verificación E2E (HTTP + BD real):** 3 generaciones → v4 ACTIVO + v1–v3 HISTORICO; restore v1 → v1 ACTIVO y `GET /schedules/fullcalendar` refleja la versión restaurada; `generation-status` → DONE con count correcto. Sin cambios en el frontend (E4 backend-only).

@@ -382,6 +382,10 @@ sequenceDiagram
 | POST/PUT/DELETE | `/disponibilidades-docentes/` | ADMIN/JEFE-PNF/**DOCENTE** | Disponibilidad (el docente gestiona la suya). |
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
 | POST | `/schedules/generate?periodo_id=` | ADMIN/JEFE-PNF | Dispara generación asíncrona (202). |
+| GET | `/schedules/generation-status?periodo_id=` | Autenticado | Estado de generación (PENDING/DONE/FAILED + count). |
+| GET | `/schedules/pre-generation-check?periodo_id=` | Autenticado | Checklist de prerequisitos para generar (E2). |
+| GET | `/schedules/versions?periodo_id=` | Autenticado | Lista versiones de horario del periodo (E4). |
+| POST | `/schedules/restore` | ADMIN/JEFE-PNF | Restaura versión de horario (ACTIVO actual→HISTORICO, objetivo→ACTIVO) (E4). |
 | GET | `/schedules/fullcalendar?periodo_id=` | Autenticado | Horarios en formato FullCalendar. |
 | POST | `/schedules/validate-move` | ADMIN/JEFE-PNF | Valida movimiento drag & drop. |
 | PUT/DELETE/GET | `/schedules/{horario_id}` y `/schedules/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Gestión manual de horarios generados. |
@@ -431,13 +435,15 @@ flowchart TD
     H --> I[Solver.Solve CP-SAT]
     I --> J{OPTIMAL o FEASIBLE?}
     J -- No --> K[Log warning: sin solucion]
-    J -- Si --> L[_clear_previous_schedules: eliminar ACTIVO previos]
-    L --> M[Insertar nuevos HorarioGenerado estado=ACTIVO version=1]
-    M --> N[Triggers sincronizan dia_semana/horas y validan sede]
+    J -- Si --> L[_archive_previous_schedules: marcar ACTIVO previos como HISTORICO]
+    L --> M[Calcular version_horario siguiente: max + 1]
+    M --> N[Insertar nuevos HorarioGenerado estado=ACTIVO con version_horario]
+    N --> O[Triggers sincronizan dia_semana/horas y validan sede]
 ```
 
 **Garantías de persistencia:**
-- **Idempotencia:** `_clear_previous_schedules(periodo_id)` borra horarios `ACTIVO` previos antes de insertar.
+- **Idempotencia + versionado (E4):** `_archive_previous_schedules(periodo_id)` marca los horarios `ACTIVO` previos como `HISTORICO` (no los borra); la nueva generación inserta con `version_horario = max(version_horario del periodo) + 1`. Así cada generación produce una nueva versión consultable/restaurable.
+- **Restore:** `POST /schedules/restore` conmuta `ACTIVO` ↔ `HISTORICO` entre la versión objetivo y la actual (endpoints `GET /schedules/versions` y `POST /schedules/restore`).
 - **Integridad:** los triggers `trg_sync_horario_bloque` y `trg_validar_sede_horario` validan/calculan los campos al insertar.
 
 ### 5.6 Servicio de validación de movimientos
@@ -640,9 +646,9 @@ npm run dev    # http://localhost:3000
 
 ### 10.2 Roadmap priorizado
 
-1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`).
-2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración).
-3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`).
+1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
+2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
+3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
 4. **Vista de recursos** en FullCalendar (`@fullcalendar/resource-timegrid`).
 5. **Dashboard dinámico** con datos reales y gráficas.
 6. **Módulo de configuración** conectado a `/api/configuraciones/`.

@@ -23,8 +23,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E1** — Commiteado (`94f938e` "E1: endpoint generation-status con tracker de estado en memoria"): `services/scheduler/status_tracker.py` (PENDING/DONE/FAILED + count + timestamp, en memoria) + endpoint autenticado `GET /api/schedules/generation-status?periodo_id=` (404 si no hay estado). Criterio verificado: tras `POST /generate`, PENDING→DONE con `count > 0`.
 - ✅ **E2** — Commiteado: `GET /api/schedules/pre-generation-check?periodo_id=` (`crud.get_pre_generation_check`, schema `PreGenerationCheck`) + panel de checklist en `Horarios.jsx` que bloquea "Generación Inteligente" cuando `listo=false` (críticos en 0: lecciones/aulas/bloques/docentes con habilitación). Disponibilidad=0 es advertencia. Criterio verificado: `pnpm build` OK y backend importa OK.
 - ✅ **E3** — Polling por estado en `Horarios.jsx`: se reemplazó el polling sobre `refetchHorarios()` por polling a `GET /schedules/generation-status` (10×3 s) con `ScheduleService.getGenerationStatus`. DONE→refetch del calendario + toast (success si `count>0`, warning si `count=0`), FAILED→toast con la causa del tracker, PENDING→spinner con intento visible en el overlay, 404→seguir esperando. Cleanup del intervalo al desmontar. Tweak backend: mensaje DONE preciso cuando `count=0`. Criterio verificado: `pnpm build` OK y backend importa OK.
+- ✅ **E4** — Control de versiones del horario: `_clear_previous_schedules` → `_archive_previous_schedules` (marca `estado='HISTORICO'` en vez de borrar; CHECK ampliado vía `database/actualizaciones/upgrade_estado_historico.sql` y schema). Nueva generación inserta con `version_horario = max+1` (`_next_version_horario`). Endpoints `GET /schedules/versions?periodo_id=` y `POST /schedules/restore` (+ schemas `HorarioVersion`/`RestoreRequest`/`RestoreResult`, CRUD `get_versiones_horario`/`restore_version_horario`). Criterio verificado E2E: 3 generaciones → 3 versiones (1 ACTIVA + 2 HISTORICO) y restore v1 funciona (FullCalendar refleja la restaurada).
 
-**Pendientes:** E4–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
+**Pendientes:** E5–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
 ---
 
@@ -54,11 +55,12 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Reemplazar el polling sobre `refetchHorarios()` por polling a `generation-status` (10×3 s): DONE→refetch, FAILED→toast con causa, PENDING→spinner.
 - ✅ Criterio: la UI refleja el estado real de generación, no solo "hay eventos". **Verificado** (`pnpm build` OK, backend importa OK).
 
-### E4 — Control de versiones del horario (~3 h)
+### E4 — Control de versiones del horario (~3 h) ✅ COMPLETADA
 - `_clear_previous_schedules`: de borrar a marcar `estado='HISTORICO'`; nueva generación inserta con `version_horario` incrementado (la columna ya existe; no tocar schema/triggers).
 - Endpoints: `GET /schedules/versions?periodo_id=` y `POST /schedules/restore?version=N` (ACTIVO actual→HISTORICO, objetivo→ACTIVO).
 - ⚠️ Verificar que no exista constraint único que bloquee el restore.
-- ✅ Criterio: 2 generaciones producen 2 versiones y el restore funciona.
+- ✅ Criterio: 2 generaciones producen 2 versiones y el restore funciona. **Verificado** (E2E: 3 generaciones → v4 ACTIVO + v1–v3 HISTORICO; restore v1 → v1 ACTIVO; FullCalendar refleja la restaurada; 404 en versión inexistente; no-op si la versión ya está activa).
+- **Nota:** el `estado='HISTORICO'` requería ampliar el CHECK de `horario_generado` (`database/actualizaciones/upgrade_estado_historico.sql`, ya aplicado). Los triggers PL/pgSQL se mantienen intactos. `horario_historial` (auditoría RESTAURADO) queda como mejora futura, sin modelo SQLAlchemy.
 
 ## Fase B · Módulos pendientes (frontend)
 

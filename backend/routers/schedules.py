@@ -79,6 +79,32 @@ def get_pre_generation_check(periodo_id: int, db: Session = Depends(get_db)):
     """
     return crud.get_pre_generation_check(db, periodo_id=periodo_id)
 
+# Endpoint para listar las versiones de horario de un periodo académico (E4)
+@router.get("/versions", response_model=List[schemas.HorarioVersion], summary="Listar versiones de horario de un periodo", dependencies=[Depends(get_current_active_user)])
+def get_schedule_versions(periodo_id: int, db: Session = Depends(get_db)):
+    """
+    Devuelve las versiones de horario generadas para un periodo académico,
+    con su estado (ACTIVO/HISTORICO), total de registros y fecha de generación.
+    Permite consultar el historial y, junto a POST /schedules/restore, restaurar
+    una versión anterior.
+    """
+    versiones = crud.get_versiones_horario(db, periodo_id=periodo_id)
+    if not versiones:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No hay versiones de horario registradas para el periodo {periodo_id}.")
+    return versiones
+
+# Endpoint para restaurar una versión de horario de un periodo académico (E4)
+@router.post("/restore", response_model=schemas.RestoreResult, summary="Restaurar versión de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def restore_schedule_version(restore_request: schemas.RestoreRequest, db: Session = Depends(get_db)):
+    """
+    Restaura una versión de horario para un periodo: la versión ACTIVO actual
+    pasa a HISTORICO y la versión objetivo pasa a ACTIVO.
+    """
+    resultado = crud.restore_version_horario(db, periodo_id=restore_request.periodo_id, version=restore_request.version)
+    if resultado is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"La versión {restore_request.version} no existe para el periodo {restore_request.periodo_id}.")
+    return resultado
+
 # Endpoint para obtener horarios en formato FullCalendar
 @router.get("/fullcalendar", response_model=List[schemas.FullCalendarEvent], summary="Obtener horarios para FullCalendar", dependencies=[Depends(get_current_active_user)])
 def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
