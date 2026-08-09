@@ -321,6 +321,22 @@ const Horarios = () => {
     retry: 0
   });
 
+  // 7. Checklist previo a la generación (E2)
+  const { data: preCheck = null, refetch: refetchPreCheck } = useQuery({
+    queryKey: ['pre-generation-check', selectedPeriodoId],
+    queryFn: async () => {
+      if (!selectedPeriodoId) return null;
+      try {
+        return await ScheduleService.getPreGenerationCheck(selectedPeriodoId);
+      } catch (err) {
+        return null;
+      }
+    },
+    enabled: !demoMode && !!selectedPeriodoId,
+    retry: 0
+  });
+  const canGenerate = demoMode ? true : (preCheck ? preCheck.listo : true);
+
   // Activar modo demo automáticamente si falla el fetch de horarios
   useEffect(() => {
     if (isHorariosError && !demoMode) {
@@ -910,7 +926,8 @@ const Horarios = () => {
         
         <button 
           onClick={triggerAutoGeneration}
-          disabled={!selectedPeriodoId || isGenerating}
+          disabled={!selectedPeriodoId || isGenerating || !canGenerate}
+          title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : undefined}
           className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
         >
           <Sparkles className="w-5 h-5 animate-pulse" />
@@ -976,6 +993,79 @@ const Horarios = () => {
         </div>
 
       </div>
+
+      {/* CHECKLIST PREVIO A LA GENERACIÓN (E2) */}
+      {!demoMode && preCheck && (
+        <div className={`rounded-3xl p-5 border shadow-[0_8px_30px_rgb(0,0,0,0.02)] ${
+          preCheck.listo
+            ? 'bg-emerald-50/50 border-emerald-200/70'
+            : 'bg-amber-50/50 border-amber-200/70'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              {preCheck.listo
+                ? <CheckCircle className="w-5 h-5 text-emerald-600" />
+                : <AlertTriangle className="w-5 h-5 text-amber-600" />}
+              <h3 className="font-bold text-sm text-slate-700">Checklist previo a la generación</h3>
+            </div>
+            {!preCheck.listo && (
+              <button
+                onClick={() => refetchPreCheck()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Revalidar</span>
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { label: 'Lecciones activas', value: preCheck.lecciones_activas, critico: preCheck.lecciones_activas === 0 },
+              { label: 'Aulas activas', value: preCheck.aulas, critico: preCheck.aulas === 0 },
+              { label: 'Bloques activos', value: preCheck.bloques, critico: preCheck.bloques === 0 },
+              { label: 'Docentes con habilitación', value: preCheck.docentes_con_habilitacion, critico: preCheck.docentes_con_habilitacion === 0 },
+              { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false }
+            ].map(item => (
+              <div key={item.label} className={`rounded-2xl p-3 border ${
+                item.value === 0
+                  ? item.critico ? 'bg-red-50 border-red-200/70' : 'bg-amber-50 border-amber-200/70'
+                  : 'bg-white border-slate-100'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
+                  {item.value > 0
+                    ? <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    : <X className="w-4 h-4 text-amber-500" />}
+                </div>
+                <p className={`mt-1 text-2xl font-extrabold ${item.value === 0 ? 'text-amber-600' : 'text-slate-800'}`}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {!preCheck.listo && (
+            <div className="mt-4 flex items-start gap-2 text-xs text-amber-800">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                {preCheck.lecciones_activas === 0 && <p>· No hay lecciones activas para este periodo. Crea lecciones antes de generar.</p>}
+                {preCheck.aulas === 0 && <p>· No hay aulas activas en el sistema.</p>}
+                {preCheck.bloques === 0 && <p>· No hay bloques horarios activos.</p>}
+                {preCheck.docentes_con_habilitacion === 0 && <p>· Ningún docente tiene habilitaciones registradas; el solver no puede asignar clases.</p>}
+                {preCheck.docentes_con_disponibilidad === 0 && <p>· Advertencia: ningún docente tiene disponibilidad definida. El solver asumirá disponibilidad total por defecto.</p>}
+                {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} lección(es) sin habilitación para su docente y materia.</p>}
+                {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} lección(es) cuyo docente no define disponibilidad.</p>}
+              </div>
+            </div>
+          )}
+
+          {preCheck.listo && (
+            <p className="mt-4 text-xs text-emerald-700 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4" />
+              Todo listo para la generación inteligente.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
