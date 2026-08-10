@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 import models, schemas
 from typing import List, Optional
-from datetime import date, timedelta, datetime
+from datetime import date, time, timedelta, datetime
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DBAPIError 
 from fastapi import HTTPException 
 from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
@@ -404,6 +404,45 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         if leccion.docente_id not in docentes_con_disp:
             lecciones_sin_disponibilidad += 1
 
+    # Lecciones sin candidatos aula+bloque en su sede. Mismo criterio que el solver
+    # (or_tools_adapter._build_model) y el trigger fn_validar_sede_horario: una lección
+    # es ubicable solo si su sede (COALESCE(sede_forzada_id, grupo.sede_id)) tiene al
+    # menos un aula activa y un bloque activo dentro de la ventana de jornada.
+    config_values = {c.clave: c.valor for c in db.query(models.Configuracion).all()}
+
+    def _parse_hora(clave, default):
+        try:
+            h, m, _ = str(config_values.get(clave)).split(":")
+            return time(int(h), int(m))
+        except (ValueError, TypeError):
+            return default
+
+    hora_inicio_jornada = _parse_hora("hora_inicio_jornada", time(7, 0))
+    hora_fin_jornada = _parse_hora("hora_fin_jornada", time(15, 0))
+    dias_laborables = config_values.get("dias_laborables", [1, 2, 3, 4, 5])
+    if not isinstance(dias_laborables, list):
+        dias_laborables = [1, 2, 3, 4, 5]
+
+    sedes_con_aula = {row[0] for row in db.query(models.Aula.sede_id).filter(models.Aula.activa == True).distinct()}  # noqa: E712
+
+    sedes_con_bloque = set()
+    for bloque in db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True):  # noqa: E712
+        if bloque.dia_semana not in dias_laborables:
+            continue
+        if bloque.hora_inicio < hora_inicio_jornada:
+            continue
+        bloque_fin = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
+        if bloque_fin > hora_fin_jornada:
+            continue
+        sedes_con_bloque.add(bloque.sede_id)
+
+    grupo_sede = {g.id: g.sede_id for g in db.query(models.Grupo).all()}
+    lecciones_sin_candidatos = 0
+    for leccion in lecciones_activas:
+        leccion_sede = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
+        if leccion_sede not in sedes_con_aula or leccion_sede not in sedes_con_bloque:
+            lecciones_sin_candidatos += 1
+
     aulas = db.query(models.Aula).filter(models.Aula.activa == True).count()  # noqa: E712
     bloques = db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True).count()  # noqa: E712
 
@@ -422,6 +461,7 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         bloques=bloques,
         lecciones_sin_habilitacion=lecciones_sin_habilitacion,
         lecciones_sin_disponibilidad=lecciones_sin_disponibilidad,
+        lecciones_sin_candidatos=lecciones_sin_candidatos,
         listo=listo,
     )
 

@@ -252,6 +252,8 @@ const Horarios = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genStatusText, setGenStatusText] = useState(''); // Texto del estado mostrado en el overlay de generación
   const [selectedVersion, setSelectedVersion] = useState(null); // Versión seleccionada para restaurar (E4b)
+  // Fecha visible de la semana en la vista por aulas (E9): se actualiza con datesSet
+  const [calWeekStart, setCalWeekStart] = useState(null);
   
   // Modal de Detalle / Edición rápida
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -263,7 +265,9 @@ const Horarios = () => {
   const [toast, setToast] = useState(null);
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    // Los errores/advertencias duran más para que el mensaje no se pierda (fix generación)
+    const duracion = (type === 'error' || type === 'warning') ? 12000 : 4000;
+    setTimeout(() => setToast(null), duracion);
   };
 
   // Base de datos local para el modo Demo
@@ -336,6 +340,13 @@ const Horarios = () => {
   const goCalendarPrev = () => getActiveCalendarApis().forEach(api => api.prev());
   const goCalendarNext = () => getActiveCalendarApis().forEach(api => api.next());
   const goCalendarToday = () => getActiveCalendarApis().forEach(api => api.today());
+
+  // Rastrea el inicio de la semana visible (E9) para mostrar la etiqueta en la vista por aulas
+  const handleDatesSet = (info) => {
+    if (info.view.type === 'timeGridWeek' && info.start) {
+      setCalWeekStart(info.start);
+    }
+  };
 
   // 2. Aulas
   const { data: aulasReal = [], isError: isAulasError } = useQuery({
@@ -514,14 +525,18 @@ const Horarios = () => {
 
   // --- MUTACIONES Y LÓGICA DE ACTUALIZACIÓN ---
 
-  // Helper para buscar el bloque más cercano a un drop de fecha/hora
-  const findNearestBloque = (date) => {
+  // Helper para buscar el bloque más cercano a un drop de fecha/hora.
+  // Solo considera bloques de la misma sede que el aula del evento (evita SITE_MISMATCH
+  // al elegir bloques de sedes distintas con la misma hora).
+  const findNearestBloque = (date, sedeId) => {
     const jsDay = date.getDay(); // 0 = Dom, 1 = Lun, etc.
     const diaSemana = jsDay === 0 ? 7 : jsDay;
     const dropTimeMin = date.getHours() * 60 + date.getMinutes(); // drop time in minutes from midnight
 
-    // Filtrar los bloques del mismo día
-    const dayBlocks = bloques.filter(b => b.dia_semana === diaSemana);
+    // Filtrar los bloques del mismo día (y de la misma sede si se indica)
+    const dayBlocks = bloques.filter(b =>
+      b.dia_semana === diaSemana && (sedeId == null || b.sede_id === sedeId)
+    );
     if (dayBlocks.length === 0) return null;
 
     let bestBlock = null;
@@ -575,17 +590,19 @@ const Horarios = () => {
     const horarioId = parseInt(event.id);
     const newStart = event.start;
 
-    // Buscar bloque más cercano correspondiente
-    const targetBlock = findNearestBloque(newStart);
+    // El aula actual se extrae de resourceId (ej. "aula_2") o del evento
+    const currentAulaId = event.extendedProps.aula_id || parseInt(event.resourceId?.replace("aula_", ""));
+    // Resolver la sede del aula para buscar bloques solo de esa sede (consistencia de sede)
+    const aulaSedeId = aulas.find(a => a.id === Number(currentAulaId))?.sede_id;
+
+    // Buscar bloque más cercano correspondiente (misma sede que el aula)
+    const targetBlock = findNearestBloque(newStart, aulaSedeId);
 
     if (!targetBlock) {
       showToast("La hora o el día seleccionado no coincide con ningún bloque horario configurado para esta sede.", "error");
       revert();
       return;
     }
-
-    // El aula actual se extrae de resourceId (ej. "aula_2") o del evento
-    const currentAulaId = event.extendedProps.aula_id || parseInt(event.resourceId?.replace("aula_", ""));
 
     if (demoMode) {
       // Simular movimiento local
@@ -983,28 +1000,47 @@ const Horarios = () => {
     }
   };
 
+  // Convierte los eventos de la API al formato de color de FullCalendar (E9):
+  // toma el backgroundColor de extendedProps y lo aplica como color real del evento.
+  const mapScheduleEvents = (eventos) => {
+    return (eventos || []).map(ev => ({
+      ...ev,
+      backgroundColor: ev.extendedProps?.backgroundColor || '#6366f1',
+      borderColor: ev.extendedProps?.backgroundColor || '#6366f1',
+      textColor: '#ffffff'
+    }));
+  };
+
   // --- RENDER EVENT COMPONENT ---
   const renderEventContent = (eventInfo) => {
     const { title, extendedProps } = eventInfo.event;
+    // Solo mostrar grupo/aula si el bloque tiene altura suficiente (primera fila visual)
+    const isTall = eventInfo.isStart && eventInfo.isEnd;
     return (
-      <div className="flex flex-col h-full w-full justify-between p-2 text-xs text-white leading-tight overflow-hidden select-none">
-        <div className="font-bold truncate" title={title}>
-          {extendedProps.materia || title}
+      <div className="flex flex-col h-full w-full justify-between p-1.5 text-[11px] text-white leading-tight overflow-hidden select-none">
+        <div className="flex items-start gap-1 min-w-0">
+          <div className="font-bold truncate" title={title}>
+            {extendedProps.materia || title}
+          </div>
         </div>
-        
-        <div className="mt-1 text-[10px] space-y-0.5 opacity-90 truncate">
-          <div className="flex items-center gap-1 font-medium">
+
+        <div className="mt-1 text-[10px] space-y-0.5 opacity-90 min-w-0">
+          <div className="flex items-center gap-1 font-medium truncate">
             <GraduationCap className="w-3 h-3 shrink-0" />
-            <span className="truncate">{extendedProps.docente}</span>
+            <span className="truncate" title={extendedProps.docente}>{extendedProps.docente}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Users className="w-3 h-3 shrink-0" />
-            <span className="truncate">{extendedProps.grupo}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <MapPin className="w-3 h-3 shrink-0" />
-            <span className="truncate">{extendedProps.aula}</span>
-          </div>
+          {isTall && (
+            <>
+              <div className="flex items-center gap-1 truncate">
+                <Users className="w-3 h-3 shrink-0" />
+                <span className="truncate" title={extendedProps.grupo}>{extendedProps.grupo}</span>
+              </div>
+              <div className="flex items-center gap-1 truncate">
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span className="truncate" title={extendedProps.aula}>{extendedProps.aula}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -1201,7 +1237,8 @@ const Horarios = () => {
               { label: 'Aulas activas', value: preCheck.aulas, critico: preCheck.aulas === 0 },
               { label: 'Bloques activos', value: preCheck.bloques, critico: preCheck.bloques === 0 },
               { label: 'Docentes con habilitación', value: preCheck.docentes_con_habilitacion, critico: preCheck.docentes_con_habilitacion === 0 },
-              { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false }
+              { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false },
+              { label: 'Lecciones sin candidatos', value: preCheck.lecciones_sin_candidatos, critico: false }
             ].map(item => (
               <div key={item.label} className={`rounded-2xl p-3 border ${
                 item.value === 0
@@ -1230,6 +1267,7 @@ const Horarios = () => {
                 {preCheck.docentes_con_disponibilidad === 0 && <p>· Advertencia: ningún docente tiene disponibilidad definida. El solver asumirá disponibilidad total por defecto.</p>}
                 {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} lección(es) sin habilitación para su docente y materia.</p>}
                 {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} lección(es) cuyo docente no define disponibilidad.</p>}
+                {preCheck.lecciones_sin_candidatos > 0 && <p>· {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede (no podrán asignarse; crea aulas/bloques en esa sede).</p>}
               </div>
             </div>
           )}
@@ -1239,6 +1277,15 @@ const Horarios = () => {
               <CheckCircle className="w-4 h-4" />
               Todo listo para la generación inteligente.
             </p>
+          )}
+
+          {preCheck.listo && preCheck.lecciones_sin_candidatos > 0 && (
+            <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-xl p-3">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>
+                Advertencia: {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede no podrán asignarse. El solver generará el resto del horario.
+              </p>
+            </div>
           )}
         </div>
       )}
@@ -1364,8 +1411,10 @@ const Horarios = () => {
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-              <span className="ml-1 text-sm font-bold text-slate-700">
-                {selectedPeriodo?.nombre || 'Periodo'}
+              <span className="ml-1 text-sm font-bold text-slate-700 flex flex-col items-end leading-tight">
+                {calWeekStart
+                  ? `Semana del ${calWeekStart.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+                  : (selectedPeriodo?.nombre || 'Periodo')}
               </span>
             </div>
           )}
@@ -1408,19 +1457,22 @@ const Horarios = () => {
                       headerToolbar={false}
                       allDaySlot={false}
                       slotMinTime="07:00:00"
-                      slotMaxTime="18:30:00"
+                      slotMaxTime="19:30:00"
                       slotDuration="00:15:00"
                       slotLabelInterval="01:00:00"
                       weekends={false}
                       editable={true}
                       droppable={true}
                       eventDurationEditable={false}
-                      events={listadoHorarios.filter(ev => ev.resourceId === `aula_${aula.id}`)}
+                      scrollTime="07:00:00"
+                      nowIndicator={true}
+                      datesSet={handleDatesSet}
+                      events={mapScheduleEvents(listadoHorarios.filter(ev => ev.resourceId === `aula_${aula.id}`))}
                       eventContent={renderEventContent}
                       eventDrop={handleEventDrop}
                       eventClick={handleEventClick}
                       themeSystem="standard"
-                      height="auto"
+                      height={600}
                     />
                   </div>
                 ))
@@ -1443,19 +1495,21 @@ const Horarios = () => {
               }}
               allDaySlot={false}
               slotMinTime="07:00:00"
-              slotMaxTime="18:30:00"
+              slotMaxTime="19:30:00"
               slotDuration="00:15:00" // Sub-slots para alineación perfecta de 45 o 90 min
               slotLabelInterval="01:00:00"
               weekends={false}
               editable={true}
               droppable={true}
               eventDurationEditable={false} // Evitar cambiar duración arrastrando bordes
-              events={listadoHorarios}
+              scrollTime="07:00:00"
+              nowIndicator={true}
+              events={mapScheduleEvents(listadoHorarios)}
               eventContent={renderEventContent}
               eventDrop={handleEventDrop}
               eventClick={handleEventClick}
               themeSystem="standard"
-              height="auto"
+              height={680}
             />
           </div>
         )}

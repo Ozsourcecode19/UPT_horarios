@@ -408,7 +408,7 @@ sequenceDiagram
 
 #### 5.5.1 Modelo de decisión
 
-- **Variables booleanas:** `x[leccion_id, bloque_id, aula_id]` — es `True` si la lección se asigna al bloque en esa aula. Solo se crean variables donde `aula.sede_id == bloque.sede_id` (restricción de sede).
+- **Variables booleanas:** `x[leccion_id, bloque_id, aula_id]` — es `True` si la lección se asigna al bloque en esa aula. Solo se crean variables donde `aula.sede_id == bloque.sede_id == leccion_sede` (restricción de sede), siendo `leccion_sede = COALESCE(leccion.sede_forzada_id, grupo.sede_id)`.
 
 #### 5.5.2 Restricciones duras
 
@@ -416,7 +416,7 @@ sequenceDiagram
 2. **Unicidad por recurso** en cada bloque: a lo sumo una clase por docente, por grupo y por aula (`AddAtMostOne`).
 3. **Disponibilidad docente:** se cancelan (`x == 0`) las variables cuyo bloque cae en una franja `NO_DISPONIBLE` o fuera de las franjas `DISPONIBLE` explícitas. Si el docente no tiene franjas explícitas, se asume disponible por defecto.
 4. **Habilitación docente–materia:** si el par `(docente_id, materia_id)` no está en `habilitaciones_docentes`, todas sus variables se fuerzan a 0.
-5. **Sede (consistencia DB):** solo se crean variables aula–bloque de la misma sede, en línea con `fn_validar_sede_horario()`.
+5. **Sede (consistencia tripartita DB):** solo se crean variables donde `aula.sede_id == bloque.sede_id == leccion_sede`, en línea con `fn_validar_sede_horario()`. La lección hereda la sede de `sede_forzada_id` o de su grupo. (Fix de generación: antes solo se exigía `aula == bloque`, por lo que el solver podía asignar una lección a una sede distinta de la suya y el trigger rechazaba el INSERT, dejando la generación en `FAILED`.)
 
 #### 5.5.3 Restricciones blandas (función objetivo)
 
@@ -445,6 +445,7 @@ flowchart TD
 
 **Garantías de persistencia:**
 - **Idempotencia + versionado (E4):** `_archive_previous_schedules(periodo_id)` marca los horarios `ACTIVO` previos como `HISTORICO` (no los borra); la nueva generación inserta con `version_horario = max(version_horario del periodo) + 1`. Así cada generación produce una nueva versión consultable/restaurable.
+- **Atomicidad (fix):** el archivado y la inserción de la nueva versión ocurren en **una sola transacción** (commit único al final de `_save_results_if_feasible`). Si el INSERT falla (p. ej. rechazo del trigger de sede), se revierte todo y la versión `ACTIVO` anterior no se pierde.
 - **Restore:** `POST /schedules/restore` conmuta `ACTIVO` ↔ `HISTORICO` entre la versión objetivo y la actual (endpoints `GET /schedules/versions` y `POST /schedules/restore`).
 - **Integridad:** los triggers `trg_sync_horario_bloque` y `trg_validar_sede_horario` validan/calculan los campos al insertar.
 
@@ -459,6 +460,8 @@ Verifica, en orden y contra la BD (no contra el solver):
 3. Habilitación docente–materia (`UNQUALIFIED_TEACHER`).
 4. Conflictos de recurso en el bloque objetivo: docente, grupo y aula (`CONFLICT_TEACHER`, `CONFLICT_GROUP`, `CONFLICT_ROOM`).
 5. Consistencia de sede entre aula y bloque (`SITE_MISMATCH`).
+
+La disponibilidad (paso 2) es **consistente con el solver** (`or_tools_adapter.py`): si el docente no tiene franjas `DISPONIBLE` explícitas se considera disponible por defecto; solo se rechaza lo cubierto por una franja `NO_DISPONIBLE`, o lo que no encaje en las franjas `DISPONIBLE` explícitas cuando éstas existen. (Antes se exigía una franja `DISPONIBLE` explícita, lo que hacía rebotar todo drag & drop de docentes sin disponibilidad definida.)
 
 Devuelve `ValidationResult(valido, mensaje, error_code)`; el endpoint traduce el fallo a HTTP 409.
 
