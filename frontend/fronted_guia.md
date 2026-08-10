@@ -182,7 +182,7 @@ HorarioGenerado + Leccion + Materia + Docente + Grupo + Aula + Sede + PeriodoAca
 ```
 
 **Posibles mejoras:**
-- Vista de aulas como "recursos" (`@fullcalendar/resource-timegrid`) para ver todas las aulas en paralelo
+- ~~Vista de aulas como "recursos" para ver todas las aulas en paralelo~~ → **✅ Implementado (E8, custom)** con la vista "por Aulas" multi-instancia en `Horarios.jsx` (sin plugin Premium).
 - Exportar el horario a PDF o imagen
 - Coloreado por grupo además de por materia
 
@@ -377,12 +377,15 @@ Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 reg
 
 ### Prioridad Media (Mejoras de UX significativas)
 
-#### D. Vista de recursos en FullCalendar (`@fullcalendar/resource-timegrid`)
-La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo. Instalar `@fullcalendar/resource-timegrid` para mostrar cada aula como una columna vertical — la vista estándar de planificadores universitarios.
+#### D. Vista de recursos en FullCalendar
+La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo.
 
-```bash
-npm install @fullcalendar/resource-timegrid @fullcalendar/resource-daygrid
-```
+> **✅ Implementado (E8, 2026-08-09) — variante custom (sin licencia Premium).** Los paquetes `@fullcalendar/resource-timegrid`/`resource-daygrid` son plugins **Premium** (licencia comercial / CC-NC-ND en trial), por lo que se descartaron y se construyó una **vista "por Aulas" multi-instancia** en `Horarios.jsx`:
+> - Estado `viewMode` (`'semana'`/`'aulas'`) con segmented control sobre la tarjeta de la grilla (iconos `Calendar`/`LayoutGrid`).
+> - En modo `aulas`: contenedor `overflow-x-auto` con una columna (`w-[360px]`, header con nombre del aula + sede) y un `<FullCalendar>` por aula activa — `events` filtrados por `resourceId === 'aula_'+id`, `headerToolbar={false}`, mismas props del calendario principal (slots 07:00–18:30, `eventContent`, `eventDrop`, `eventClick`, Modo Demo).
+> - Navegación global `prev/today/next` (helpers `getActiveCalendarApis`/`goCalendarPrev`/`goCalendarNext`/`goCalendarToday`) que itera los refs de la vista activa (`resourceCalRefs`); `gotoDate` al cambiar de periodo también itera todos los refs.
+> - **Limitación:** el drag & drop es intra-columna (cambiar de aula se hace desde el modal de edición). `timeGridWeek` sigue siendo la vista por defecto/fallback.
+> - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E visual pendiente en el navegador.
 
 #### E. Módulo de Períodos Académicos
 No existe una página de gestión de periodos. El usuario no puede crear/editar periodos desde el frontend. Crear `Periodos.jsx` con CRUD y conectar a `api/periodos.js`.
@@ -619,7 +622,7 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - **Resultado grilla virtual (con defaults `07:00–15:00`, `dias_laborables=[1..5]`):** muestra `5 días × 7 bloques = 35` celdas. Con `hora_fin_jornada=20:00:00` pasa a `5 × 12 = 60`; los bloques de Sáb/Dom solo se consideran si `dias_laborables` incluye 6/7 (config global, por diseño).
    - **Estado vacío + hint de ventana (`DocenteDisponibilidad.jsx`):** si una sede no tiene bloques (o todos caen fuera de la ventana) la grilla muestra un mensaje explícito (`sin_bloques`/`fuera_ventana`) en vez del fallback ficticio — antes, una sede vacía (p. ej. `EV-004` con 0 bloques) mostraba `FALLBACK_BLOQUES_TIME` (18 filas 07:00–20:30) × 5 días = **90 celdas engañosas**. Además, header de la grilla con hint "Ventana de jornada: HH:MM–HH:MM" y "Días: N".
    - **Conteo visible = duración × ventana (no bug):** con `hora_fin_jornada=12:00:00`, las sedes físicas (45') muestran `5 × 5 = 25` bloques y una sede flexible de 60' (p. ej. `AA-003`) muestra `4 × 5 = 20`, porque solo caben enteros los que terminan antes de las 12:00. Para `5 × 5 = 25` en bloques de 60' hay que subir `hora_fin_jornada` a `13:00:00`.
-   - **Verificación:** `pnpm build` OK + `python -c "import main"` OK. E2E pendiente: con `hora_fin_jornada=12:00` la grilla y el solver usan solo bloques hasta las 11:45.
+   - **Verificación:** `pnpm build` OK + `python -c "import main"` OK. **E2E verificado** (2026-08-09): con `hora_fin_jornada=12:00` la grilla muestra 5 bloques/día (último 11:00→11:45) y una regeneración del periodo asigna solo bloques `DENTRO_VENTANA` (nueva versión ACTIVA con bloque 07:00→07:45).
 
 ### Contexto de la Sesión Actual (2026-08-09) — Extensión: UI de gestión de bloques horarios
 
@@ -633,7 +636,7 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - Gateo por rol: escrituras solo `ADMIN`/`JEFE-PNF` (`useAuth`); no-admin lee con badge "Solo lectura" (backend 403 como segunda barrera).
 3. **`src/api/bloques.js`:** `getBloques` (limit 1000) + `createBloque`/`updateBloque`/`deleteBloque` contra el CRUD ya existente en `/bloques-horarios/`.
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
-5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente: crear un bloque para `EV-004` (sede virtual sin bloques) y verlo aparecer en la grilla de disponibilidad tras invalidación.
+5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
 ### Contexto de la Sesión Actual (2026-08-09) — E8: Reorganización de la navegación
 
@@ -666,4 +669,4 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 2. **Frontend — `BloquesHorarios.jsx`:** botón **"Generar grilla"** (solo `isWritable`) en el encabezado que abre un **modal de confirmación dedicado** (desacoplado de `confirmAction`, que exige un bloque concreto). El modal tiene select de duración pre-seleccionado con `duracion_bloque_default` (query `['configuraciones']`, fallback 45) y checkbox "Renumerar orden visual". Tras ejecutar muestra toast `X creados, Y omitidos` + `invalidateQueries(['bloques'])`. En Modo Demo simula la grilla localmente (`generarSimulacionDemo`, espejo del backend) sobre `demo_bloques_horarios`.
 3. **`src/api/bloques.js`:** nuevo `generateBloquesEstandar(payload)` → `POST /bloques-horarios/estandar`.
 4. **`Settings.jsx`:** `duracion_bloque_default` cambia de widget numérico (15–120) a **select 30/45/60/90/120** (alineado con el CHECK de BD); nota del grupo "Estructura de bloques" actualizada: ahora pre-selecciona la duración del generador.
-5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size) + `python -c "import main"` OK. E2E pendiente: ejecutar el endpoint 2 veces sobre la misma sede (2ª con `creados=0`).
+5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size) + `python -c "import main"` OK. **E2E verificado** (2026-08-09): `POST /bloques-horarios/estandar` sobre sede 4 ejecutado 3 veces (45min) → `creados:0, omitidos:50` en todas; con `overwrite:true` renumera `orden_visual` 1..10 por día sin duplicados de tripleta (conteo sede 4 = 50).
