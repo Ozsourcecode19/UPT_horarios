@@ -26,7 +26,7 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E4** — Control de versiones del horario: `_clear_previous_schedules` → `_archive_previous_schedules` (marca `estado='HISTORICO'` en vez de borrar; CHECK ampliado vía `database/actualizaciones/upgrade_estado_historico.sql` y schema). Nueva generación inserta con `version_horario = max+1` (`_next_version_horario`). Endpoints `GET /schedules/versions?periodo_id=` y `POST /schedules/restore` (+ schemas `HorarioVersion`/`RestoreRequest`/`RestoreResult`, CRUD `get_versiones_horario`/`restore_version_horario`). Criterio verificado E2E: 3 generaciones → 3 versiones (1 ACTIVA + 2 HISTORICO) y restore v1 funciona (FullCalendar refleja la restaurada).
 - ✅ **E4b** — UI de versiones y restauración del horario: `ScheduleService.getScheduleVersions`/`restoreScheduleVersion` + panel en `Horarios.jsx` (selector de versión con badges ACTIVO/HISTORICO, botón "Restaurar versión" gateado por rol ADMIN/JEFE-PNF vía `useAuth`, invalidación de `['horarios']` y `['schedule-versions']` post-restore, patrón Modo Demo con fallback `[]`). Criterio verificado: `pnpm build` OK + E2E API (restaurar v2 → FullCalendar refleja la versión; DOCENTE → 403 en restore, 200 en lectura).
 
-**Pendientes:** E5–E10 del roadmap, bugs menores (Dashboard estático, Settings placeholder, sin página de periodos), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
+**Pendientes:** E9–E10 del roadmap, bugs menores (Dashboard sin gráficas, Settings con pestañas pendientes), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
 ---
 
@@ -94,10 +94,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 ## Fase C · Visualización avanzada
 
-### E8 — Vista de recursos en FullCalendar (~3 h)
-- Instalar `@fullcalendar/resource-timegrid` + `resource-daygrid`; configurar aulas como recursos (el evento ya trae `resourceId`).
-- Mantener `timeGridWeek` como vista por defecto/fallback.
-- ✅ Criterio: calendario muestra aulas en columnas paralelas.
+### E8 — Vista de recursos en FullCalendar (~3 h) ✅ COMPLETADA
+- **Decisión:** no se usa `@fullcalendar/resource-timegrid` + `resource-daygrid` (son plugins **Premium** con licencia comercial/CC-NC-ND en trial). En su lugar se implementó una **vista custom multi-instancia** en `Horarios.jsx`.
+- **Implementación:** estado `viewMode` (`'semana'`/`'aulas'`), selector de vista en la tarjeta de la grilla, y en modo `aulas` una columna `<FullCalendar>` por aula activa (`events` filtrados por `resourceId === 'aula_'+id`, `headerToolbar={false}`) dentro de un contenedor con scroll horizontal. Navegación global `prev/today/next` (`getActiveCalendarApis`) y sincronización de `gotoDate` iterando los refs de la vista activa.
+- **Limitación documentada:** drag & drop solo intra-columna (cambio de aula vía modal de edición); `timeGridWeek` sigue siendo la vista por defecto/fallback.
+- ✅ Criterio: calendario muestra aulas en columnas paralelas. **Verificado** (`pnpm build` OK, solo warning preexistente de chunk size).
 
 ## Fase D · Calidad
 

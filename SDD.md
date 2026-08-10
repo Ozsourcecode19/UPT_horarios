@@ -132,6 +132,7 @@ flowchart TD
 | Generación de horarios | Algoritmo greedy/heurístico propio | Google OR-Tools CP-SAT | Solver probado para problemas de asignación (timetabling), restricciones duras/blancas expresables declarativamente. |
 | Ejecución de la generación | Síncrona en el request | Asíncrona (`BackgroundTasks`) con 202 Accepted | La generación puede tardar 10–60 s; no debe bloquear la API. |
 | Vista de calendario | Tabla HTML propia | FullCalendar `timeGridWeek` | Componente maduro con drag & drop e interacciones listas. |
+| Vista de recursos (aulas en paralelo) | Plugin Premium `@fullcalendar/resource-timegrid` (licencia comercial) | Vista custom multi-instancia (una columna `<FullCalendar>` por aula) | Se evita la licencia Premium; reutiliza `eventContent`/`eventDrop`/`eventClick` existentes; limitación: drag & drop solo intra-columna (cambio de aula vía modal de edición). |
 | Validación de reglas | Solo en el solver | Solver + triggers PL/pgSQL | Defensa en profundidad: el solver genera soluciones válidas y la BD rechaza violaciones directas (p. ej., cambios manuales por SQL). |
 | Gestión de esquema | `Base.metadata.create_all` | Alembic + scripts SQL versionados | Control de versiones del esquema y actualizaciones incrementales. |
 
@@ -643,14 +644,14 @@ npm run dev    # http://localhost:3000
 | 🟡 Media | `Settings.jsx` es un placeholder vacío. | Pendiente. |
 | 🟢 Baja | `Horarios.jsx` de ~1147 líneas (refactorizar a `features/`). | Pendiente. |
 | 🟢 Baja | Proyecto en JS (sin TypeScript). | Pendiente. |
-| 🟢 Baja | Sin exportación PDF/iCal, sin modo oscuro, sin vista de recursos. | Pendiente. |
+| 🟢 Baja | Sin exportación PDF/iCal, sin modo oscuro. Vista de recursos: **✅ Implementada (E8, custom).** | Pendiente. |
 
 ### 10.2 Roadmap priorizado
 
 1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
 2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
 3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
-4. **Vista de recursos** en FullCalendar (`@fullcalendar/resource-timegrid`).
+4. **Vista de recursos** en FullCalendar. **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna (un `<FullCalendar>` por aula, scroll horizontal) sin plugin Premium (`@fullcalendar/resource-timegrid` es comercial). `timeGridWeek` sigue siendo la vista por defecto.
 5. **Dashboard dinámico** con datos reales y gráficas.
 6. **Módulo de configuración** conectado a `/api/configuraciones/`.
 

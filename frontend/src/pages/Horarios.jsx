@@ -11,7 +11,7 @@ import {
   Calendar, Sparkles, RefreshCw, AlertTriangle, Trash2, 
   Settings, Clock, Users, CheckCircle, CheckCircle2, X, ChevronRight, 
   Info, Plus, Edit2, MapPin, GraduationCap, ArrowRight,
-  AlertCircle, Database, History
+  AlertCircle, Database, History, LayoutGrid, ChevronLeft
 } from 'lucide-react';
 
 import ScheduleService from '../api/schedule';
@@ -235,6 +235,7 @@ const FlowStepper = ({ preCheck, demoMode }) => {
 const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
+  const resourceCalRefs = useRef([]); // Refs de los calendarios por aula (vista 'aulas')
   const genPollRef = useRef(null); // Ref para limpiar el polling de generación al desmontar
   const { user } = useAuth();
   // Solo ADMIN/JEFE-PNF pueden restaurar versiones (el backend también responde 403)
@@ -242,6 +243,8 @@ const Horarios = () => {
 
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
+  // Vista de la grilla: 'semana' (timeGridWeek) o 'aulas' (columnas paralelas por aula - E8 custom)
+  const [viewMode, setViewMode] = useState('semana');
   // Inicializar en 'todos' para reflejar inmediatamente todos los horarios generados de todas las aulas/docentes
   const [filterType, setFilterType] = useState('todos'); // 'todos', 'aula', 'docente', 'grupo'
   const [filterValue, setFilterValue] = useState('');
@@ -280,6 +283,7 @@ const Horarios = () => {
         clearInterval(genPollRef.current);
         genPollRef.current = null;
       }
+      resourceCalRefs.current = [];
     };
   }, []);
 
@@ -309,17 +313,29 @@ const Horarios = () => {
 
   const selectedPeriodo = periodos.find(p => p.id === Number(selectedPeriodoId));
 
+  // Devuelve las APIs de FullCalendar de la vista activa (principal o columnas por aula)
+  const getActiveCalendarApis = () => {
+    if (viewMode === 'aulas') {
+      return resourceCalRefs.current.filter(Boolean).map(ref => ref.getApi());
+    }
+    return calendarRef.current ? [calendarRef.current.getApi()] : [];
+  };
+
   // Sincronizar fecha activa de la grilla de FullCalendar al cambiar de período
   useEffect(() => {
-    if (calendarRef.current && selectedPeriodo?.fecha_inicio) {
+    if (selectedPeriodo?.fecha_inicio) {
       try {
-        const api = calendarRef.current.getApi();
-        api.gotoDate(selectedPeriodo.fecha_inicio);
+        getActiveCalendarApis().forEach(api => api.gotoDate(selectedPeriodo.fecha_inicio));
       } catch (err) {
         console.log("Sincronizando fecha del calendario...", err);
       }
     }
-  }, [selectedPeriodoId, selectedPeriodo]);
+  }, [selectedPeriodoId, selectedPeriodo, viewMode]);
+
+  // Navegación global para la vista por aulas (todas las columnas en paralelo)
+  const goCalendarPrev = () => getActiveCalendarApis().forEach(api => api.prev());
+  const goCalendarNext = () => getActiveCalendarApis().forEach(api => api.next());
+  const goCalendarToday = () => getActiveCalendarApis().forEach(api => api.today());
 
   // 2. Aulas
   const { data: aulasReal = [], isError: isAulasError } = useQuery({
@@ -334,6 +350,8 @@ const Horarios = () => {
     retry: 0
   });
   const aulas = demoMode || isAulasError || aulasReal.length === 0 ? MOCK_AULAS : aulasReal;
+  // Aulas para las columnas paralelas de la vista 'aulas' (E8). MOCK no trae 'activa', se asumen activas.
+  const aulasColumnas = aulas.filter(a => a.activa !== false);
 
   // 3. Docentes
   const { data: docentesReal = [], isError: isDocentesError } = useQuery({
@@ -1296,10 +1314,118 @@ const Horarios = () => {
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
         
+        {/* Selector de vista + navegación de la vista por aulas (E8) */}
+        <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl">
+            <button
+              onClick={() => setViewMode('semana')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                viewMode === 'semana'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Vista Semana</span>
+            </button>
+            <button
+              onClick={() => setViewMode('aulas')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                viewMode === 'aulas'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Vista por Aulas</span>
+            </button>
+          </div>
+
+          {viewMode === 'aulas' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goCalendarPrev}
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
+                title="Semana anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={goCalendarToday}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+                title="Hoy"
+              >
+                Hoy
+              </button>
+              <button
+                onClick={goCalendarNext}
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
+                title="Semana siguiente"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <span className="ml-1 text-sm font-bold text-slate-700">
+                {selectedPeriodo?.nombre || 'Periodo'}
+              </span>
+            </div>
+          )}
+        </div>
+
         {isHorariosLoading && !demoMode ? (
           <div className="py-32 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></div>
             <p className="text-sm font-medium text-slate-400">Cargando grilla horaria...</p>
+          </div>
+        ) : viewMode === 'aulas' ? (
+          /* Vista por aulas: una columna de FullCalendar por aula (E8, sin plugin Premium) */
+          <div className="schedule-calendar-wrapper animate-in fade-in duration-300 overflow-x-auto pb-2">
+            <div className="flex gap-4 min-w-max">
+              {aulasColumnas.length === 0 ? (
+                <div className="py-20 px-16 flex flex-col items-center justify-center gap-3 text-center">
+                  <LayoutGrid className="w-10 h-10 text-slate-300" />
+                  <p className="text-sm font-medium text-slate-400">No hay aulas activas para mostrar en columnas.</p>
+                </div>
+              ) : (
+                aulasColumnas.map((aula, idx) => (
+                  <div key={`${calendarKey}-${aula.id}`} className="w-[360px] shrink-0 flex flex-col">
+                    <div className="px-3 py-2.5 mb-3 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/70 flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-700 truncate">{aula.nombre}</p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          Sede: {aulas.find(a => a.id === aula.id)?.sede_id === 1 ? 'Principal' : 'Este'}
+                        </p>
+                      </div>
+                    </div>
+                    <FullCalendar
+                      ref={el => { resourceCalRefs.current[idx] = el; }}
+                      plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
+                      initialView="timeGridWeek"
+                      initialDate={initialDateString}
+                      locale={esLocale}
+                      headerToolbar={false}
+                      allDaySlot={false}
+                      slotMinTime="07:00:00"
+                      slotMaxTime="18:30:00"
+                      slotDuration="00:15:00"
+                      slotLabelInterval="01:00:00"
+                      weekends={false}
+                      editable={true}
+                      droppable={true}
+                      eventDurationEditable={false}
+                      events={listadoHorarios.filter(ev => ev.resourceId === `aula_${aula.id}`)}
+                      eventContent={renderEventContent}
+                      eventDrop={handleEventDrop}
+                      eventClick={handleEventClick}
+                      themeSystem="standard"
+                      height="auto"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         ) : (
           <div className="schedule-calendar-wrapper animate-in fade-in duration-300">
