@@ -125,17 +125,29 @@ class ScheduleGenerator:
         bloques_ids = [b.id for b in bloques if b.dia_semana in dias_disponibles]
         aulas_ids = [a.id for a in aulas]
 
+        # Mapa grupo_id -> sede_id para determinar la sede de cada lección
+        # (mismo criterio que el trigger PL/pgSQL fn_validar_sede_horario:
+        # COALESCE(leccion.sede_forzada_id, grupo.sede_id)).
+        grupo_sede = {g.id: g.sede_id for g in grupos}
+
         # 3. Crear variables de decisión (Booleanas: Leccion-Lugar-Tiempo)
         # La variable x[l_id][b_id][a_id] es True si la leccion l_id se asigna al bloque b_id en la aula a_id
         assignment_vars_local = {} # Dict[(leccion_id, bloque_id, aula_id), Any]
         for leccion in lecciones:
+            leccion_sede = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
+            if leccion_sede is None:
+                self.logger.warning(f"Lección {leccion.id}: no se pudo determinar su sede; se omite (no tendrá candidatos).")
+                continue
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue # Saltar bloques en días no laborables
                 for aula in aulas:
-                    # Restricción de consistencia de Sede: Aula y Bloque deben pertenecer a la misma sede
-                    # (Requisito estricto del trigger PL/pgSQL fn_validar_sede_horario)
-                    if aula.sede_id != bloque.sede_id:
+                    # Restricción de consistencia de Sede (requisito estricto del trigger
+                    # PL/pgSQL fn_validar_sede_horario): Aula, Bloque y Lección deben
+                    # pertenecer a la misma sede. Si el solver solo exigiera Aula==Bloque,
+                    # podría asignar una lección a una sede distinta de la suya y el
+                    # trigger rechazaría el INSERT dejando la generación en FAILED.
+                    if aula.sede_id != bloque.sede_id or aula.sede_id != leccion_sede:
                         continue
 
                     var_name = f"x_l{leccion.id}_b{bloque.id}_a{aula.id}"
@@ -348,18 +360,21 @@ class ScheduleGenerator:
         Archiva los horarios ACTIVO anteriores del periodo académico marcándolos
         como HISTORICO (en lugar de eliminarlos). Esto garantiza la idempotencia
         de la generación y habilita el control de versiones del horario.
+
+        IMPORTANTE: este UPDATE no hace commit. Forma parte de la MISMA transacción
+        que inserta la nueva versión (ver _save_results_if_feasible), de modo que si
+        el guardado falla se revierte todo y se conserva la versión ACTIVO anterior.
         """
         try:
             archived_count = self.db.query(models.HorarioGenerado).filter(
                 models.HorarioGenerado.periodo_id == periodo_id,
                 models.HorarioGenerado.estado == 'ACTIVO'
             ).update({'estado': 'HISTORICO'}, synchronize_session='fetch')
-            self.db.commit()
             self.logger.info(f"Archivado exitoso: {archived_count} horarios ACTIVO previos marcados como HISTORICO para el periodo {periodo_id}.")
         except Exception as e:
             self.db.rollback()
             self.logger.error(f"Error al archivar horarios previos del periodo {periodo_id}: {e}")
-            raise e
+            raise
 
     def _next_version_horario(self, periodo_id: int) -> int:
         """
@@ -376,13 +391,17 @@ class ScheduleGenerator:
     def _save_results_if_feasible(self, status: int, periodo_id: int): # <-- CORREGIDO: cp_model.CpSolverStatus
         """
         Guarda los resultados en la base de datos si la solución es factible.
-        Antes de insertar la nueva asignación, elimina los registros anteriores del periodo.
+        El archivado de la versión anterior y la inserción de la nueva versión se
+        realizan en una única transacción (commit final): si algo falla al insertar
+        (p. ej. el trigger de sede), se revierte todo y la versión ACTIVO previa
+        no se pierde.
         """
         # CORREGIDO: Comparar status con los enums de CpSolverStatus (esto es lo importante)
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]: # status es ahora CpSolverStatus
             self.logger.info("Solución factible encontrada. Archivando horarios anteriores...")
             
-            # Archivar horarios ACTIVO anteriores del periodo antes de insertar la nueva versión
+            # Archivar horarios ACTIVO anteriores del periodo antes de insertar la nueva versión.
+            # Sin commit interno: comparte transacción con los INSERT de la nueva versión.
             self._archive_previous_schedules(periodo_id)
 
             # Calcular la siguiente versión de horario para el periodo

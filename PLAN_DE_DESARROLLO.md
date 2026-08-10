@@ -28,6 +28,8 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 **Pendientes:** E9–E10 del roadmap, bugs menores (Dashboard sin gráficas, Settings con pestañas pendientes), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
 
+**Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
+
 ---
 
 # Ejecuciones

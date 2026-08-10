@@ -80,6 +80,7 @@ class PreGenerationCheck(BaseModel):
     bloques: int = 0
     lecciones_sin_habilitacion: int = 0
     lecciones_sin_disponibilidad: int = 0
+    lecciones_sin_candidatos: int = 0
     listo: bool = False
     class Config:
         from_attributes = True

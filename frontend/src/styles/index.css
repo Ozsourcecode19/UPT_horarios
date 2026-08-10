@@ -26,14 +26,129 @@
   }
 }
 
-.fc-timeGridWeek-view {
-  height: calc(100vh - 200px);
+/* ==========================================================================
+   THEME FullCalendar v6 (Horarios.jsx) — E9
+   Se estiliza vía CSS variables embebidas en el bundle de @fullcalendar/core.
+   Paleta coherente con el diseño de la app (slate + blue/indigo).
+   ========================================================================== */
+.fc {
+  --fc-border-color: #e2e8f0;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-today-bg-color: #eff6ff;
+  --fc-highlight-color: #eff6ff;
+  --fc-now-indicator-color: #6366f1;
+  --fc-small-font-size: 0.85em;
+
+  /* Toolbar nativa estilizada */
+  --fc-button-bg-color: #f1f5f9;
+  --fc-button-border-color: transparent;
+  --fc-button-text-color: #475569;
+  --fc-button-hover-bg-color: #e2e8f0;
+  --fc-button-hover-border-color: transparent;
+  --fc-button-active-bg-color: #3b82f6;
+  --fc-button-active-border-color: transparent;
+  --fc-button-active-text-color: #ffffff;
 }
 
 .fc-header-toolbar {
   margin-bottom: 1rem;
 }
 
-.fc-scroller {
+.fc .fc-button {
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.75rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.fc .fc-button:focus {
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.25);
+}
+
+.fc .fc-button-group .fc-button {
+  margin-right: 0.25rem;
+}
+
+/* Cabecera de días/columnas */
+.fc .fc-col-header-cell {
+  padding: 0.5rem 0.25rem;
+  background: #f8fafc;
+}
+
+.fc .fc-col-header-cell-cushion {
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Día de hoy en la cabecera */
+.fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  color: #2563eb;
+}
+
+/* Etiquetas de hora de la columna de tiempo */
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+/* Líneas de los sub-slots (punteadas para separar bloques de 15 min) */
+.fc .fc-timegrid-slot {
+  border-bottom: 1px dashed #eef2f7;
+}
+
+/* Eventos: tarjetas con borde izquierdo de color y sombra sutil */
+.fc .fc-event {
+  border-radius: 0.5rem;
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.08);
+}
+
+.fc .fc-event-main {
+  overflow: hidden;
+}
+
+.fc .fc-event.fc-event-start.fc-event-end {
+  border-radius: 0.5rem;
+}
+
+/* Indicador "ahora" */
+.fc .fc-timegrid-now-indicator-line {
+  border-color: #6366f1;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: #6366f1;
+}
+
+/* Scrollbar fino dentro del recuadro del calendario */
+.fc .fc-scroller {
   overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.fc .fc-scroller::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 8px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
 }

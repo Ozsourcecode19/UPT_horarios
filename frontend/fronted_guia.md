@@ -387,6 +387,18 @@ La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo.
 > - **Limitación:** el drag & drop es intra-columna (cambiar de aula se hace desde el modal de edición). `timeGridWeek` sigue siendo la vista por defecto/fallback.
 > - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E visual pendiente en el navegador.
 
+#### D1. Rediseño visual de la grilla FullCalendar + fix de corte/scroll
+
+> **✅ Implementado (E9, 2026-08-09).** Dos problemas reportados en la vista semanal: (1) la grilla **se cortaba** y (2) **no permitía scroll dentro del recuadro**. Causa raíz: la regla CSS `.fc-timeGridWeek-view { height: calc(100vh - 200px) }` en `index.css` chocaba con `height="auto"` de FullCalendar, dejando la grilla clavada a un alto que no alcanzaba las 18:30. Además los eventos usaban el azul por defecto porque `backgroundColor` vivía solo en `extendedProps`.
+>
+> - **Fix de altura/scroll:** se eliminó el override CSS; ambos `<FullCalendar>` usan ahora `height={680}` (vista semana) y `height={600}` (columnas por aula) → FullCalendar crea su scroller interno (`.fc-scroller`) con `overflow-y: auto` y scrollbar fino personalizado en `index.css`.
+> - **Theme FullCalendar v6:** theme vía CSS variables `--fc-*` en `frontend/src/styles/index.css` coherente con el diseño de la app: bordes `slate-200`, cabecera de días slate-700 bold uppercase sobre fondo `slate-50`, "today" `blue-50`, botones nativos estilizados (rounded-xl, slate, activo `#3b82f6`), `now-indicator` `#6366f1`, sub-slots con líneas punteadas.
+> - **Colores por materia:** helper `mapScheduleEvents(events)` en `Horarios.jsx` que convierte `extendedProps.backgroundColor` → `backgroundColor`/`borderColor`/`textColor` del evento (fallback `#6366f1`); aplicado al prop `events` de ambos calendarios.
+> - **Evento rediseñado:** `renderEventContent` compacto — materia bold + docente siempre; grupo/aula solo cuando el bloque es alto (`isStart && isEnd`, bloques de 90 min); `title`/tooltip con la info completa; `text-[11px]`, `truncate`, `select-none`.
+> - **Extras:** `nowIndicator={true}`, `scrollTime="07:00:00"`, `slotMaxTime="19:30:00"` (respiro visual al bloque de 18:00) y etiqueta "Semana del {día}" en la navegación de la vista por aulas (estado `calWeekStart` alimentado por `datesSet`).
+> - **Fix drag & drop (sede):** `findNearestBloque(date, sedeId)` ahora filtra los bloques **solo de la sede del aula** del evento (antes elegía el bloque más cercano por tiempo entre *todas* las sedes, causando `SITE_MISMATCH` intermitente y revert). `handleEventDrop` resuelve `currentAulaId` primero y deriva `sede_id` desde `aulas`. Verificado con BD real: bloques de varias sedes coinciden en la misma hora (p. ej. 08:00 en sedes 1,2,3,4).
+> - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E visual pendiente en el navegador.
+
 #### E. Módulo de Períodos Académicos
 No existe una página de gestión de periodos. El usuario no puede crear/editar periodos desde el frontend. Crear `Periodos.jsx` con CRUD y conectar a `api/periodos.js`.
 

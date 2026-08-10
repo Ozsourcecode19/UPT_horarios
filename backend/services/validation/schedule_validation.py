@@ -64,17 +64,30 @@ def validate_move(db_session: Session, horario_id: int, nuevo_bloque_id: Optiona
     if not bloque_objetivo or not aula_objetivo:
         return ValidationResult(False, "Bloque o aula objetivo no encontrado.", "INVALID_TARGET")
 
-    # 2. Validar disponibilidad del docente en el nuevo bloque
-    # Cargar disponibilidad del docente para el día y hora del nuevo bloque
-    disp_docente = db_session.query(models.DisponibilidadDocente).filter(
+    # 2. Validar disponibilidad del docente en el nuevo bloque.
+    # Consistente con el solver (or_tools_adapter.py): sin franjas DISPONIBLE explícitas
+    # el docente se considera disponible por defecto; solo se bloquea lo que esté
+    # cubierto por una franja NO_DISPONIBLE, o lo que no encaje en las franjas
+    # DISPONIBLE explícitas cuando éstas existen.
+    disps_docente = db_session.query(models.DisponibilidadDocente).filter(
         models.DisponibilidadDocente.docente_id == docente_id,
-        models.DisponibilidadDocente.dia_semana == bloque_objetivo.dia_semana,
-        models.DisponibilidadDocente.tipo_disponibilidad == 'DISPONIBLE',
-        models.DisponibilidadDocente.hora_inicio <= bloque_objetivo.hora_inicio,
-        models.DisponibilidadDocente.hora_fin >= (datetime.combine(date.min, bloque_objetivo.hora_inicio) + timedelta(minutes=bloque_objetivo.duracion_minutos)).time()
-    ).first()
+        models.DisponibilidadDocente.dia_semana == bloque_objetivo.dia_semana
+    ).all()
 
-    if not disp_docente:
+    bloque_inicio = bloque_objetivo.hora_inicio
+    bloque_fin = (datetime.combine(date.min, bloque_objetivo.hora_inicio) + timedelta(minutes=bloque_objetivo.duracion_minutos)).time()
+
+    def franja_cubre(d):
+        return d.hora_inicio <= bloque_inicio and d.hora_fin >= bloque_fin
+
+    # a. Bloque cubierto por una franja NO_DISPONIBLE explícita => rechazado
+    no_disponibles = [d for d in disps_docente if d.tipo_disponibilidad == 'NO_DISPONIBLE' and franja_cubre(d)]
+    if no_disponibles:
+        return ValidationResult(False, f"Docente no disponible en el nuevo bloque ({bloque_objetivo.dia_semana}, {bloque_objetivo.hora_inicio}).", "UNAVAILABLE_TEACHER")
+
+    # b. Si existen franjas DISPONIBLE explícitas, el bloque debe encajar en alguna
+    disponibles_explicit = [d for d in disps_docente if d.tipo_disponibilidad == 'DISPONIBLE']
+    if disponibles_explicit and not any(franja_cubre(d) for d in disponibles_explicit):
         return ValidationResult(False, f"Docente no disponible en el nuevo bloque ({bloque_objetivo.dia_semana}, {bloque_objetivo.hora_inicio}).", "UNAVAILABLE_TEACHER")
 
 
