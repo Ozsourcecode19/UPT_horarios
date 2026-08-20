@@ -13,6 +13,7 @@ class Grupo(Base):
     sede_id = Column(Integer, ForeignKey("sedes.id"), nullable=False)
     cantidad_alumnos = Column(Integer, default=0)
     periodo_id = Column(Integer, ForeignKey("periodos_academicos.id"))
+    division = Column(String(20), nullable=False, default='MATUTINO')
     activo = Column(Boolean, default=True)
 
     # CORREGIDO: Uso de lambda, timezone-aware, e import explícito
@@ -30,4 +31,5 @@ class Grupo(Base):
     # Check Constraints
     __table_args__ = (
         CheckConstraint(cantidad_alumnos >= 0, name="ck_cantidad_alumnos_grupo"),
+        CheckConstraint(division.in_(['MATUTINO', 'VESPERTINO', 'NOCTURNO']), name="ck_division_grupo"),
     )

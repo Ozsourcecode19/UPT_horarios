@@ -65,10 +65,10 @@ INSERT INTO periodos_academicos (nombre, tipo_corte, fecha_inicio, fecha_fin, an
 ('Trimestre 2-2026', 'TRIMESTRAL', '2026-08-01', '2026-10-31', 2026, 'PLANIFICACION');
 
 -- Grupos
-INSERT INTO grupos (nombre, trayecto_id, sede_id, cantidad_alumnos, periodo_id, activo) VALUES
-('1M', 1, 1, 25, 1, TRUE), -- Grupo 1M, Trayecto 1 de INF, Sede 1, Periodo 1
-('2M', 1, 1, 22, 1, TRUE), -- Grupo 2M, Trayecto 1 de INF, Sede 1, Periodo 1
-('1E', 3, 1, 30, 1, TRUE); -- Grupo 1E, Trayecto 1 de EDU, Sede 1, Periodo 1
+INSERT INTO grupos (nombre, trayecto_id, sede_id, cantidad_alumnos, periodo_id, division, activo) VALUES
+('1M', 1, 1, 25, 1, 'MATUTINO', TRUE), -- Grupo 1M, Trayecto 1 de INF, Sede 1, Periodo 1
+('2M', 1, 1, 22, 1, 'MATUTINO', TRUE), -- Grupo 2M, Trayecto 1 de INF, Sede 1, Periodo 1
+('1E', 3, 1, 30, 1, 'VESPERTINO', TRUE); -- Grupo 1E, Trayecto 1 de EDU, Sede 1, Periodo 1
 
 -- Docentes
 INSERT INTO docentes (nombre, apellido, email, carga_maxima, sede_principal_id, usuario_id, activo) VALUES

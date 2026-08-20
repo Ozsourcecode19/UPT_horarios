@@ -46,9 +46,9 @@ const MOCK_DOCENTES = [
 ];
 
 const MOCK_GRUPOS = [
-  { id: 1, nombre: "Sección A - Informática" },
-  { id: 2, nombre: "Sección B - Informática" },
-  { id: 3, nombre: "Sección C - Mecánica" }
+  { id: 1, nombre: "Sección A - Informática", division: 'MATUTINO' },
+  { id: 2, nombre: "Sección B - Informática", division: 'VESPERTINO' },
+  { id: 3, nombre: "Sección C - Mecánica", division: 'NOCTURNO' }
 ];
 
 const MOCK_MATERIAS = [

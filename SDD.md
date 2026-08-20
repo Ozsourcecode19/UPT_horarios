@@ -309,13 +309,13 @@ erDiagram
 | `materias` | Materias del PNF | `color_hex` usado por FullCalendar. |
 | `aulas` | Espacios físicos/virtuales | Tipos: AULA, LABORATORIO, AUDITORIO, TALLER, VIRTUAL. |
 | `bloques_horarios` | Franjas temporales por sede y día | `dia_semana` 1=Lunes..7=Domingo, duración 30/45/60/90/120 min. |
-| `grupos` | Secciones de estudiantes | Vinculados a trayecto, sede y periodo. |
+| `grupos` | Secciones de estudiantes | Vinculados a trayecto, sede, periodo y división (turno). `division` (MATUTINO/VESPERTINO/NOCTURNO) restringe la ventana de bloques asignables. |
 | `lecciones` | Demanda de clase (docente+grupo+materia) | Filtrada por `periodo_id` y `activo` durante la generación. |
 | `disponibilidad_docentes` | Franjas de disponibilidad del docente | DISPONIBLE / NO_DISPONIBLE / PREFERENCIA. |
 | `habilitaciones_docentes` | Qué materias puede dictar cada docente | Nivel BASICO..ESPECIALISTA, ventana de fechas. |
 | `horario_generado` | Resultado de la asignación | `dia_semana`, `hora_inicio`, `hora_fin` calculados por trigger. |
 | `horario_historial` | Trazabilidad de cambios sobre horarios | Tabla de auditoría. |
-| `configuracion` | Parámetros del solver | Clave JSONB: `dias_laborables`, `hora_inicio_jornada`, pesos de restricciones blandas, etc. |
+| `configuracion` | Parámetros del solver | Clave JSONB: `dias_laborables`, `hora_inicio_jornada`, `ventana_matutino`, `ventana_vespertino`, `ventana_nocturno`, pesos de restricciones blandas, etc. |
 | `carrera_periodo` | Relación N:M carreras↔periodos | Tabla intermedia. |
 
 ### 4.3 Funciones y triggers de PostgreSQL
@@ -652,13 +652,11 @@ npm run dev    # http://localhost:3000
 
 ### 10.2 Roadmap priorizado
 
-> Los ítems 5–6 y siguientes han sido desglosados en ejecuciones reducidas E11–E19 en `PLAN_DE_DESARROLLO.md` (Fases E–G): analítica/exportación, paginación/CSV, refactor a `features/`, refresh token/403, settings completo y tracker persistente + auditoría.
-
 1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
 2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
 3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
 4. **Vista de recursos** en FullCalendar. **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna (un `<FullCalendar>` por aula, scroll horizontal) sin plugin Premium (`@fullcalendar/resource-timegrid` es comercial). `timeGridWeek` sigue siendo la vista por defecto.
-5. **Dashboard dinámico** con datos reales y gráficas. **✅ Implementado (E6 + E11):** stats reales vía `useQuery` (E6); panel "Analítica del periodo vigente" con recharts (carga horaria por docente, distribución por materia) e indicador de salud del horario desde `pre-generation-check` + `generation-status` (E11). Lógica pura en `src/utils/dashboardStats.js`.
+5. **Dashboard dinámico** con datos reales y gráficas.
 6. **Módulo de configuración** conectado a `/api/configuraciones/`.
 
 ### 10.3 Riesgos técnicos
