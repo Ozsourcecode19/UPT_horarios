@@ -356,7 +356,7 @@ El modelo actual (fire-and-forget + timeout fijo) es frágil. La generación pue
 - **Opción 1 (Simple):** Polling al endpoint `GET /api/schedules/fullcalendar` hasta obtener resultados.
 - **Opción 2 (Robusto):** Añadir un endpoint `GET /api/schedules/generation-status?periodo_id={id}` que devuelva `{status: "PENDING"|"DONE"|"FAILED", count: N}` y que el frontend consulte cada 3 segundos.
 
-> **✅ Implementado (E1 + E3):** Existe el endpoint `generation-status` (tracker en memoria) y `Horarios.jsx` hace polling a él (10×3 s). DONE→refetch del calendario, FAILED→toast con causa, PENDING→spinner con intento visible, 404→seguir esperando.
+> **✅ Implementado (E1 + E3 + E10):** Existe el endpoint `generation-status` (tracker en memoria) y el ciclo de polling (10×3 s) está encapsulado en el hook `src/hooks/useGenerationPolling.js` (`useGenerationPolling`, expone `start`/`stop`/`pollRef`). DONE→refetch del calendario, FAILED→toast con causa, PENDING→spinner con intento visible, 404→seguir esperando. `Horarios.jsx` solo conecta callbacks `onStatus`/`onSettled`.
 
 #### B. Control de versiones del horario
 Actualmente, re-generar un horario no limpia los anteriores, acumulando duplicados. Implementar:
@@ -393,10 +393,10 @@ La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo.
 >
 > - **Fix de altura/scroll:** se eliminó el override CSS; ambos `<FullCalendar>` usan ahora `height={680}` (vista semana) y `height={600}` (columnas por aula) → FullCalendar crea su scroller interno (`.fc-scroller`) con `overflow-y: auto` y scrollbar fino personalizado en `index.css`.
 > - **Theme FullCalendar v6:** theme vía CSS variables `--fc-*` en `frontend/src/styles/index.css` coherente con el diseño de la app: bordes `slate-200`, cabecera de días slate-700 bold uppercase sobre fondo `slate-50`, "today" `blue-50`, botones nativos estilizados (rounded-xl, slate, activo `#3b82f6`), `now-indicator` `#6366f1`, sub-slots con líneas punteadas.
-> - **Colores por materia:** helper `mapScheduleEvents(events)` en `Horarios.jsx` que convierte `extendedProps.backgroundColor` → `backgroundColor`/`borderColor`/`textColor` del evento (fallback `#6366f1`); aplicado al prop `events` de ambos calendarios.
+> - **Colores por materia:** helper `mapScheduleEvents(events)` en `src/utils/schedule.js` que convierte `extendedProps.backgroundColor` → `backgroundColor`/`borderColor`/`textColor` del evento (fallback `#6366f1`); aplicado al prop `events` de ambos calendarios.
 > - **Evento rediseñado:** `renderEventContent` compacto — materia bold + docente siempre; grupo/aula solo cuando el bloque es alto (`isStart && isEnd`, bloques de 90 min); `title`/tooltip con la info completa; `text-[11px]`, `truncate`, `select-none`.
 > - **Extras:** `nowIndicator={true}`, `scrollTime="07:00:00"`, `slotMaxTime="19:30:00"` (respiro visual al bloque de 18:00) y etiqueta "Semana del {día}" en la navegación de la vista por aulas (estado `calWeekStart` alimentado por `datesSet`).
-> - **Fix drag & drop (sede):** `findNearestBloque(date, sedeId)` ahora filtra los bloques **solo de la sede del aula** del evento (antes elegía el bloque más cercano por tiempo entre *todas* las sedes, causando `SITE_MISMATCH` intermitente y revert). `handleEventDrop` resuelve `currentAulaId` primero y deriva `sede_id` desde `aulas`. Verificado con BD real: bloques de varias sedes coinciden en la misma hora (p. ej. 08:00 en sedes 1,2,3,4).
+> - **Fix drag & drop (sede):** `findNearestBloque(date, sedeId, bloques)` (en `src/utils/schedule.js`) ahora filtra los bloques **solo de la sede del aula** del evento (antes elegía el bloque más cercano por tiempo entre *todas* las sedes, causando `SITE_MISMATCH` intermitente y revert). `handleEventDrop` resuelve `currentAulaId` primero y deriva `sede_id` desde `aulas`. Verificado con BD real: bloques de varias sedes coinciden en la misma hora (p. ej. 08:00 en sedes 1,2,3,4).
 > - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E visual pendiente en el navegador.
 
 #### E. Módulo de Períodos Académicos
@@ -425,7 +425,9 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 El proyecto usa `.jsx` sin tipos. Definir interfaces para `Docente`, `Leccion`, `BloqueHorario`, `FullCalendarEvent` reduciría errores en runtime al acceder a propiedades inexistentes.
 
 #### I. Refactorizar a estructura `features/`
-Mover la lógica pesada de `Horarios.jsx` (1116 líneas) a:
+> **✅ En curso (E10, parcial):** el primer paso de extracción ya está hecho: la lógica pura salió de `Horarios.jsx` hacia `src/utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`) y `src/utils/scheduleValidation.js` (`validateMoveMock`, obj. con `{horarioId, nuevoBloqueId, nuevaAulaId, eventosDemo, aulas, bloques, periodoId}`); el polling quedó en `src/hooks/useGenerationPolling.js`. `Horarios.jsx` pasó de ~1147 a ~1460 líneas (se extrajeron ~250 líneas de lógica). Pendiente: hooks `useScheduleGeneration` y `useDragDropValidation`, y seguir recortando `Horarios.jsx`.
+
+La propuesta original era:
 ```
 src/features/schedule/
   ├── hooks/useScheduleGeneration.js
@@ -553,7 +555,7 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
      - **DONE** → invalidación de `['horarios', periodoId]` + `refetchHorarios()`; toast success con el `count` si `>0`, o warning con el `message` del tracker si `count=0` (solver infeasible).
      - **FAILED** → toast error con la causa real (el `message` del tracker).
      - **404** (el tracker aún no registra la tarea) → se sigue esperando; timeout a los 10 intentos muestra warning.
-   - **Cleanup:** el intervalo se guarda en `genPollRef` (useRef) y se limpia al desmontar el componente, evitando fugas de memoria.
+   - **Cleanup:** el intervalo se guarda en `genPollRef` (useRef) y se limpia al desmontar el componente, evitando fugas de memoria. **(E10)** el ciclo quedó encapsulado en `src/hooks/useGenerationPolling.js` (`useGenerationPolling` con `onStatus`/`onSettled`), y `Horarios.jsx` solo lo arranca con `startGenerationPolling(periodoId)` y conecta los callbacks.
    - **Backend (`routers/schedules.py`):** el mensaje de `set_done` ahora distingue `count>0` ("Solución guardada: N horarios.") de `count=0` ("El solver no encontró una solución factible para el periodo.").
    - **Verificación:** `pnpm build` OK y `import main` OK en el backend.
 

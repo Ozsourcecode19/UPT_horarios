@@ -11,7 +11,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
   - `createdb -U postgres horarios_upt`
   - `sudo -u postgres psql -d horarios_upt -f database/schema_horarios_v2.1.1.sql` (esquema base)
   - Upgrades/seed/limpieza en `database/actualizaciones/`, `database/operaciones/` (`Reset_y_poblar_datos.sql` puebla datos de prueba).
-- **Tests:** no existen suites. `pytest`/`httpx` (backend) y `vitest`/`testing-library` (frontend) están en las dependencias pero no hay tests en el repo; la verificación es manual. No hay lint/typecheck configurados.
+- **Tests:** backend con suite `pytest`/`httpx` en `backend/tests/` (E9, 46 tests) sobre SQLite in-memory (`pytest.ini` con `pythonpath = .`; fix `JSONB→JSON` en `conftest.py`); **no** dependen de la BD Postgres ni de triggers. Frontend sin suites (vitest instalado, pendiente E10). No hay lint/typecheck configurados. Correr: `cd backend && source .venv/bin/activate && pytest`.
 
 ## Gotchas críticos
 
@@ -33,7 +33,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
   - `core/security.py` — JWT HS256 (30 min) + bcrypt + `require_role([...])`. Roles: `ADMIN`/`JEFE-PNF` (acceso total), `DOCENTE` (solo lectura + su propia disponibilidad), `LECTOR` (solo lectura).
   - Endpoints de horarios: `GET /api/schedules/fullcalendar?periodo_id=`, `POST /api/schedules/generate`, `POST /api/schedules/validate-move`, más CRUD en `/api/schedules/`.
 - **Frontend**: entrada `src/main.jsx`, rutas en `src/routes/AppRouter.jsx`, clientes Axios en `src/api/` (interceptor JWT con redirect a `/login` en 401). Patrón de datos: TanStack Query + invalidación post-mutación (`invalidateQueries`). Token en `localStorage`.
-- **Monolitos a evitar agrandar:** `src/pages/Horarios.jsx` (~1147 líneas, Fase 4/5 concentradas). `Dashboard.jsx` (stats hardcodeadas, botón "Generar" sin `onClick`), `Settings.jsx` (placeholder) y gestión de periodos sin página: pendientes conocidos.
+- **Monolitos a evitar agrandar:** `src/pages/Horarios.jsx` (~1460 líneas, Fase 4/5 concentradas). La lógica pura ya se está extrayendo (E10): helpers en `src/utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`), validación demo en `src/utils/scheduleValidation.js` (`validateMoveMock`) y el polling de generación en `src/hooks/useGenerationPolling.js`. `Dashboard.jsx` (stats hardcodeadas, botón "Generar" sin `onClick`) y gestión de periodos sin página: pendientes conocidos.
 
 ## Convenciones
 

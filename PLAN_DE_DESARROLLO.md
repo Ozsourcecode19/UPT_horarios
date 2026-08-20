@@ -26,7 +26,7 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E4** — Control de versiones del horario: `_clear_previous_schedules` → `_archive_previous_schedules` (marca `estado='HISTORICO'` en vez de borrar; CHECK ampliado vía `database/actualizaciones/upgrade_estado_historico.sql` y schema). Nueva generación inserta con `version_horario = max+1` (`_next_version_horario`). Endpoints `GET /schedules/versions?periodo_id=` y `POST /schedules/restore` (+ schemas `HorarioVersion`/`RestoreRequest`/`RestoreResult`, CRUD `get_versiones_horario`/`restore_version_horario`). Criterio verificado E2E: 3 generaciones → 3 versiones (1 ACTIVA + 2 HISTORICO) y restore v1 funciona (FullCalendar refleja la restaurada).
 - ✅ **E4b** — UI de versiones y restauración del horario: `ScheduleService.getScheduleVersions`/`restoreScheduleVersion` + panel en `Horarios.jsx` (selector de versión con badges ACTIVO/HISTORICO, botón "Restaurar versión" gateado por rol ADMIN/JEFE-PNF vía `useAuth`, invalidación de `['horarios']` y `['schedule-versions']` post-restore, patrón Modo Demo con fallback `[]`). Criterio verificado: `pnpm build` OK + E2E API (restaurar v2 → FullCalendar refleja la versión; DOCENTE → 403 en restore, 200 en lectura).
 
-**Pendientes:** E9–E10 del roadmap, bugs menores (Dashboard sin gráficas, Settings con pestañas pendientes), sin tests (pytest/vitest instalados, sin suites). `docs/*.pdf` vacíos.
+**Pendientes:** E10 del roadmap, bugs menores (Dashboard sin gráficas, Settings con pestañas pendientes), E9 con tests backend (46 tests), frontend sin suites (vitest instalado). `docs/*.pdf` vacíos.
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
@@ -104,10 +104,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 ## Fase D · Calidad
 
-### E9 — Tests backend (pytest + httpx) (~2–3 h)
-- Unitarios de `validate_move` (cada `error_code`), `or_tools_adapter` (modelo factible/infactible con sesión falsa/sqlite en memoria), cálculo `lunes_base` y tracker de estado.
+### E9 — Tests backend (pytest + httpx) (~2–3 h) ✅ COMPLETADA
+- Suite en `backend/tests/` (46 tests): `test_status_tracker.py` (ciclo PENDING→DONE/FAILED, clear), `test_schedule_validation.py` (todos los `error_code` de `validate_move`), `test_or_tools_adapter.py` (modelo factible OPTIMAL→guarda v1, infactible por NO_DISPONIBLE→no guarda, `_next_version_horario`, `_load_config_from_db`/`_parse_hora_jornada`), `test_horarios_para_calendario.py` (cálculo `lunes_base` + mapeo FullCalendar, skip de NULLs/fuera de rango), `test_api_schedules.py` (smoke httpx de `GET /schedules/generation-status` con token JWT real y override de `get_db`).
+- Estrategia: SQLite in-memory con `StaticPool` + `create_all` de los modelos; fix `JSONB→JSON with_variant` en `conftest.py` (la columna `valor` de `Configuracion` no compila en sqlite). `pytest.ini` con `pythonpath = .` para imports planos. **Sin** triggers PL/pgSQL ni BD real.
 - ⚠️ No depender de triggers PL/pgSQL en tests; aislar lógica pura.
-- ✅ Criterio: `cd backend && pytest` pasa.
+- ✅ Criterio: `cd backend && pytest` pasa. **Verificado** (`46 passed`).
 
 ### E10 — Tests frontend (vitest) (~2 h)
 - Añadir script `test` en `package.json` + config vitest; tests de mapeo de eventos, cálculo de fechas y lógica de polling con servicios mockeados.
