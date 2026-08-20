@@ -51,7 +51,7 @@ const DocenteHabilitacionesPage = () => {
     }
   }, [isDocentesError]);
 
-  const docentes = demoMode || isDocentesError || docentesReal.length === 0 ? MOCK_DOCENTES : docentesReal;
+  const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">

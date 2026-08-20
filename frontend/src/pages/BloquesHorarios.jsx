@@ -184,7 +184,7 @@ const BloquesHorarios = () => {
     }
   }, [isBloquesError]);
 
-  const sedes = demoMode || isSedesError || sedesReal.length === 0 ? MOCK_SEDES : sedesReal;
+  const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
   const bloques = demoMode ? demoBloques : bloquesReal;
 
   const sedeActual = sedes.find(s => s.id === Number(selectedSedeId));

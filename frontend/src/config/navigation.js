@@ -13,6 +13,7 @@ import {
   Calendar,
   Settings,
   GraduationCap,
+  School,
 } from 'lucide-react';
 
 export const NAVIGATION = [
@@ -42,6 +43,8 @@ export const NAVIGATION = [
         ],
       },
       { label: 'Materias', path: '/materias', icon: BookOpen, roles: '*' },
+      { label: 'Carreras', path: '/carreras', icon: School, roles: ['ADMIN', 'JEFE-PNF'] },
+      { label: 'Trayectos Académicos', path: '/trayectos', icon: Layers, roles: ['ADMIN'] },
       { label: 'Grupos y Lecciones', path: '/lecciones', icon: Layers, roles: '*' },
     ],
   },

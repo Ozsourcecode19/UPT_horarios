@@ -297,7 +297,7 @@ const Horarios = () => {
     },
     retry: 0
   });
-  const periodos = demoMode || isPeriodosError || periodosReal.length === 0 ? MOCK_PERIODOS : periodosReal;
+  const periodos = demoMode || isPeriodosError ? MOCK_PERIODOS : periodosReal;
 
   // Asignar primer periodo por defecto cuando se cargue
   useEffect(() => {
@@ -351,7 +351,7 @@ const Horarios = () => {
     },
     retry: 0
   });
-  const aulas = demoMode || isAulasError || aulasReal.length === 0 ? MOCK_AULAS : aulasReal;
+  const aulas = demoMode || isAulasError ? MOCK_AULAS : aulasReal;
   // Aulas para las columnas paralelas de la vista 'aulas' (E8). MOCK no trae 'activa', se asumen activas.
   const aulasColumnas = aulas.filter(a => a.activa !== false);
 
@@ -367,7 +367,7 @@ const Horarios = () => {
     },
     retry: 0
   });
-  const docentes = demoMode || isDocentesError || docentesReal.length === 0 ? MOCK_DOCENTES : docentesReal;
+  const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
 
   // 4. Grupos
   const { data: gruposReal = [], isError: isGruposError } = useQuery({
@@ -381,7 +381,7 @@ const Horarios = () => {
     },
     retry: 0
   });
-  const grupos = demoMode || isGruposError || gruposReal.length === 0 ? MOCK_GRUPOS : gruposReal;
+  const grupos = demoMode || isGruposError ? MOCK_GRUPOS : gruposReal;
 
   // 5. Bloques
   const { data: bloquesReal = [], isError: isBloquesError } = useQuery({
@@ -395,7 +395,7 @@ const Horarios = () => {
     },
     retry: 0
   });
-  const bloques = demoMode || isBloquesError || bloquesReal.length === 0 ? MOCK_BLOQUES : bloquesReal;
+  const bloques = demoMode || isBloquesError ? MOCK_BLOQUES : bloquesReal;
 
   // 6. Horarios Generados (Eventos)
   const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, refetch: refetchHorarios } = useQuery({

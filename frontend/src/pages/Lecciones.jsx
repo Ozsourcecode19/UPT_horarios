@@ -267,11 +267,11 @@ const Lecciones = () => {
   const listadoGrupos = demoMode ? demoGrupos : gruposReal;
   const listadoLecciones = demoMode ? demoLecciones : leccionesReal;
   
-  const docentes = demoMode || isDocentesError || docentesReal.length === 0 ? MOCK_DOCENTES : docentesReal;
-  const sedes = demoMode || isSedesError || sedesReal.length === 0 ? MOCK_SEDES : sedesReal;
-  const materias = demoMode || isMateriasError || materiasReal.length === 0 ? MOCK_MATERIAS : materiasReal;
-  const trayectos = demoMode || isTrayectosError || trayectosReal.length === 0 ? MOCK_TRAYECTOS : trayectosReal;
-  const periodos = demoMode || isPeriodosError || periodosReal.length === 0 ? MOCK_PERIODOS : periodosReal;
+  const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
+  const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
+  const materias = demoMode || isMateriasError ? MOCK_MATERIAS : materiasReal;
+  const trayectos = demoMode || isTrayectosError ? MOCK_TRAYECTOS : trayectosReal;
+  const periodos = demoMode || isPeriodosError ? MOCK_PERIODOS : periodosReal;
 
   // --- CONFIGURACIÓN DE FORMULARIOS REACT HOOK FORM ---
   const { 

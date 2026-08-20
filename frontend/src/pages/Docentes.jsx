@@ -90,7 +90,7 @@ const Docentes = () => {
     retry: 0,
   });
 
-  const sedes = demoMode || isSedesError || sedesReal.length === 0 ? MOCK_SEDES : sedesReal;
+  const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
 
   // --- QUERY DE DOCENTES (API) ---
   const { 
