@@ -21,6 +21,9 @@ import DocentsService from '../api/docents';
 import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
 import { useAuth } from '../context/AuthContext';
+import { mapScheduleEvents, findNearestBloque, filterEvents, recalcularEventoDemo } from '../utils/schedule';
+import { validateMoveMock } from '../utils/scheduleValidation';
+import useGenerationPolling from '../hooks/useGenerationPolling';
 
 // --- CONFIGURACIÓN MOCK PARA MODO DEMO ---
 const MOCK_PERIODOS = [
@@ -236,7 +239,6 @@ const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
   const resourceCalRefs = useRef([]); // Refs de los calendarios por aula (vista 'aulas')
-  const genPollRef = useRef(null); // Ref para limpiar el polling de generación al desmontar
   const { user } = useAuth();
   // Solo ADMIN/JEFE-PNF pueden restaurar versiones (el backend también responde 403)
   const canRestore = ['ADMIN', 'JEFE-PNF'].includes(user?.role);
@@ -270,6 +272,37 @@ const Horarios = () => {
     setTimeout(() => setToast(null), duracion);
   };
 
+  // Polling del estado de generación (E3/E10): ciclo setInterval/clearInterval encapsulado
+  const { start: startGenerationPolling, pollRef: genPollRef } = useGenerationPolling({
+    onStatus: (texto) => setGenStatusText(texto),
+    onSettled: ({ tipo, status }) => {
+      if (tipo === 'DONE') {
+        // La generación terminó: refrescar el calendario y reportar el resultado
+        setIsGenerating(false);
+        setGenStatusText('');
+        queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+        refetchHorarios();
+        if (status.count > 0) {
+          showToast(`¡Horarios generados exitosamente (${status.count}) y reflejados en el calendario!`, "success");
+        } else {
+          showToast(status.message || "El solver no encontró una combinación factible. Revisa lecciones, disponibilidades y habilitaciones.", "warning");
+        }
+      } else if (tipo === 'FAILED') {
+        showToast(status.message || "Error al generar el horario en el servidor.", "error");
+        setIsGenerating(false);
+        setGenStatusText('');
+      } else if (tipo === 'PENDING_TIMEOUT') {
+        showToast("La generación tardó más de lo esperado. Revalida el checklist e intenta de nuevo.", "warning");
+        setIsGenerating(false);
+        setGenStatusText('');
+      } else if (tipo === 'ERROR') {
+        showToast("No se pudo consultar el estado de generación. Recarga la página e intenta de nuevo.", "error");
+        setIsGenerating(false);
+        setGenStatusText('');
+      }
+    }
+  });
+
   // Base de datos local para el modo Demo
   const [demoHorarios, setDemoHorarios] = useState(() => {
     const saved = localStorage.getItem('demo_horarios');
@@ -280,13 +313,10 @@ const Horarios = () => {
     localStorage.setItem('demo_horarios', JSON.stringify(demoHorarios));
   }, [demoHorarios]);
 
-  // Limpiar el polling de generación si el componente se desmonta
+  // Limpiar referencias de los calendarios por aula si el componente se desmonta
+  // (el polling de generación ya se limpia en useGenerationPolling)
   useEffect(() => {
     return () => {
-      if (genPollRef.current) {
-        clearInterval(genPollRef.current);
-        genPollRef.current = null;
-      }
       resourceCalRefs.current = [];
     };
   }, []);
@@ -486,29 +516,7 @@ const Horarios = () => {
   const listadoHorariosRaw = demoMode ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId)) : horariosReal;
 
   // --- FILTRADO DE EVENTOS EN MEMORIA ---
-  const listadoHorarios = listadoHorariosRaw.filter(evento => {
-    if (filterType === 'todos' || !filterValue) return true;
-    if (filterType === 'aula') {
-      // Comparar aula_id o resourceId
-      const aulaId = evento.extendedProps?.aula_id || parseInt(evento.resourceId?.replace("aula_", ""));
-      return aulaId === Number(filterValue);
-    }
-    if (filterType === 'docente') {
-      // Comparar por coincidencia de nombre o id
-      const docenteNombre = evento.extendedProps?.docente || '';
-      const selectedDoc = docentes.find(d => d.id === Number(filterValue));
-      if (!selectedDoc) return false;
-      const fullDocName = `${selectedDoc.apellido}, ${selectedDoc.nombre}`.toLowerCase();
-      return docenteNombre.toLowerCase().includes(fullDocName) || docenteNombre.toLowerCase().includes(selectedDoc.nombre.toLowerCase());
-    }
-    if (filterType === 'grupo') {
-      const grupoNombre = evento.extendedProps?.grupo || '';
-      const selectedGrp = grupos.find(g => g.id === Number(filterValue));
-      if (!selectedGrp) return false;
-      return grupoNombre.toLowerCase() === selectedGrp.nombre.toLowerCase();
-    }
-    return true;
-  });
+  const listadoHorarios = filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos });
 
   // Limpiar el subfiltro cuando cambia el tipo de filtro
   useEffect(() => {
@@ -524,40 +532,6 @@ const Horarios = () => {
   }, [filterType, aulas, docentes, grupos]);
 
   // --- MUTACIONES Y LÓGICA DE ACTUALIZACIÓN ---
-
-  // Helper para buscar el bloque más cercano a un drop de fecha/hora.
-  // Solo considera bloques de la misma sede que el aula del evento (evita SITE_MISMATCH
-  // al elegir bloques de sedes distintas con la misma hora).
-  const findNearestBloque = (date, sedeId) => {
-    const jsDay = date.getDay(); // 0 = Dom, 1 = Lun, etc.
-    const diaSemana = jsDay === 0 ? 7 : jsDay;
-    const dropTimeMin = date.getHours() * 60 + date.getMinutes(); // drop time in minutes from midnight
-
-    // Filtrar los bloques del mismo día (y de la misma sede si se indica)
-    const dayBlocks = bloques.filter(b =>
-      b.dia_semana === diaSemana && (sedeId == null || b.sede_id === sedeId)
-    );
-    if (dayBlocks.length === 0) return null;
-
-    let bestBlock = null;
-    let minDiff = 9999;
-
-    dayBlocks.forEach(b => {
-      const [h, m] = b.hora_inicio.split(':').map(Number);
-      const blockTimeMin = h * 60 + m;
-      const diff = Math.abs(dropTimeMin - blockTimeMin);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestBlock = b;
-      }
-    });
-
-    // Validar que no esté exageradamente lejos (máximo 45 min de diferencia)
-    if (minDiff < 45) {
-      return bestBlock;
-    }
-    return null;
-  };
 
   // Mutación para mover horarios (Drag & Drop)
   const moveScheduleMutation = useMutation({
@@ -596,7 +570,7 @@ const Horarios = () => {
     const aulaSedeId = aulas.find(a => a.id === Number(currentAulaId))?.sede_id;
 
     // Buscar bloque más cercano correspondiente (misma sede que el aula)
-    const targetBlock = findNearestBloque(newStart, aulaSedeId);
+    const targetBlock = findNearestBloque(newStart, aulaSedeId, bloques);
 
     if (!targetBlock) {
       showToast("La hora o el día seleccionado no coincide con ningún bloque horario configurado para esta sede.", "error");
@@ -606,7 +580,10 @@ const Horarios = () => {
 
     if (demoMode) {
       // Simular movimiento local
-      const res = validateMoveMock(horarioId, targetBlock.id, currentAulaId);
+      const res = validateMoveMock({
+        horarioId, nuevoBloqueId: targetBlock.id, nuevaAulaId: currentAulaId,
+        eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId
+      });
       if (!res.valido) {
         showToast(res.mensaje, "error");
         revert();
@@ -614,7 +591,10 @@ const Horarios = () => {
       }
 
       // Proceder con el guardado local en demoMode
-      actualizarEventoDemo(horarioId, targetBlock, currentAulaId);
+      const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
+      setDemoHorarios(prev => prev.map(e => e.id === horarioId
+        ? recalcularEventoDemo(e, targetBlock, currentAulaId, fechaBase, aulas)
+        : e));
       showToast("Movimiento simulado con éxito en Modo Demo");
     } else {
       // Conexión real con API
@@ -628,104 +608,6 @@ const Horarios = () => {
         revert();
       }
     }
-  };
-
-  // Simulación de validación local para modo Demo
-  const validateMoveMock = (horarioId, nuevoBloqueId, nuevaAulaId) => {
-    const targetBlock = bloques.find(b => b.id === nuevoBloqueId);
-    if (!targetBlock) return { valido: false, mensaje: "Bloque objetivo inválido.", error_code: "INVALID_TARGET" };
-
-    const movingEvent = demoHorarios.find(e => e.id === horarioId);
-    if (!movingEvent) return { valido: false, mensaje: "Horario no encontrado.", error_code: "NOT_FOUND" };
-
-    const docente = movingEvent.extendedProps.docente;
-    const grupo = movingEvent.extendedProps.grupo;
-    const aulaObj = aulas.find(a => a.id === Number(nuevaAulaId));
-    
-    if (!aulaObj) return { valido: false, mensaje: "Aula objetivo no encontrada.", error_code: "INVALID_TARGET" };
-
-    // Validar consistencia de sedes
-    if (aulaObj.sede_id !== targetBlock.sede_id) {
-      return { valido: false, mensaje: `Inconsistencia: El Aula (${aulaObj.nombre}) y el Bloque horario pertenecen a sedes distintas.`, error_code: "SITE_MISMATCH" };
-    }
-
-    // Colisión de docente
-    const conflictoDoc = demoHorarios.find(e => 
-      e.id !== horarioId && 
-      e.extendedProps.bloque_id === nuevoBloqueId && 
-      e.extendedProps.docente === docente &&
-      e.extendedProps.periodo_id === Number(selectedPeriodoId)
-    );
-    if (conflictoDoc) {
-      return { valido: false, mensaje: `Conflicto de Docente: ${docente} ya tiene la clase '${conflictoDoc.extendedProps.materia}' en este bloque.`, error_code: "CONFLICT_TEACHER" };
-    }
-
-    // Colisión de grupo
-    const conflictoGrupo = demoHorarios.find(e => 
-      e.id !== horarioId && 
-      e.extendedProps.bloque_id === nuevoBloqueId && 
-      e.extendedProps.grupo === grupo &&
-      e.extendedProps.periodo_id === Number(selectedPeriodoId)
-    );
-    if (conflictoGrupo) {
-      return { valido: false, mensaje: `Conflicto de Grupo: El grupo '${grupo}' ya tiene la clase '${conflictoGrupo.extendedProps.materia}' en este bloque.`, error_code: "CONFLICT_GROUP" };
-    }
-
-    // Colisión de aula
-    const conflictoAula = demoHorarios.find(e => 
-      e.id !== horarioId && 
-      e.extendedProps.bloque_id === nuevoBloqueId && 
-      e.extendedProps.aula_id === Number(nuevaAulaId) &&
-      e.extendedProps.periodo_id === Number(selectedPeriodoId)
-    );
-    if (conflictoAula) {
-      return { valido: false, mensaje: `Conflicto de Aula: El ${aulaObj.nombre} ya está ocupado por '${conflictoAula.extendedProps.materia}' en este bloque.`, error_code: "CONFLICT_ROOM" };
-    }
-
-    return { valido: true };
-  };
-
-  // Modificar evento en el estado Demo localmente
-  const actualizarEventoDemo = (horarioId, targetBlock, aulaId) => {
-    // Encontrar la fecha de inicio del periodo académico activo
-    const fechaBaseStr = selectedPeriodo?.fecha_inicio || "2026-06-29";
-    const fechaBase = new Date(fechaBaseStr + "T00:00:00");
-    
-    // Calcular nueva fecha
-    const fechaEvento = new Date(fechaBase);
-    fechaEvento.setDate(fechaBase.getDate() + (targetBlock.dia_semana - 1));
-    const fechaEventoStr = fechaEvento.toISOString().split('T')[0];
-
-    const startISO = `${fechaEventoStr}T${targetBlock.hora_inicio}`;
-    
-    // Calcular hora de fin
-    const [h, m] = targetBlock.hora_inicio.split(':').map(Number);
-    const dateFin = new Date(fechaEvento);
-    dateFin.setHours(h);
-    dateFin.setMinutes(m + targetBlock.duracion_minutos);
-    const endHours = String(dateFin.getHours()).padStart(2, '0');
-    const endMins = String(dateFin.getMinutes()).padStart(2, '0');
-    const endISO = `${fechaEventoStr}T${endHours}:${endMins}:00`;
-
-    const targetAulaObj = aulas.find(a => a.id === Number(aulaId));
-
-    setDemoHorarios(prev => prev.map(e => {
-      if (e.id === horarioId) {
-        return {
-          ...e,
-          start: startISO,
-          end: endISO,
-          resourceId: `aula_${aulaId}`,
-          extendedProps: {
-            ...e.extendedProps,
-            aula_id: Number(aulaId),
-            bloque_id: targetBlock.id,
-            aula: targetAulaObj ? targetAulaObj.nombre : e.extendedProps.aula
-          }
-        };
-      }
-      return e;
-    }));
   };
 
   // --- OPERACIÓN: ABRIR MODAL DETALLES AL HACER CLICK ---
@@ -772,12 +654,18 @@ const Horarios = () => {
     }
 
     if (demoMode) {
-      const res = validateMoveMock(selectedEvent.id, blockId, roomId);
+      const res = validateMoveMock({
+        horarioId: selectedEvent.id, nuevoBloqueId: blockId, nuevaAulaId: roomId,
+        eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId
+      });
       if (!res.valido) {
         showToast(res.mensaje, "error");
         return;
       }
-      actualizarEventoDemo(selectedEvent.id, targetBlock, roomId);
+      const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
+      setDemoHorarios(prev => prev.map(e => e.id === selectedEvent.id
+        ? recalcularEventoDemo(e, targetBlock, roomId, fechaBase, aulas)
+        : e));
       showToast("Cambio guardado en Modo Demo");
       setIsEditModalOpen(false);
       setSelectedEvent(null);
@@ -931,84 +819,15 @@ const Horarios = () => {
         await ScheduleService.generateSchedule(selectedPeriodoId);
         showToast("Procesando horarios en segundo plano con OR-Tools. Verificando estado...", "info");
 
-        // Polling por estado real: consulta generation-status cada 3 segundos (máximo 10 intentos = 30s)
-        let attempts = 0;
-        const maxAttempts = 10;
+        // Polling por estado real (E3): useGenerationPolling gestiona el ciclo
         setGenStatusText("Encolando tarea de generación...");
-
-        if (genPollRef.current) {
-          clearInterval(genPollRef.current);
-        }
-        genPollRef.current = setInterval(async () => {
-          attempts++;
-          try {
-            const status = await ScheduleService.getGenerationStatus(selectedPeriodoId);
-            const countLabel = status.count != null ? ` · ${status.count} horarios` : '';
-            setGenStatusText(`Estado: ${status.status}${countLabel} (intento ${attempts}/${maxAttempts})`);
-
-            // DONE: la generación terminó, refrescar el calendario y reportar el resultado
-            if (status.status === 'DONE') {
-              clearInterval(genPollRef.current);
-              genPollRef.current = null;
-              setIsGenerating(false);
-              setGenStatusText('');
-              queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
-              await refetchHorarios();
-
-              if (status.count > 0) {
-                showToast(`¡Horarios generados exitosamente (${status.count}) y reflejados en el calendario!`, "success");
-              } else {
-                showToast(status.message || "El solver no encontró una combinación factible. Revisa lecciones, disponibilidades y habilitaciones.", "warning");
-              }
-              return;
-            }
-
-            // FAILED: la generación falló, mostrar la causa del tracker
-            if (status.status === 'FAILED') {
-              clearInterval(genPollRef.current);
-              genPollRef.current = null;
-              setIsGenerating(false);
-              setGenStatusText('');
-              showToast(status.message || "Error al generar el horario en el servidor.", "error");
-              return;
-            }
-
-            // PENDING: aún procesando; agotar intentos
-            if (attempts >= maxAttempts) {
-              clearInterval(genPollRef.current);
-              genPollRef.current = null;
-              setIsGenerating(false);
-              setGenStatusText('');
-              showToast("La generación tardó más de lo esperado. Revalida el checklist e intenta de nuevo.", "warning");
-            }
-          } catch (err) {
-            // 404 = la tarea aún no registra estado en el tracker: seguir esperando
-            if (attempts >= maxAttempts) {
-              clearInterval(genPollRef.current);
-              genPollRef.current = null;
-              setIsGenerating(false);
-              setGenStatusText('');
-              showToast("No se pudo consultar el estado de generación. Recarga la página e intenta de nuevo.", "error");
-            }
-          }
-        }, 3000);
+        startGenerationPolling(selectedPeriodoId);
       } catch (err) {
         setIsGenerating(false);
         setGenStatusText('');
         showToast("Error al iniciar generación automática en el servidor", "error");
       }
     }
-  };
-
-  // Convierte los eventos de la API al formato de color de FullCalendar (E9):
-  // toma el backgroundColor de extendedProps y lo aplica como color real del evento.
-  const mapScheduleEvents = (eventos) => {
-    return (eventos || []).map(ev => ({
-      ...ev,
-      backgroundColor: ev.extendedProps?.backgroundColor || '#6366f1',
-      borderColor: ev.extendedProps?.backgroundColor || '#6366f1',
-      textColor: '#ffffff'
-    }));
   };
 
   // --- RENDER EVENT COMPONENT ---
