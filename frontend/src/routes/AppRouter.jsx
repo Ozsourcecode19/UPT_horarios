@@ -8,6 +8,8 @@ import DocenteDisponibilidadPage from '../pages/DocenteDisponibilidadPage';
 import DocenteHabilitacionesPage from '../pages/DocenteHabilitacionesPage';
 import Materias from '../pages/Materias';
 import Aulas from '../pages/Aulas';
+import Trayectos from '../pages/Trayectos';
+import Carreras from '../pages/Carreras';
 import Horarios from '../pages/Horarios';
 import Periodos from '../pages/Periodos';
 import Settings from '../pages/Settings';
@@ -31,6 +33,8 @@ const AppRouter = () => {
           <Route path="/docentes/habilitaciones" element={<DocenteHabilitacionesPage />} />
           <Route path="/materias" element={<Materias />} />
           <Route path="/aulas" element={<Aulas />} />
+          <Route path="/carreras" element={<Carreras />} />
+          <Route path="/trayectos" element={<Trayectos />} />
           <Route path="/lecciones" element={<Lecciones />} />
           <Route path="/periodos" element={<Periodos />} />
           <Route path="/bloques" element={<BloquesHorarios />} />

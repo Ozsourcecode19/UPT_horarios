@@ -60,6 +60,8 @@ frontend/src/
 │   ├── DocenteHabilitacionesPage.jsx    ✅ Sub-ruta /docentes/habilitaciones (Modo Demo)
 │   ├── Materias.jsx            ✅ CRUD completo con selector de color
 │   ├── Aulas.jsx               ✅ CRUD completo
+│   ├── Carreras.jsx            ✅ CRUD completo (carreras/PNF, ADMIN + JEFE-PNF)
+│   ├── Trayectos.jsx           ✅ CRUD completo (trayectos académicos, solo ADMIN)
 │   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
 │   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Stepper de flujo + Modo Demo
 │   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
@@ -481,6 +483,8 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 - Materias: `/api/materias/`
 - Aulas: `/api/aulas/`
 - Grupos: `/api/grupos/`
+- Trayectos: `/api/trayectos-academicos/`
+- Carreras: `/api/carreras/`
 - Lecciones: `/api/lecciones/`
 - Periodos: `/api/periodos-academicos/`
 - Bloques: `/api/bloques-horarios/`
@@ -734,3 +738,30 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - **Distribución por materia:** `PieChart` dona (`innerRadius=55/outerRadius=85`) con `Cell` por color de materia + leyenda.
    - **Modo Demo:** los eventos para las gráficas salen de `generarEventosSimulados` (mismo código que el real → mismas funciones puras) y el preCheck/estado de `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS` (DONE, 8 horarios).
 5. **Verificación:** `pnpm test` → **69 passed** (54 + 15) y `pnpm build` OK (solo warning preexistente de chunk size; recharts añade ~350 kB al bundle, candidato a code-splitting futuro). Backend sin cambios.
+
+### Contexto de la Sesión Actual (2026-08-20) — Página de gestión de Trayectos Académicos
+
+1. **`src/pages/Trayectos.jsx` (nuevo, ruta `/trayectos`, sidebar "Trayectos Académicos" con icono `Layers`, solo rol `ADMIN`):** CRUD completo sobre `/api/trayectos-academicos/` (backend ya existía, sin cambios). Patrón de `Materias.jsx`:
+   - Schema zod: `carrera_id` (número requerido), `nombre` (2–100), `anio_academico` (2000–2100), `orden_secuencial` (≥1), `estado` (`ACTIVO`/`INACTIVO`).
+   - **Select de carrera** pobladо desde `useQuery(['carreras'])` con `CarrerasService` (nuevo `src/api/carreras.js`, mismo patrón de los demás servicios); el nombre de la carrera se muestra en la tabla por join client-side.
+   - **Borrado protegido:** antes de eliminar consulta `useQuery(['grupos'])` (`GruposService`) y **bloquea** el borrado con toast si el trayecto tiene grupos vinculados (evita el `ON DELETE CASCADE` accidental de `grupos.trayecto_id`), patrón de `Aulas.jsx`.
+   - Queries `['trayectos']`/`['carreras']`/`['grupos']` comparten key con `Lecciones.jsx`/`Horarios.jsx`, así `invalidateQueries(['trayectos'])` refresca el dropdown de trayectos en el modal de grupos automáticamente.
+   - Modo Demo con `demo_trayectos` en `localStorage` (misma key que ya usaba `Lecciones.jsx`, así comparten el mismo estado local) + `MOCK_TRAYECTOS`/`MOCK_CARRERAS`/`MOCK_GRUPOS`, banner "Reconectar API", auto-activación si el backend falla.
+   - UI: stat cards (total/activos/carreras cubiertas/grupos vinculados), búsqueda por nombre-carrera-año, badge de conteo de grupos por fila, modal crear/editar y confirmación de borrado.
+   - Errores 422/500 del backend (p. ej. carrera inexistente) se muestran desde `err.response.data.detail`.
+2. **Integración:** ruta `/trayectos` en `AppRouter.jsx`; ítem en `config/navigation.js` bajo **CATÁLOGO** con `roles: ['ADMIN']` (el backend limita escritura a `ADMIN`). El breadcrumb/header se genera solo vía `getRouteMeta`.
+3. **Backend sin cambios** (el CRUD de trayectos ya estaba completo y registrado).
+4. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente manual: login como `admin`, `/trayectos`, crear/editar/borrar y verificar el bloqueo de borrado con un grupo vinculado.
+
+### Contexto de la Sesión Actual (2026-08-20) — Página de gestión de Carreras
+
+1. **`src/pages/Carreras.jsx` (nuevo, ruta `/carreras`, sidebar "Carreras" con icono `School`, roles `ADMIN` + `JEFE-PNF`):** CRUD completo sobre `/api/carreras/` (backend ya existía, sin cambios). Patrón de `Trayectos.jsx`:
+   - Schema zod: `nombre` (1–150), `codigo` (1–20, UNIQUE en BD), `tipo_distribucion` (`SEMESTRAL`/`TRIMESTRAL`/`CUATRIMESTRAL`/`ANUAL`).
+   - **Borrado protegido:** antes de eliminar consulta `useQuery(['trayectos'])` (`TrayectosService`) y **bloquea** el borrado con toast si la carrera tiene trayectos vinculados (evita el `ON DELETE CASCADE` en cadena: trayectos → grupos → lecciones → horarios), patrón de `Trayectos.jsx`.
+   - Queries `['carreras']`/`['trayectos']` comparten key con `Trayectos.jsx`, así `invalidateQueries(['carreras'])` refresca el select de carreras en el modal de trayectos automáticamente.
+   - Modo Demo con `demo_carreras` en `localStorage` + `MOCK_CARRERAS`/`MOCK_TRAYECTOS`, banner "Reconectar API", auto-activación si el backend falla.
+   - Errores 409 (código duplicado) y demás del backend se muestran desde `err.response.data.detail`.
+   - UI: stat cards (total/trayectos vinculados/tipos de distribución/semestrales), búsqueda por nombre-código-tipo, badge de tipo de distribución con color por valor, conteo de trayectos por fila, modal crear/editar y confirmación de borrado.
+2. **Integración:** ruta `/carreras` en `AppRouter.jsx`; ítem en `config/navigation.js` bajo **CATÁLOGO** con `roles: ['ADMIN', 'JEFE-PNF']` (el backend permite escribir a ambos). El breadcrumb/header se genera solo vía `getRouteMeta`.
+3. **Backend sin cambios** (el CRUD de carreras ya estaba completo y registrado). `src/api/carreras.js` ya existía desde la tarea de Trayectos.
+4. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente manual: login como `admin`, `/carreras`, crear/editar/borrar y verificar el bloqueo de borrado con un trayecto vinculado.
