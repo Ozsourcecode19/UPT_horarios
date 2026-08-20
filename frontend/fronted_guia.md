@@ -54,7 +54,7 @@ frontend/src/
 │
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
-│   ├── Dashboard.jsx           ✅ Stats dinámicas (useQuery) + acciones rápidas
+│   ├── Dashboard.jsx            ✅ Stats dinámicas (useQuery) + analítica (recharts) + salud del horario
 │   ├── Docentes.jsx            ✅ CRUD Plantilla Docente (listado)
 │   ├── DocenteDisponibilidadPage.jsx    ✅ Sub-ruta /docentes/disponibilidad (Modo Demo)
 │   ├── DocenteHabilitacionesPage.jsx    ✅ Sub-ruta /docentes/habilitaciones (Modo Demo)
@@ -410,7 +410,11 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 - Gráfica de distribución de carga horaria por docente (usar `recharts` o similar)
 - Indicador de conflictos detectados en el último horario generado
 
-> **✅ Parcialmente implementado (E6):** Las tarjetas ya muestran datos reales vía `useQuery` (`['docents']`, `['subjects']`, `['aulas']`, `['periodos']`, `['dashboard-horarios', periodoVigente]`), con periodo vigente `estado='ACTIVO'` y patrón Modo Demo. Las acciones rápidas navegan con `useNavigate` a `/horarios`, `/docentes`, `/materias` y `/periodos`. Pendiente de este ítem: gráficas (recharts) e indicador de conflictos.
+> **✅ Implementado (E6 + E11):** Las tarjetas muestran datos reales vía `useQuery` (`['docents']`, `['subjects']`, `['aulas']`, `['periodos']`, `['dashboard-horarios', periodoVigente]`), con periodo vigente `estado='ACTIVO'` y patrón Modo Demo. Las acciones rápidas navegan con `useNavigate` a `/horarios`, `/docentes`, `/materias` y `/periodos`. **E11 añadió la sección "Analítica del periodo vigente"** (las 5 `StatCard` se conservan como KPIs):
+> - **Carga horaria por docente** (recharts `BarChart`, barras horizontales): agrupa `extendedProps.docente` y suma duración (horas/semana).
+> - **Distribución por materia** (`PieChart` dona): cuenta clases por `extendedProps.materia` con su `backgroundColor`.
+> - **Salud del horario:** `resumenConflictos` combina `GET /schedules/pre-generation-check` y `GET /schedules/generation-status` (404 = nunca generado) → niveles `ok|warn|error|sin-datos` con badge + chips.
+> - Lógica pura en `src/utils/dashboardStats.js` (testeada: **15 tests**, suite vitest total **69**); Modo Demo usa `generarEventosSimulados` + `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS`; skeleton mientras cargan los horarios.
 
 #### G. Módulo de Configuración
 `Settings.jsx` está vacío. Conectar con `GET/PUT /api/configuraciones/` para que el administrador pueda ajustar: días laborables, hora inicio/fin de jornada, peso de restricciones blandas del solver.
@@ -439,9 +443,9 @@ src/features/schedule/
 El diseño actual usa clases de Tailwind compatibles con `dark:`. Implementar toggle con `ThemeContext` y persistencia en `localStorage`.
 
 #### K. Exportar horario a PDF / iCal
-Añadir botón de exportación en `Horarios.jsx`:
-- PDF: usar `html2canvas` + `jsPDF` para capturar el calendario
-- iCal (`.ics`): generar archivo de calendario compatible con Google Calendar / Outlook
+> **Planificado como E12 (ver `PLAN_DE_DESARROLLO.md`).** Añadir botón de exportación en `Horarios.jsx`:
+> - **PDF:** impresión CSS con `@media print` de una **vista propia** (cuadrícula HTML materia/docente/aula/grupo/sede, ajena a FullCalendar; durante la impresión se oculta la grilla `.fc`). Sin dependencias nuevas (se descartó `html2canvas` + `jsPDF`).
+> - **iCal (`.ics`):** generar archivo de calendario en cliente con Blob + `a[download]`, compatible con Google Calendar / Outlook.
 
 ---
 
@@ -714,3 +718,19 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - **`src/utils/__tests__/schedule.test.js`** (+3): `generarEventosSimulados` (4 eventos con `periodo_id`/`resourceId`/baseDate, normalización de string a number, materias y colores esperados).
 5. **Limpieza:** se eliminó `src/hooks/useSchedule.js` (placeholder vacío commiteado desde el primer commit).
 6. **Verificación:** `pnpm test` → **54 passed**, `pnpm build` OK (solo warning preexistente de chunk size) y `pytest` backend → **46 passed** (sin cambios de backend).
+
+### Contexto de la Sesión Actual (2026-08-20) — E11: Dashboard con gráficas y salud del horario
+
+1. **Dependencia `recharts` v3.10.1** instalada (`pnpm add recharts`).
+2. **`src/utils/dashboardStats.js` (nuevo, lógica pura testeable):**
+   - `cargaHorariaPorDocente(eventos)` → agrupa por `extendedProps.docente` y suma `(end-start)` en horas/semana (1 decimal), ordenado desc; ignora fechas inválidas/duración ≤ 0; fallback "Docente no asignado".
+   - `distribucionPorMateria(eventos)` → `[{materia, count, color}]` con el `backgroundColor` del evento (fallback `#6366f1`), ordenado desc.
+   - `resumenConflictos(preCheck, generationStatus)` → `{nivel: ok|warn|error|sin-datos, items}`: requisitos críticos de `pre-generation-check` (lecciones/aulas/bloques/habilitación en 0 → error), advertencias (`lecciones_sin_*`), y estado de `generation-status` (DONE → ok con count; FAILED → error; PENDING → warn; null sin preCheck → sin-datos; null con preCheck → warn "No se ha generado").
+3. **`src/utils/__tests__/dashboardStats.test.js` (nuevo, 15 tests):** casos de suma/orden/fallbacks, fechas inválidas, listas vacías, distribución con color y fallback, y los 4 niveles de salud (ok/warn/error/sin-datos) + items esperados.
+4. **`src/pages/Dashboard.jsx`:** se **conservan** las 5 `StatCard` (KPIs) y se añade la sección **"Analítica del periodo vigente"** (debajo del grid):
+   - Queries nuevas (patrón Modo Demo, `retry: 0`, catch → null): `['dashboard-pre-check', periodoVigente?.id]` y `['dashboard-generation-status', periodoVigente?.id]` (404 = nunca generado).
+   - **Salud del horario:** badge por `nivel` + lista de items con icono por nivel (CheckCircle2/AlertTriangle/XCircle/Info) + botón "Ver horario del periodo".
+   - **Carga horaria por docente:** recharts `BarChart` `layout="vertical"` (nombres largos en el eje Y), skeleton mientras carga, `EmptyAnalitica` si no hay horarios.
+   - **Distribución por materia:** `PieChart` dona (`innerRadius=55/outerRadius=85`) con `Cell` por color de materia + leyenda.
+   - **Modo Demo:** los eventos para las gráficas salen de `generarEventosSimulados` (mismo código que el real → mismas funciones puras) y el preCheck/estado de `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS` (DONE, 8 horarios).
+5. **Verificación:** `pnpm test` → **69 passed** (54 + 15) y `pnpm build` OK (solo warning preexistente de chunk size; recharts añade ~350 kB al bundle, candidato a code-splitting futuro). Backend sin cambios.

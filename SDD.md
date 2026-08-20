@@ -652,11 +652,13 @@ npm run dev    # http://localhost:3000
 
 ### 10.2 Roadmap priorizado
 
+> Los ítems 5–6 y siguientes han sido desglosados en ejecuciones reducidas E11–E19 en `PLAN_DE_DESARROLLO.md` (Fases E–G): analítica/exportación, paginación/CSV, refactor a `features/`, refresh token/403, settings completo y tracker persistente + auditoría.
+
 1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
 2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
 3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
 4. **Vista de recursos** en FullCalendar. **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna (un `<FullCalendar>` por aula, scroll horizontal) sin plugin Premium (`@fullcalendar/resource-timegrid` es comercial). `timeGridWeek` sigue siendo la vista por defecto.
-5. **Dashboard dinámico** con datos reales y gráficas.
+5. **Dashboard dinámico** con datos reales y gráficas. **✅ Implementado (E6 + E11):** stats reales vía `useQuery` (E6); panel "Analítica del periodo vigente" con recharts (carga horaria por docente, distribución por materia) e indicador de salud del horario desde `pre-generation-check` + `generation-status` (E11). Lógica pura en `src/utils/dashboardStats.js`.
 6. **Módulo de configuración** conectado a `/api/configuraciones/`.
 
 ### 10.3 Riesgos técnicos
