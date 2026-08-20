@@ -7,7 +7,7 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 1. Abrir el proyecto `UPT_horarios` en Antigravity.
 2. En el chat de la IDE, pedir al asistente: *"Lee `AGENTS.md` primero y sigue sus convenciones (español, no tocar `python/`, mantener triggers PL/pgSQL, patrón Modo Demo). Ahora ejecuta la E{n}: <ver alcance abajo>."*
 3. Al terminar, validar el **criterio de verificación** de la ejecución antes de pasar a la siguiente.
-4. Ejecutar en orden: las dependencias importan (E1→E2→E3 son la misma feature; la Fase D va al final).
+4. Ejecutar en orden: las dependencias importan (E1→E2→E3 son la misma feature; la Fase D va al final). Las Fases E11–E19 son **independientes** entre sí (E15 es un refactor, recomendable tras estabilizar E10); se pueden tomar en cualquier orden priorizando lo que desbloquee al usuario.
 
 ## Estado actual del proyecto
 
@@ -31,8 +31,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E8** — Vista de recursos "por Aulas" en FullCalendar: vista custom multi-instancia en `Horarios.jsx` (sin plugin Premium), navegación global sincronizada, DnD intra-columna. Criterio verificado: `pnpm build` OK.
 - ✅ **E9** — Suite de tests backend (pytest + httpx): 46 tests en `backend/tests/` (tracker, `validate_move`, solver OR-Tools, `lunes_base`/mapeo FullCalendar, smoke API) sobre SQLite in-memory con `StaticPool` + fix `JSONB→JSON` en `conftest.py`. Criterio verificado: `cd backend && pytest` → `46 passed`.
 - ✅ **E10** — Refactor + tests frontend: extracción de lógica pura (~293 líneas) a `utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`), `utils/scheduleValidation.js` (`validateMoveMock`) y `hooks/useGenerationPolling.js`; **suite vitest** (54 tests, `pnpm test` ✅). **Cierre E10:** hooks `useScheduleGeneration` y `useDragDropValidation` extraídos; `Horarios.jsx` de ~1460 → **1160 líneas**.
+- ✅ **E11** — Dashboard analítico: recharts (v3.10.1), sección "Analítica del periodo vigente" (barras de carga horaria por docente, dona de distribución por materia, tarjeta "Salud del horario" desde `pre-generation-check` + `generation-status`); lógica pura en `utils/dashboardStats.js` con **15 tests nuevos** (suite vitest **69 tests**). Sin backend nuevo; Modo Demo con `generarEventosSimulados` + `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS`. Criterio verificado: `pnpm test` → **69 passed** y `pnpm build` OK.
 
-**Pendientes:** Backlog (opcional, no incluido): migración `Horarios.jsx` → `features/schedule/`, exportación PDF/iCal, modo oscuro, migración TypeScript, gráficas en Dashboard y pestañas pendientes de Settings. `docs/*.pdf` vacíos. Backend testeado (E9, 46 tests ✅); frontend con suite de lógica pura y hooks (E10, 54 tests ✅).
+**Roadmap aprobado (E12–E19, por implementar):** **Fase E · Analítica y exportación (frontend)** — E12 exportación de horarios a PDF/iCal, E13 modo oscuro · **Fase F · Pulido y mantenibilidad** — E14 paginación/orden/CSV en CRUDs, E15 reestructura `features/schedule/`, E16 micro-mejoras de horarios (color por grupo + heatmap de disponibilidad) · **Fase G · Sesión, RBAC y backend robustos** — E17 refresh token + manejo de 403, E18 Settings completo (Seguridad/BD/Notificaciones), E19 backend tracker persistente + auditoría de restauración. Las ejecuciones son cronológicamente independientes (recomendado E15 como refactor tras estabilizar E10). `docs/*.pdf` vacíos. Backend testeado (E9, 46 tests ✅); frontend con suite de lógica pura, hooks y analítica (E10/E11, 69 tests ✅).
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
@@ -130,12 +131,74 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
   - Criterio: `pnpm test` → **54 passed** y `pnpm build` OK. **Verificado.**
 - ✅ **Hecho — hooks (cierre 2026-08-20):** `src/hooks/useScheduleGeneration.js` (encapsula `triggerAutoGeneration`, estados `isGenerating`/`genStatusText`, wiring de `useGenerationPolling` y toasts; `scheduleService`/`pollingHook` inyectables, refs de callbacks) y `src/hooks/useDragDropValidation.js` (mutación `validate-move`+`update`, `handleEventDrop`/`handleEventClick`/`handleSaveChangesModal`/`handleDeleteSchedule` y todo el estado del modal). `Horarios.jsx` quedó en **~1160 líneas** (antes ~1460); se eliminó el placeholder vacío `useSchedule.js`. Criterio de cierre: `pnpm test` 54 ✅ y `pnpm build` OK. **Verificado.**
 
+## Fase E · Analítica y exportación (frontend)
+
+### E11 — Dashboard con gráficas y salud del horario (~2–3 h) ✅ COMPLETADA
+- Instalar `recharts` (v3.10.1); las 5 `StatCard` se **conservan** como resumen de KPIs y se añadió debajo la sección **"Analítica del periodo vigente"**:
+  - **Carga horaria por docente** (barras horizontales, recharts `BarChart`): agrupa eventos de `GET /schedules/fullcalendar?periodo_id=` por `extendedProps.docente` y suma duración (horas/semana).
+  - **Distribución por materia** (dona, `PieChart`): cuenta clases por `extendedProps.materia` con el color de `extendedProps.backgroundColor`.
+  - **Indicador de conflictos ("Salud del horario"):** derivado de `pre-generation-check` (lecciones sin candidatos / sin disponibilidad / sin habilitación, requisitos críticos) y de `generation-status` (DONE/FAILED/PENDING/404) → niveles `ok|warn|error|sin-datos` con chips e items explicativos.
+- **Sin backend nuevo.** Lógica pura en `src/utils/dashboardStats.js` (`cargaHorariaPorDocente`, `distribucionPorMateria`, `resumenConflictos`) con 15 tests nuevos en `src/utils/__tests__/dashboardStats.test.js`. Modo Demo: gráficas calculadas con `generarEventosSimulados` + `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS` (mismo código que en modo real); skeleton de carga mientras cargan los horarios.
+- ✅ Criterio: las gráficas muestran datos reales del periodo vigente en el navegador; `pnpm test` → **69 passed** (54 + 15) y `pnpm build` OK. **Verificado.**
+
+### E12 — Exportación de horarios a PDF / iCal (~2–3 h) 🆕 PLANIFICADA
+- Botón **"Exportar"** en `Horarios.jsx` (demo y real), menú con dos acciones:
+  - **PDF — impresión CSS de una vista propia (ajena a FullCalendar):** definir una cuadrícula HTML limpia (columnas por día, filas por hora) con materia/docente/aula/grupo/sede del periodo filtrado actual, renderizada en modal y imprimible con `@media print` (ocultar la grilla `.fc` del calendario durante la impresión). Sin dependencias nuevas.
+  - **iCal (`.ics`):** generar el archivo en cliente a partir de los eventos del periodo (materia, docente, aula, sede, fecha/hora) y descargarlo con Blob + `a[download]`; compatible Google Calendar/Outlook.
+- ✅ Criterio: desde `Horarios.jsx` se imprime la vista propia con el horario real (y demo) y se descarga un `.ics` válido.
+
+### E13 — Modo oscuro (~2–3 h) 🆕 PLANIFICADA
+- `ThemeContext` (theme `light`/`dark`) + `useTheme`; toggle en el header de `MainLayout.jsx`; persistencia en `localStorage` y detección inicial de `prefers-color-scheme`.
+- `darkMode: 'class'` en `tailwind.config.js` y clases `dark:` en los componentes principales (MainLayout, Login, paneles/tarjetas de CRUDs y Horarios).
+- Backend sin cambios; patrón Modo Demo intacto (solo tema visual).
+- ✅ Criterio: el toggle cambia el tema, persiste tras recarga y el contraste es usable; `pnpm build` OK.
+
+## Fase F · Pulido y mantenibilidad
+
+### E14 — Paginación, orden y exportación CSV en CRUDs (~2–3 h) 🆕 PLANIFICADA
+- **Backend:** añadir el total real a los GET de listado (`skip/limit`) — p. ej. devolver `{items, total}` o un header/campo `total` — en docentes, materias, aulas, lecciones, periodos y bloques (manteniendo compatibilidad con respuestas actuales).
+- **Frontend** (Docentes, Materias, Aulas, Lecciones, Periodos, BloquesHorarios): controles de paginación (siguiente/anterior/n.º página), ordenamiento por columna (cliente) y **exportar CSV** de la vista actual (Blob + `a[download]`). Patrón Modo Demo y `retry: 0` intactos.
+- ✅ Criterio: los listados pagan con el total real del backend; el CSV descarga con los datos visibles; `pytest` (backend) y `pnpm test` OK.
+
+### E15 — Reestructura `features/schedule/` (~1–2 h) 🆕 PLANIFICADA
+- Mover a `src/features/schedule/` los módulos del dominio horario (api `schedule.js`, hooks `useGenerationPolling`/`useScheduleGeneration`/`useDragDropValidation`, utils `schedule.js`/`scheduleValidation.js`) junto con sus tests; actualizar imports relativos en `Horarios.jsx` y donde corresponda.
+- `Horarios.jsx` queda como página fina que importa desde `features/schedule/`. Backend sin cambios.
+- ✅ Criterio: `pnpm test` (54) y `pnpm build` OK tras el movimiento.
+
+### E16 — Micro-mejoras de horarios (~2 h) 🆕 PLANIFICADA
+- **Coloreado de eventos por grupo** además de por materia (toggle en `Horarios.jsx`; reutilizar `mapScheduleEvents` para resolver el color según el modo).
+- **Heatmap agregado de disponibilidad docente** (vista resumen por día/hora) para detectar huecos al planificar; reutiliza la query `['disponibilidades']`/`['docentes']`.
+- ✅ Criterio: preview visual correcto; `pnpm test` y `pnpm build` OK.
+
+## Fase G · Sesión, RBAC y backend robustos
+
+### E17 — Refresh token + manejo de 403 (~2–3 h) 🆕 PLANIFICADA
+- **Backend:** endpoint `POST /api/token/refresh` (emitir `refresh_token` con `sub`+`rol` y exp 7 días junto al access de 30 min — o flujo rotativo simple), validación/revocación; tests en la suite E9.
+- **Frontend:** `auth.service` guarda el refresh en `localStorage`; el interceptor de Axios, ante un **401**, hace **un** refresh silencioso y reintenta la request original (sin perder la acción del usuario); ante un **403** deja de forzar logout (hoy redirige a `/login` en cualquier 401/403) y muestra aviso por rol.
+- ✅ Criterio: la sesión sobrevive los 30 minutos de vida del access sin re-login; un 403 de `require_role` no desloga al usuario.
+
+### E18 — Settings completo: Seguridad / Base de datos / Notificaciones (~2–3 h) 🆕 PLANIFICADA
+- **Seguridad (RBAC):** nueva pestaña consumiendo `GET/POST/PUT/DELETE /api/usuarios` — listar, crear, cambiar `rol`, activar/desactivar; escrituras gateadas a `ADMIN` (backend ya responde 403); patrón Modo Demo (`demo_usuarios`).
+- **Base de datos:** pestaña de diagnóstico — conteos por entidad y estado de la última generación (derivados de endpoints/joins existentes) con indicador de salud; solo lectura.
+- **Notificaciones:** preferencias (p. ej. avisos de generación) persistidas como JSONB editable genérico vía `GET/PUT /api/configuraciones/`.
+- ✅ Criterio: un ADMIN gestiona usuarios desde la UI; las tres pestañas quedan funcionales y el resto del módulo Algoritmo intacto; `pnpm build` OK.
+
+### E19 — Backend: tracker persistente + auditoría de restauración (~2–3 h) 🆕 PLANIFICADA
+- **`generacion_log` (persistente):** reemplazar el tracker en memoria de E1/E3, que se pierde al reiniciar, por una tabla (periodo, estado PENDING/DONE/FAILED, count, mensaje, timestamp) que alimenta `GET /schedules/generation-status` manteniendo el mismo contrato de respuesta.
+- **`horario_historial` (auditoría):** registrar cada restauración de versión (`POST /schedules/restore`) con periodo, `version_horario`, usuario y timestamp (nota de E4).
+- SQL de upgrade + schema base actualizados **conservando los triggers PL/pgSQL**; casos pytest (E9) para ambos.
+- ✅ Criterio: tras reiniciar el backend el estado DONE persiste y `generation-status` responde igual; un `restore` deja trazabilidad en `horario_historial`; `pytest` OK.
+
 ## Backlog (opcional, no incluido)
-Migración final `Horarios.jsx` → `features/schedule/` (al terminar la extracción de E10), exportación PDF/iCal, modo oscuro, migración TypeScript.
+- Migración a **TypeScript** (item H de `fronted_guia.md`; grande, requiere interfaces para Docente, Leccion, BloqueHorario, FullCalendarEvent).
+- Sustituir el **polling** de generación por **WebSocket**/Server-Sent Events.
+- **UI de Carreras** (`/api/carreras` ya existe en backend; falta página en frontend).
+- **Exportación Excel** (XLSX) de horarios y listados.
+- **Notificaciones push / recordatorios** de generación y periodos.
 
 ---
 
 ## Riesgos a vigilar
-- El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
+- El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker). **E19** lo resuelve con la tabla persistente `generacion_log`.
 - Cualquier cambio en `database/schema_horarios_v2.1.1.sql` debe conservar los triggers PL/pgSQL.
 - Los tests (E9/E10) no deben requerir la BD real con triggers.
