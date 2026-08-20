@@ -21,9 +21,9 @@ import DocentsService from '../api/docents';
 import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
 import { useAuth } from '../context/AuthContext';
-import { mapScheduleEvents, findNearestBloque, filterEvents, recalcularEventoDemo } from '../utils/schedule';
-import { validateMoveMock } from '../utils/scheduleValidation';
-import useGenerationPolling from '../hooks/useGenerationPolling';
+import { mapScheduleEvents, filterEvents } from '../utils/schedule';
+import useScheduleGeneration from '../hooks/useScheduleGeneration';
+import useDragDropValidation from '../hooks/useDragDropValidation';
 
 // --- CONFIGURACIÓN MOCK PARA MODO DEMO ---
 const MOCK_PERIODOS = [
@@ -251,17 +251,9 @@ const Horarios = () => {
   const [filterType, setFilterType] = useState('todos'); // 'todos', 'aula', 'docente', 'grupo'
   const [filterValue, setFilterValue] = useState('');
   const [demoMode, setDemoMode] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genStatusText, setGenStatusText] = useState(''); // Texto del estado mostrado en el overlay de generación
   const [selectedVersion, setSelectedVersion] = useState(null); // Versión seleccionada para restaurar (E4b)
   // Fecha visible de la semana en la vista por aulas (E9): se actualiza con datesSet
   const [calWeekStart, setCalWeekStart] = useState(null);
-  
-  // Modal de Detalle / Edición rápida
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editAulaId, setEditAulaId] = useState('');
-  const [editBloqueId, setEditBloqueId] = useState('');
   
   // Toast
   const [toast, setToast] = useState(null);
@@ -271,37 +263,6 @@ const Horarios = () => {
     const duracion = (type === 'error' || type === 'warning') ? 12000 : 4000;
     setTimeout(() => setToast(null), duracion);
   };
-
-  // Polling del estado de generación (E3/E10): ciclo setInterval/clearInterval encapsulado
-  const { start: startGenerationPolling, pollRef: genPollRef } = useGenerationPolling({
-    onStatus: (texto) => setGenStatusText(texto),
-    onSettled: ({ tipo, status }) => {
-      if (tipo === 'DONE') {
-        // La generación terminó: refrescar el calendario y reportar el resultado
-        setIsGenerating(false);
-        setGenStatusText('');
-        queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
-        refetchHorarios();
-        if (status.count > 0) {
-          showToast(`¡Horarios generados exitosamente (${status.count}) y reflejados en el calendario!`, "success");
-        } else {
-          showToast(status.message || "El solver no encontró una combinación factible. Revisa lecciones, disponibilidades y habilitaciones.", "warning");
-        }
-      } else if (tipo === 'FAILED') {
-        showToast(status.message || "Error al generar el horario en el servidor.", "error");
-        setIsGenerating(false);
-        setGenStatusText('');
-      } else if (tipo === 'PENDING_TIMEOUT') {
-        showToast("La generación tardó más de lo esperado. Revalida el checklist e intenta de nuevo.", "warning");
-        setIsGenerating(false);
-        setGenStatusText('');
-      } else if (tipo === 'ERROR') {
-        showToast("No se pudo consultar el estado de generación. Recarga la página e intenta de nuevo.", "error");
-        setIsGenerating(false);
-        setGenStatusText('');
-      }
-    }
-  });
 
   // Base de datos local para el modo Demo
   const [demoHorarios, setDemoHorarios] = useState(() => {
@@ -531,304 +492,41 @@ const Horarios = () => {
     }
   }, [filterType, aulas, docentes, grupos]);
 
-  // --- MUTACIONES Y LÓGICA DE ACTUALIZACIÓN ---
-
-  // Mutación para mover horarios (Drag & Drop)
-  const moveScheduleMutation = useMutation({
-    mutationFn: async ({ horarioId, nuevoBloqueId, nuevaAulaId }) => {
-      // 1. Validar movimiento
-      await ScheduleService.validateMove({
-        horario_id: horarioId,
-        nuevo_bloque_id: nuevoBloqueId,
-        nueva_aula_id: nuevaAulaId
-      });
-      // 2. Ejecutar actualización
-      return await ScheduleService.updateSchedule(horarioId, {
-        bloque_id: nuevoBloqueId,
-        aula_id: nuevaAulaId
-      });
-    },
-    onSuccess: () => {
-      showToast("Horario movido y sincronizado correctamente");
-      queryClient.invalidateQueries({ queryKey: ['horarios'] });
-    },
-    onError: (err) => {
-      const errorMsg = err.response?.data?.detail?.mensaje || "Conflicto en restricciones al mover el horario.";
-      showToast(errorMsg, "error");
-    }
+  // --- LÓGICA DE DRAG & DROP Y EDICIÓN DE EVENTOS (E10) ---
+  const {
+    selectedEvent,
+    isEditModalOpen,
+    setIsEditModalOpen,
+    editAulaId,
+    setEditAulaId,
+    editBloqueId,
+    setEditBloqueId,
+    handleEventDrop,
+    handleEventClick,
+    handleSaveChangesModal,
+    handleDeleteSchedule,
+  } = useDragDropValidation({
+    demoMode,
+    demoHorarios,
+    setDemoHorarios,
+    aulas,
+    bloques,
+    selectedPeriodo,
+    selectedPeriodoId,
+    showToast,
+    onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
   });
 
-  // Handler para evento de soltar (eventDrop) de FullCalendar
-  const handleEventDrop = async (dropInfo) => {
-    const { event, revert } = dropInfo;
-    const horarioId = parseInt(event.id);
-    const newStart = event.start;
-
-    // El aula actual se extrae de resourceId (ej. "aula_2") o del evento
-    const currentAulaId = event.extendedProps.aula_id || parseInt(event.resourceId?.replace("aula_", ""));
-    // Resolver la sede del aula para buscar bloques solo de esa sede (consistencia de sede)
-    const aulaSedeId = aulas.find(a => a.id === Number(currentAulaId))?.sede_id;
-
-    // Buscar bloque más cercano correspondiente (misma sede que el aula)
-    const targetBlock = findNearestBloque(newStart, aulaSedeId, bloques);
-
-    if (!targetBlock) {
-      showToast("La hora o el día seleccionado no coincide con ningún bloque horario configurado para esta sede.", "error");
-      revert();
-      return;
-    }
-
-    if (demoMode) {
-      // Simular movimiento local
-      const res = validateMoveMock({
-        horarioId, nuevoBloqueId: targetBlock.id, nuevaAulaId: currentAulaId,
-        eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId
-      });
-      if (!res.valido) {
-        showToast(res.mensaje, "error");
-        revert();
-        return;
-      }
-
-      // Proceder con el guardado local en demoMode
-      const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
-      setDemoHorarios(prev => prev.map(e => e.id === horarioId
-        ? recalcularEventoDemo(e, targetBlock, currentAulaId, fechaBase, aulas)
-        : e));
-      showToast("Movimiento simulado con éxito en Modo Demo");
-    } else {
-      // Conexión real con API
-      try {
-        await moveScheduleMutation.mutateAsync({
-          horarioId: horarioId,
-          nuevoBloqueId: targetBlock.id,
-          nuevaAulaId: currentAulaId
-        });
-      } catch (err) {
-        revert();
-      }
-    }
-  };
-
-  // --- OPERACIÓN: ABRIR MODAL DETALLES AL HACER CLICK ---
-  const handleEventClick = (clickInfo) => {
-    const { event } = clickInfo;
-    const evProps = event.extendedProps;
-    
-    const evId = parseInt(event.id);
-    const cAulaId = evProps.aula_id || parseInt(event.resourceId?.replace("aula_", ""));
-    const cBloqueId = evProps.bloque_id;
-
-    setSelectedEvent({
-      id: evId,
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      materia: evProps.materia,
-      materia_codigo: evProps.materia_codigo,
-      docente: evProps.docente,
-      grupo: evProps.grupo,
-      aula: evProps.aula,
-      sede: evProps.sede,
-      aula_id: cAulaId,
-      bloque_id: cBloqueId
-    });
-
-    setEditAulaId(cAulaId);
-    setEditBloqueId(cBloqueId);
-    setIsEditModalOpen(true);
-  };
-
-  // Guardar cambios desde el modal
-  const handleSaveChangesModal = async (e) => {
-    e.preventDefault();
-    if (!selectedEvent) return;
-
-    const blockId = Number(editBloqueId);
-    const roomId = Number(editAulaId);
-    const targetBlock = bloques.find(b => b.id === blockId);
-
-    if (!targetBlock) {
-      showToast("Bloque horario seleccionado no es válido.", "error");
-      return;
-    }
-
-    if (demoMode) {
-      const res = validateMoveMock({
-        horarioId: selectedEvent.id, nuevoBloqueId: blockId, nuevaAulaId: roomId,
-        eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId
-      });
-      if (!res.valido) {
-        showToast(res.mensaje, "error");
-        return;
-      }
-      const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
-      setDemoHorarios(prev => prev.map(e => e.id === selectedEvent.id
-        ? recalcularEventoDemo(e, targetBlock, roomId, fechaBase, aulas)
-        : e));
-      showToast("Cambio guardado en Modo Demo");
-      setIsEditModalOpen(false);
-      setSelectedEvent(null);
-    } else {
-      try {
-        await moveScheduleMutation.mutateAsync({
-          horarioId: selectedEvent.id,
-          nuevoBloqueId: blockId,
-          nuevaAulaId: roomId
-        });
-        setIsEditModalOpen(false);
-        setSelectedEvent(null);
-      } catch (err) {
-        // El Toast de error lo maneja onError de la mutación
-      }
-    }
-  };
-
-  // Dar de baja/eliminar clase
-  const handleDeleteSchedule = async () => {
-    if (!selectedEvent) return;
-
-    if (demoMode) {
-      setDemoHorarios(prev => prev.filter(e => e.id !== selectedEvent.id));
-      showToast("Clase eliminada del horario local (Demo)", "info");
-      setIsEditModalOpen(false);
-      setSelectedEvent(null);
-    } else {
-      try {
-        await ScheduleService.deleteSchedule(selectedEvent.id);
-        showToast("Clase eliminada del horario exitosamente", "info");
-        queryClient.invalidateQueries({ queryKey: ['horarios'] });
-        setIsEditModalOpen(false);
-        setSelectedEvent(null);
-      } catch (err) {
-        showToast("No se pudo eliminar la clase del servidor", "error");
-      }
-    }
-  };
-
-  // --- OPERACIÓN: GENERACIÓN AUTOMÁTICA ---
-  const triggerAutoGeneration = async () => {
-    if (!selectedPeriodoId) return;
-    
-    setIsGenerating(true);
-    showToast("Algoritmo de OR-Tools iniciado en segundo plano...", "info");
-
-    if (demoMode) {
-      // Simular retraso de 3 segundos
-      setTimeout(() => {
-        // Generar algunos horarios simulados para el periodo seleccionado
-        const baseDate = selectedPeriodo?.fecha_inicio || "2026-06-29";
-        
-        // Simular sobrescritura de horarios de este periodo con unos nuevos
-        const nuevosEventosDemo = [
-          {
-            id: 11,
-            title: "Matemática I - Mendoza, Luis",
-            start: `${baseDate}T07:00:00`,
-            end: `${baseDate}T08:30:00`,
-            resourceId: "aula_1",
-            extendedProps: {
-              grupo: "Sección A - Informática",
-              docente: "Mendoza, Luis",
-              materia: "Matemática I",
-              materia_codigo: "MAT-101",
-              backgroundColor: "#3B82F6",
-              aula: "Aula 101",
-              sede: "Sede Principal",
-              leccion_id: 1,
-              aula_id: 1,
-              bloque_id: 1,
-              periodo_id: Number(selectedPeriodoId)
-            }
-          },
-          {
-            id: 12,
-            title: "Algoritmos y Estructuras - Gómez, Carlos",
-            start: `${baseDate}T08:30:00`,
-            end: `${baseDate}T10:00:00`,
-            resourceId: "aula_1",
-            extendedProps: {
-              grupo: "Sección A - Informática",
-              docente: "Gómez, Carlos",
-              materia: "Algoritmos y Estructuras",
-              materia_codigo: "ALG-102",
-              backgroundColor: "#8B5CF6",
-              aula: "Aula 101",
-              sede: "Sede Principal",
-              leccion_id: 2,
-              aula_id: 1,
-              bloque_id: 2,
-              periodo_id: Number(selectedPeriodoId)
-            }
-          },
-          {
-            id: 13,
-            title: "Bases de Datos I - Rodríguez, María",
-            start: `${baseDate}T10:15:00`,
-            end: `${baseDate}T11:45:00`,
-            resourceId: "aula_2",
-            extendedProps: {
-              grupo: "Sección B - Informática",
-              docente: "Rodríguez, María",
-              materia: "Bases de Datos I",
-              materia_codigo: "BD-103",
-              backgroundColor: "#10B981",
-              aula: "Aula 102",
-              sede: "Sede Principal",
-              leccion_id: 3,
-              aula_id: 2,
-              bloque_id: 3,
-              periodo_id: Number(selectedPeriodoId)
-            }
-          },
-          {
-            id: 14,
-            title: "Programación Orientada a Objetos - Sánchez, Ana",
-            start: `${baseDate}T11:45:00`,
-            end: `${baseDate}T13:15:00`,
-            resourceId: "aula_3",
-            extendedProps: {
-              grupo: "Sección A - Informática",
-              docente: "Sánchez, Ana",
-              materia: "Programación Orientada a Objetos",
-              materia_codigo: "POO-104",
-              backgroundColor: "#F59E0B",
-              aula: "Laboratorio C1",
-              sede: "Sede Principal",
-              leccion_id: 4,
-              aula_id: 3,
-              bloque_id: 4,
-              periodo_id: Number(selectedPeriodoId)
-            }
-          }
-        ];
-
-        // Reemplazar eventos del periodo actual en demoHorarios
-        setDemoHorarios(prev => {
-          const filtrados = prev.filter(h => h.extendedProps?.periodo_id !== Number(selectedPeriodoId));
-          return [...filtrados, ...nuevosEventosDemo];
-        });
-
-        setIsGenerating(false);
-        showToast("Horario óptimo autogenerado exitosamente (Simulado)");
-      }, 2500);
-    } else {
-      // Conexión real con API
-      try {
-        // Disparar proceso en segundo plano en backend (retorna HTTP 202 Accepted)
-        await ScheduleService.generateSchedule(selectedPeriodoId);
-        showToast("Procesando horarios en segundo plano con OR-Tools. Verificando estado...", "info");
-
-        // Polling por estado real (E3): useGenerationPolling gestiona el ciclo
-        setGenStatusText("Encolando tarea de generación...");
-        startGenerationPolling(selectedPeriodoId);
-      } catch (err) {
-        setIsGenerating(false);
-        setGenStatusText('');
-        showToast("Error al iniciar generación automática en el servidor", "error");
-      }
-    }
-  };
+  // --- GENERACIÓN AUTOMÁTICA (E10) ---
+  const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
+    demoMode,
+    selectedPeriodoId,
+    selectedPeriodo,
+    setDemoHorarios,
+    onRefetch: refetchHorarios,
+    onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] }),
+    showToast,
+  });
 
   // --- RENDER EVENT COMPONENT ---
   const renderEventContent = (eventInfo) => {

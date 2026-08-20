@@ -11,7 +11,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
   - `createdb -U postgres horarios_upt`
   - `sudo -u postgres psql -d horarios_upt -f database/schema_horarios_v2.1.1.sql` (esquema base)
   - Upgrades/seed/limpieza en `database/actualizaciones/`, `database/operaciones/` (`Reset_y_poblar_datos.sql` puebla datos de prueba).
-- **Tests:** backend con suite `pytest`/`httpx` en `backend/tests/` (E9, 46 tests) sobre SQLite in-memory (`pytest.ini` con `pythonpath = .`; fix `JSONB→JSON` en `conftest.py`); **no** dependen de la BD Postgres ni de triggers. Frontend sin suites (vitest instalado, pendiente E10). No hay lint/typecheck configurados. Correr: `cd backend && source .venv/bin/activate && pytest`.
+- **Tests:** backend con suite `pytest`/`httpx` en `backend/tests/` (E9, 46 tests) sobre SQLite in-memory (`pytest.ini` con `pythonpath = .`; fix `JSONB→JSON` en `conftest.py`); **no** dependen de la BD Postgres ni de triggers. Frontend con suite `vitest` (E10, 54 tests en `src/utils/__tests__/` y `src/hooks/__tests__/` — lógica pura + hooks `useGenerationPolling`/`useScheduleGeneration`/`useDragDropValidation`; `vitest.config.js` + `src/test/setup.js`). No hay lint/typecheck configurados. Correr: backend `cd backend && source .venv/bin/activate && pytest`; frontend `cd frontend && pnpm test`.
 
 ## Gotchas críticos
 

@@ -110,3 +110,91 @@ export const recalcularEventoDemo = (evento, targetBlock, aulaId, fechaBase, aul
     }
   };
 };
+
+// Genera los eventos simulados que se inyectan al horario del periodo en Modo Demo
+// tras "generar" (misma simulación que antes vivía inline en triggerAutoGeneration de Horarios.jsx, E10).
+export const generarEventosSimulados = (baseDate, periodoId) => {
+  const pid = Number(periodoId);
+  return [
+    {
+      id: 11,
+      title: "Matemática I - Mendoza, Luis",
+      start: `${baseDate}T07:00:00`,
+      end: `${baseDate}T08:30:00`,
+      resourceId: "aula_1",
+      extendedProps: {
+        grupo: "Sección A - Informática",
+        docente: "Mendoza, Luis",
+        materia: "Matemática I",
+        materia_codigo: "MAT-101",
+        backgroundColor: "#3B82F6",
+        aula: "Aula 101",
+        sede: "Sede Principal",
+        leccion_id: 1,
+        aula_id: 1,
+        bloque_id: 1,
+        periodo_id: pid
+      }
+    },
+    {
+      id: 12,
+      title: "Algoritmos y Estructuras - Gómez, Carlos",
+      start: `${baseDate}T08:30:00`,
+      end: `${baseDate}T10:00:00`,
+      resourceId: "aula_1",
+      extendedProps: {
+        grupo: "Sección A - Informática",
+        docente: "Gómez, Carlos",
+        materia: "Algoritmos y Estructuras",
+        materia_codigo: "ALG-102",
+        backgroundColor: "#8B5CF6",
+        aula: "Aula 101",
+        sede: "Sede Principal",
+        leccion_id: 2,
+        aula_id: 1,
+        bloque_id: 2,
+        periodo_id: pid
+      }
+    },
+    {
+      id: 13,
+      title: "Bases de Datos I - Rodríguez, María",
+      start: `${baseDate}T10:15:00`,
+      end: `${baseDate}T11:45:00`,
+      resourceId: "aula_2",
+      extendedProps: {
+        grupo: "Sección B - Informática",
+        docente: "Rodríguez, María",
+        materia: "Bases de Datos I",
+        materia_codigo: "BD-103",
+        backgroundColor: "#10B981",
+        aula: "Aula 102",
+        sede: "Sede Principal",
+        leccion_id: 3,
+        aula_id: 2,
+        bloque_id: 3,
+        periodo_id: pid
+      }
+    },
+    {
+      id: 14,
+      title: "Programación Orientada a Objetos - Sánchez, Ana",
+      start: `${baseDate}T11:45:00`,
+      end: `${baseDate}T13:15:00`,
+      resourceId: "aula_3",
+      extendedProps: {
+        grupo: "Sección A - Informática",
+        docente: "Sánchez, Ana",
+        materia: "Programación Orientada a Objetos",
+        materia_codigo: "POO-104",
+        backgroundColor: "#F59E0B",
+        aula: "Laboratorio C1",
+        sede: "Sede Principal",
+        leccion_id: 4,
+        aula_id: 3,
+        bloque_id: 4,
+        periodo_id: pid
+      }
+    }
+  ];
+};

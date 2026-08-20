@@ -581,8 +581,9 @@ sequenceDiagram
 
 ### 8.1 Estado actual
 
-- Existen dependencias de testing en el backend (`pytest`, `httpx`) y frontend (`vitest`, `@testing-library/react`), **pero no hay suites de tests automatizados en el repositorio**.
-- La verificación práctica se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a FullCalendar).
+- **Backend (E9):** suite `pytest`/`httpx` en `backend/tests/` con **46 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible), cálculo `lunes_base` y smoke de API. **Sin** BD Postgres ni triggers PL/pgSQL.
+- **Frontend (E10):** suite **vitest** con **54 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`) y los hooks `useGenerationPolling` (fake timers + servicio mock), `useScheduleGeneration` y `useDragDropValidation` (ciclos demo/real, toasts, rollback por `revert()`, estado del modal).
+- La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a FullCalendar).
 
 ### 8.2 Estrategia recomendada
 

@@ -1,6 +1,6 @@
 # Guía del Proyecto Frontend — Sistema de Horarios UPT Bolívar
 **Versión:** 2.0 — Estado Real del Proyecto  
-**Fecha de actualización:** 2026-07-19  
+**Fecha de actualización:** 2026-08-20  
 **Stack:** React 18 · Vite · TanStack Query · FullCalendar · Axios · FastAPI (backend)
 
 ---
@@ -425,7 +425,7 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 El proyecto usa `.jsx` sin tipos. Definir interfaces para `Docente`, `Leccion`, `BloqueHorario`, `FullCalendarEvent` reduciría errores en runtime al acceder a propiedades inexistentes.
 
 #### I. Refactorizar a estructura `features/`
-> **✅ En curso (E10, parcial):** el primer paso de extracción ya está hecho: la lógica pura salió de `Horarios.jsx` hacia `src/utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`) y `src/utils/scheduleValidation.js` (`validateMoveMock`, obj. con `{horarioId, nuevoBloqueId, nuevaAulaId, eventosDemo, aulas, bloques, periodoId}`); el polling quedó en `src/hooks/useGenerationPolling.js`. `Horarios.jsx` pasó de ~1147 a ~1460 líneas (se extrajeron ~250 líneas de lógica). Pendiente: hooks `useScheduleGeneration` y `useDragDropValidation`, y seguir recortando `Horarios.jsx`.
+> **✅ Completado (E10, 2026-08-20):** la extracción de lógica pura está commiteada (`48d80d7`): la lógica salió de `Horarios.jsx` hacia `src/utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`), `src/utils/scheduleValidation.js` (`validateMoveMock`, obj. con `{horarioId, nuevoBloqueId, nuevaAulaId, eventosDemo, aulas, bloques, periodoId}`) y el polling quedó encapsulado en `src/hooks/useGenerationPolling.js` (ciclo `setInterval`/`clearInterval` con `onStatus`/`onSettled`). **Cierre (misma sesión):** se extrajeron los hooks `useScheduleGeneration` (generación real+demo, estados `isGenerating`/`genStatusText`, wiring del polling) y `useDragDropValidation` (mutación validate-move+update, `handleEventDrop`/`handleEventClick`/`handleSaveChangesModal`/`handleDeleteSchedule` y el estado del modal). **`Horarios.jsx` pasó de ~1460 a ~1160 líneas.** Suite vitest con **54 tests** (`pnpm test` ✅, `pnpm build` OK) en `src/utils/__tests__/`, `src/hooks/__tests__/` (incluye `schedule.test.js` con casos de `generarEventosSimulados`) y `src/test/setup.js`.
 
 La propuesta original era:
 ```
@@ -504,7 +504,7 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 | Archivo | Complejidad | Razón |
 |---|---|---|
-| `frontend/src/pages/Horarios.jsx` | 🔴 Alta (1116 líneas) | Toda la lógica de Fase 4 y 5 concentrada aquí |
+| `frontend/src/pages/Horarios.jsx` | 🔴 Alta (~1160 líneas) | FullCalendar + filtros + checklist + versiones + vista por aulas (lógica de gen/DnD extraída a hooks E10) |
 | `backend/services/scheduler/or_tools_adapter.py` | 🔴 Alta | Lógica CP-SAT con muchas variables y restricciones |
 | `backend/crud/horarios_generados.py` | 🟡 Media (338 líneas) | Manejo exhaustivo de excepciones DB |
 | `frontend/src/pages/Docentes.jsx` | 🟡 Media (762 líneas) | 3 tabs + CRUD + Disponibilidad + Habilitaciones |
@@ -684,3 +684,33 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 3. **`src/api/bloques.js`:** nuevo `generateBloquesEstandar(payload)` → `POST /bloques-horarios/estandar`.
 4. **`Settings.jsx`:** `duracion_bloque_default` cambia de widget numérico (15–120) a **select 30/45/60/90/120** (alineado con el CHECK de BD); nota del grupo "Estructura de bloques" actualizada: ahora pre-selecciona la duración del generador.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size) + `python -c "import main"` OK. **E2E verificado** (2026-08-09): `POST /bloques-horarios/estandar` sobre sede 4 ejecutado 3 veces (45min) → `creados:0, omitidos:50` en todas; con `overwrite:true` renumera `orden_visual` 1..10 por día sin duplicados de tripleta (conteo sede 4 = 50).
+
+### Contexto de la Sesión Actual (2026-08-20) — E10: extracción de lógica pura + suite vitest
+
+1. **Extracción de lógica pura de `Horarios.jsx` (commit `48d80d7`):** se movieron ~293 líneas fuera del monolito de la Fase 4/5 hacia módulos testables de forma aislada (paso previo a la suite vitest; los comentarios de los archivos ya lo indican: *"extraida de Horarios.jsx (E10) para poder testearla de forma aislada (vitest)"*):
+   - **`src/utils/schedule.js`:** `mapScheduleEvents` (convierte `extendedProps.backgroundColor` → color real, fallback `#6366f1`), `findNearestBloque(date, sedeId, bloques)` (solo bloques de la misma sede que el aula del evento), `filterEvents` y `recalcularEventoDemo`.
+   - **`src/utils/scheduleValidation.js`:** `validateMoveMock` (mismo contrato que el endpoint real: `validateMoveMock({horarioId, nuevoBloqueId, nuevaAulaId, eventosDemo, aulas, bloques, periodoId})`).
+   - **`src/hooks/useGenerationPolling.js`:** ciclo de polling encapsulado (`setInterval`/`clearInterval`, 10×3 s) con callbacks `onStatus`/`onSettled`, para que `Horarios.jsx` solo arranque con `startGenerationPolling(periodoId)` y conecte los callbacks (ver también sección A y la nota E3).
+2. **Puntos de llamada actualizados en `Horarios.jsx`:** drag & drop (`handleEventDrop`), modal de edición (`handleEventClick`/save) y arranque de generación — todos consumen los helpers/hooks extraídos.
+3. **`Horarios.jsx` tras la extracción:** de ~1147 a **~1460 líneas** (aparentemente crece porque la extracción consolida lógica inline repetida en helpers; la meta final de E10/ítem I es seguir recortando con los hooks `useScheduleGeneration` y `useDragDropValidation`).
+4. **Suite vitest implementada (misma sesión):** script `"test": "vitest run"` en `package.json`, `vitest.config.js` (entorno `jsdom`, `globals`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`) y **36 tests en 3 archivos**:
+   - **`src/utils/__tests__/schedule.test.js`** (20): `mapScheduleEvents` (color real/fallback `#6366f1`/sin mutar), `findNearestBloque` (mismo día + filtro de sede, umbral 45 min, Dom `getDay()=0` → `dia_semana=7`, listas vacías), `filterEvents` (todos/aula por `aula_id` y por `resourceId`, docente por "apellido, nombre" o primer nombre, grupo exacto, not-found), `recalcularEventoDemo` (start/end/resourceId/aula con fecha base a mediodía para evitar corrimientos de zona horaria, conserva nombre de aula si no existe la objetivo).
+   - **`src/utils/__tests__/scheduleValidation.test.js`** (9): todos los `error_code` de `validateMoveMock` (`INVALID_TARGET` bloque y aula, `NOT_FOUND`, `SITE_MISMATCH`, `CONFLICT_TEACHER`, `CONFLICT_GROUP`, `CONFLICT_ROOM`), caso `{valido:true}` y aislamiento por `periodo_id`.
+   - **`src/hooks/__tests__/useGenerationPolling.test.js`** (7): con `vi.useFakeTimers()` + `scheduleService` mock inyectado — DONE y FAILED (detienen el ciclo), `PENDING_TIMEOUT` tras `maxAttempts`, ERROR cuando el servicio rechaza (404), `stop()` manual, cleanup al desmontar y re-binding de callbacks vía `rerender` sin perder el ciclo.
+5. **E9 backend (misma ejecución):** suite pytest/httpx con 46 tests sobre SQLite in-memory (`backend/tests/`), ver E9 en `PLAN_DE_DESARROLLO.md`.
+6. **Verificación:** `pnpm build` OK, `pnpm test` → `36 passed` y `pytest` → `46 passed`.
+
+### Contexto de la Sesión Actual (2026-08-20) — Cierre E10: hooks extraídos + suite ampliada
+
+1. **Hook `src/hooks/useScheduleGeneration.js` (nuevo):** encapsula la generación automática (modo real + Modo Demo + polling) que vivía en `Horarios.jsx` (`triggerAutoGeneration` + estados `isGenerating`/`genStatusText` + callbacks `onStatus`/`onSettled` de `useGenerationPolling`).
+   - Params: `demoMode`, `selectedPeriodoId`, `selectedPeriodo`, `setDemoHorarios`, `onRefetch`, `onInvalidate`, `showToast`, `scheduleService` (default `ScheduleService`, inyectable) y `pollingHook` (default `useGenerationPolling`, inyectable para tests).
+   - Refs de callbacks en `depsRef` para evitar closures obsoletos dentro del `setInterval` del polling; `useEffect` que resetea `isGenerating`/`genStatusText` al cambiar de periodo.
+   - La lista de eventos simulados demo se extrajo al helper puro **`generarEventosSimulados(baseDate, periodoId)`** en `src/utils/schedule.js` (4 eventos con `periodo_id` number y `baseDate` interpolada).
+2. **Hook `src/hooks/useDragDropValidation.js` (nuevo, `.js`):** encapsula la mutación de movimiento (valida + actualiza), los handlers de FullCalendar (`handleEventDrop`, `handleEventClick`, `handleSaveChangesModal`, `handleDeleteSchedule`) y el estado del modal de edición (`selectedEvent`, `isEditModalOpen`, `editAulaId`, `editBloqueId` + setters). `scheduleService` inyectable; usa `findNearestBloque`/`recalcularEventoDemo`/`validateMoveMock` de `utils/`.
+3. **`Horarios.jsx` adelgazado:** se eliminaron ~300 líneas (mutación, 4 handlers, generación y event demo inline). Ahora consume ambos hooks; quedó en **~1160 líneas** (antes ~1460). La UI (FullCalendar, filtros, checklist, versiones, vistas, modales) no cambió de comportamiento.
+4. **Suite vitest ampliada (36 → 54 tests):**
+   - **`src/hooks/__tests__/useScheduleGeneration.test.js`** (5): con `pollingHook` fake que captura `start`/callbacks — demo genera 4 eventos (fake timers) y cierra `isGenerating`; real dispara `POST` + `start(periodoId)`; `DONE count>0` → toast success + `onInvalidate` + `onRefetch`; `DONE count=0` → warning del tracker; `FAILED` → toast con causa; rechazo de `generateSchedule` → error y sin polling.
+   - **`src/hooks/__tests__/useDragDropValidation.test.jsx`** (11, `.jsx` por el JSX del wrapper `QueryClientProvider`): drop sin bloque → `revert`+toast; demo válido → `setDemoHorarios`; demo inválido (conflicto docente) → revert sin guardar; real → `validateMove` + `updateSchedule` + invalidate; real con conflicto backend → revert; `handleEventClick` abre modal y precarga aula/bloque; guardar modal demo válido → guarda y cierra; bloque inválido → toast y modal abierto; borrar demo → filtra evento y cierra; borrar real → `deleteSchedule` + invalidate.
+   - **`src/utils/__tests__/schedule.test.js`** (+3): `generarEventosSimulados` (4 eventos con `periodo_id`/`resourceId`/baseDate, normalización de string a number, materias y colores esperados).
+5. **Limpieza:** se eliminó `src/hooks/useSchedule.js` (placeholder vacío commiteado desde el primer commit).
+6. **Verificación:** `pnpm test` → **54 passed**, `pnpm build` OK (solo warning preexistente de chunk size) y `pytest` backend → **46 passed** (sin cambios de backend).
