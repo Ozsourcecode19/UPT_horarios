@@ -54,7 +54,7 @@ frontend/src/
 │
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
-│   ├── Dashboard.jsx            ✅ Stats dinámicas (useQuery) + analítica (recharts) + salud del horario
+│   ├── Dashboard.jsx           ✅ Stats dinámicas (useQuery) + acciones rápidas
 │   ├── Docentes.jsx            ✅ CRUD Plantilla Docente (listado)
 │   ├── DocenteDisponibilidadPage.jsx    ✅ Sub-ruta /docentes/disponibilidad (Modo Demo)
 │   ├── DocenteHabilitacionesPage.jsx    ✅ Sub-ruta /docentes/habilitaciones (Modo Demo)
@@ -62,11 +62,11 @@ frontend/src/
 │   ├── Aulas.jsx               ✅ CRUD completo
 │   ├── Carreras.jsx            ✅ CRUD completo (carreras/PNF, ADMIN + JEFE-PNF)
 │   ├── Trayectos.jsx           ✅ CRUD completo (trayectos académicos, solo ADMIN)
-│   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia)
+│   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia + división)
 │   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Stepper de flujo + Modo Demo
 │   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
 │   ├── BloquesHorarios.jsx     ✅ Gestión de bloques horarios (CRUD por sede, Modo Demo, roles)
-│   └── Settings.jsx            ✅ Configuración del optimizador (E7)
+│   └── Settings.jsx            ✅ Configuración del optimizador (E7 + Turnos/divisiones)
 │
 ├── routes/
 │   ├── AppRouter.jsx           ✅ React Router v6 + rutas protegidas + sub-rutas de Docentes
@@ -412,11 +412,7 @@ Reemplazar las tarjetas estáticas del Dashboard con:
 - Gráfica de distribución de carga horaria por docente (usar `recharts` o similar)
 - Indicador de conflictos detectados en el último horario generado
 
-> **✅ Implementado (E6 + E11):** Las tarjetas muestran datos reales vía `useQuery` (`['docents']`, `['subjects']`, `['aulas']`, `['periodos']`, `['dashboard-horarios', periodoVigente]`), con periodo vigente `estado='ACTIVO'` y patrón Modo Demo. Las acciones rápidas navegan con `useNavigate` a `/horarios`, `/docentes`, `/materias` y `/periodos`. **E11 añadió la sección "Analítica del periodo vigente"** (las 5 `StatCard` se conservan como KPIs):
-> - **Carga horaria por docente** (recharts `BarChart`, barras horizontales): agrupa `extendedProps.docente` y suma duración (horas/semana).
-> - **Distribución por materia** (`PieChart` dona): cuenta clases por `extendedProps.materia` con su `backgroundColor`.
-> - **Salud del horario:** `resumenConflictos` combina `GET /schedules/pre-generation-check` y `GET /schedules/generation-status` (404 = nunca generado) → niveles `ok|warn|error|sin-datos` con badge + chips.
-> - Lógica pura en `src/utils/dashboardStats.js` (testeada: **15 tests**, suite vitest total **69**); Modo Demo usa `generarEventosSimulados` + `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS`; skeleton mientras cargan los horarios.
+> **✅ Parcialmente implementado (E6):** Las tarjetas ya muestran datos reales vía `useQuery` (`['docents']`, `['subjects']`, `['aulas']`, `['periodos']`, `['dashboard-horarios', periodoVigente]`), con periodo vigente `estado='ACTIVO'` y patrón Modo Demo. Las acciones rápidas navegan con `useNavigate` a `/horarios`, `/docentes`, `/materias` y `/periodos`. Pendiente de este ítem: gráficas (recharts) e indicador de conflictos.
 
 #### G. Módulo de Configuración
 `Settings.jsx` está vacío. Conectar con `GET/PUT /api/configuraciones/` para que el administrador pueda ajustar: días laborables, hora inicio/fin de jornada, peso de restricciones blandas del solver.
@@ -445,9 +441,9 @@ src/features/schedule/
 El diseño actual usa clases de Tailwind compatibles con `dark:`. Implementar toggle con `ThemeContext` y persistencia en `localStorage`.
 
 #### K. Exportar horario a PDF / iCal
-> **Planificado como E12 (ver `PLAN_DE_DESARROLLO.md`).** Añadir botón de exportación en `Horarios.jsx`:
-> - **PDF:** impresión CSS con `@media print` de una **vista propia** (cuadrícula HTML materia/docente/aula/grupo/sede, ajena a FullCalendar; durante la impresión se oculta la grilla `.fc`). Sin dependencias nuevas (se descartó `html2canvas` + `jsPDF`).
-> - **iCal (`.ics`):** generar archivo de calendario en cliente con Blob + `a[download]`, compatible con Google Calendar / Outlook.
+Añadir botón de exportación en `Horarios.jsx`:
+- PDF: usar `html2canvas` + `jsPDF` para capturar el calendario
+- iCal (`.ics`): generar archivo de calendario compatible con Google Calendar / Outlook
 
 ---
 
@@ -483,8 +479,6 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 - Materias: `/api/materias/`
 - Aulas: `/api/aulas/`
 - Grupos: `/api/grupos/`
-- Trayectos: `/api/trayectos-academicos/`
-- Carreras: `/api/carreras/`
 - Lecciones: `/api/lecciones/`
 - Periodos: `/api/periodos-academicos/`
 - Bloques: `/api/bloques-horarios/`
@@ -723,45 +717,25 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 5. **Limpieza:** se eliminó `src/hooks/useSchedule.js` (placeholder vacío commiteado desde el primer commit).
 6. **Verificación:** `pnpm test` → **54 passed**, `pnpm build` OK (solo warning preexistente de chunk size) y `pytest` backend → **46 passed** (sin cambios de backend).
 
-### Contexto de la Sesión Actual (2026-08-20) — E11: Dashboard con gráficas y salud del horario
+### Contexto de la Sesión Actual (2026-08-20) — División de grupos (MATUTINO/VESPERTINO/NOCTURNO)
 
-1. **Dependencia `recharts` v3.10.1** instalada (`pnpm add recharts`).
-2. **`src/utils/dashboardStats.js` (nuevo, lógica pura testeable):**
-   - `cargaHorariaPorDocente(eventos)` → agrupa por `extendedProps.docente` y suma `(end-start)` en horas/semana (1 decimal), ordenado desc; ignora fechas inválidas/duración ≤ 0; fallback "Docente no asignado".
-   - `distribucionPorMateria(eventos)` → `[{materia, count, color}]` con el `backgroundColor` del evento (fallback `#6366f1`), ordenado desc.
-   - `resumenConflictos(preCheck, generationStatus)` → `{nivel: ok|warn|error|sin-datos, items}`: requisitos críticos de `pre-generation-check` (lecciones/aulas/bloques/habilitación en 0 → error), advertencias (`lecciones_sin_*`), y estado de `generation-status` (DONE → ok con count; FAILED → error; PENDING → warn; null sin preCheck → sin-datos; null con preCheck → warn "No se ha generado").
-3. **`src/utils/__tests__/dashboardStats.test.js` (nuevo, 15 tests):** casos de suma/orden/fallbacks, fechas inválidas, listas vacías, distribución con color y fallback, y los 4 niveles de salud (ok/warn/error/sin-datos) + items esperados.
-4. **`src/pages/Dashboard.jsx`:** se **conservan** las 5 `StatCard` (KPIs) y se añade la sección **"Analítica del periodo vigente"** (debajo del grid):
-   - Queries nuevas (patrón Modo Demo, `retry: 0`, catch → null): `['dashboard-pre-check', periodoVigente?.id]` y `['dashboard-generation-status', periodoVigente?.id]` (404 = nunca generado).
-   - **Salud del horario:** badge por `nivel` + lista de items con icono por nivel (CheckCircle2/AlertTriangle/XCircle/Info) + botón "Ver horario del periodo".
-   - **Carga horaria por docente:** recharts `BarChart` `layout="vertical"` (nombres largos en el eje Y), skeleton mientras carga, `EmptyAnalitica` si no hay horarios.
-   - **Distribución por materia:** `PieChart` dona (`innerRadius=55/outerRadius=85`) con `Cell` por color de materia + leyenda.
-   - **Modo Demo:** los eventos para las gráficas salen de `generarEventosSimulados` (mismo código que el real → mismas funciones puras) y el preCheck/estado de `MOCK_PRE_CHECK`/`MOCK_GEN_STATUS` (DONE, 8 horarios).
-5. **Verificación:** `pnpm test` → **69 passed** (54 + 15) y `pnpm build` OK (solo warning preexistente de chunk size; recharts añade ~350 kB al bundle, candidato a code-splitting futuro). Backend sin cambios.
+1. **Base de datos:**
+   - Columna `division` en `grupos` con `CHECK (MATUTINO,VESPERTINO,NOCTURNO)` y default `MATUTINO`.
+   - 3 claves de configuración `ventana_matutino`, `ventana_vespertino`, `ventana_nocturno` (JSONB `{hora_inicio, hora_fin}`) en `configuracion`.
+   - Script `database/actualizaciones/upgrade_division_grupos.sql` idempotente (ALTER + CHECK + INSERT ON CONFLICT).
+   - Seed actualizado en `Reset_y_poblar_datos.sql` con divisiones por grupo.
 
-### Contexto de la Sesión Actual (2026-08-20) — Página de gestión de Trayectos Académicos
+2. **Backend:**
+   - `models/grupo.py`: columna `division` + `CheckConstraint`.
+   - `schemas/grupo.py`: campo `division` con validación regex en Create/Update.
+   - `or_tools_adapter.py`: al crear variables de decisión, filtra bloques por la ventana del turno del grupo (intersección jornada global ∩ ventana turno del grupo). Usa `ventana_*` de `configuracion` con fallback a jornada global.
 
-1. **`src/pages/Trayectos.jsx` (nuevo, ruta `/trayectos`, sidebar "Trayectos Académicos" con icono `Layers`, solo rol `ADMIN`):** CRUD completo sobre `/api/trayectos-academicos/` (backend ya existía, sin cambios). Patrón de `Materias.jsx`:
-   - Schema zod: `carrera_id` (número requerido), `nombre` (2–100), `anio_academico` (2000–2100), `orden_secuencial` (≥1), `estado` (`ACTIVO`/`INACTIVO`).
-   - **Select de carrera** pobladо desde `useQuery(['carreras'])` con `CarrerasService` (nuevo `src/api/carreras.js`, mismo patrón de los demás servicios); el nombre de la carrera se muestra en la tabla por join client-side.
-   - **Borrado protegido:** antes de eliminar consulta `useQuery(['grupos'])` (`GruposService`) y **bloquea** el borrado con toast si el trayecto tiene grupos vinculados (evita el `ON DELETE CASCADE` accidental de `grupos.trayecto_id`), patrón de `Aulas.jsx`.
-   - Queries `['trayectos']`/`['carreras']`/`['grupos']` comparten key con `Lecciones.jsx`/`Horarios.jsx`, así `invalidateQueries(['trayectos'])` refresca el dropdown de trayectos en el modal de grupos automáticamente.
-   - Modo Demo con `demo_trayectos` en `localStorage` (misma key que ya usaba `Lecciones.jsx`, así comparten el mismo estado local) + `MOCK_TRAYECTOS`/`MOCK_CARRERAS`/`MOCK_GRUPOS`, banner "Reconectar API", auto-activación si el backend falla.
-   - UI: stat cards (total/activos/carreras cubiertas/grupos vinculados), búsqueda por nombre-carrera-año, badge de conteo de grupos por fila, modal crear/editar y confirmación de borrado.
-   - Errores 422/500 del backend (p. ej. carrera inexistente) se muestran desde `err.response.data.detail`.
-2. **Integración:** ruta `/trayectos` en `AppRouter.jsx`; ítem en `config/navigation.js` bajo **CATÁLOGO** con `roles: ['ADMIN']` (el backend limita escritura a `ADMIN`). El breadcrumb/header se genera solo vía `getRouteMeta`.
-3. **Backend sin cambios** (el CRUD de trayectos ya estaba completo y registrado).
-4. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente manual: login como `admin`, `/trayectos`, crear/editar/borrar y verificar el bloqueo de borrado con un grupo vinculado.
+3. **Frontend:**
+   - **`Lecciones.jsx` (pestaña Grupos):** `division` en `grupoSchema` (z.enum), `<select>` en modal, badge coloreado en tabla, `MOCK_GRUPOS` actualizado.
+   - **`Horarios.jsx` / `Trayectos.jsx`:** `division` en `MOCK_GRUPOS` para consistencia demo.
+   - **`Settings.jsx`:** nuevo grupo "Turnos / Divisiones" (icono `Layers`), widget `ventana` (2 inputs `type="time"` sobre JSON `{hora_inicio, hora_fin}`), claves `ventana_*` mapeadas a grupo "turnos", nota explicativa de intersección con jornada global, icono `Layers` rosa.
+   - **MOCK_CONFIGURACIONES** actualizado con 3 ventanas por defecto (07:00–12:00 / 13:00–18:00 / 18:00–22:00).
 
-### Contexto de la Sesión Actual (2026-08-20) — Página de gestión de Carreras
+4. **Documentación:** `SDD.md` (columna `division` y claves `ventana_*`), `fronted_guia.md` (estructura de páginas, Settings con grupo Turnos).
 
-1. **`src/pages/Carreras.jsx` (nuevo, ruta `/carreras`, sidebar "Carreras" con icono `School`, roles `ADMIN` + `JEFE-PNF`):** CRUD completo sobre `/api/carreras/` (backend ya existía, sin cambios). Patrón de `Trayectos.jsx`:
-   - Schema zod: `nombre` (1–150), `codigo` (1–20, UNIQUE en BD), `tipo_distribucion` (`SEMESTRAL`/`TRIMESTRAL`/`CUATRIMESTRAL`/`ANUAL`).
-   - **Borrado protegido:** antes de eliminar consulta `useQuery(['trayectos'])` (`TrayectosService`) y **bloquea** el borrado con toast si la carrera tiene trayectos vinculados (evita el `ON DELETE CASCADE` en cadena: trayectos → grupos → lecciones → horarios), patrón de `Trayectos.jsx`.
-   - Queries `['carreras']`/`['trayectos']` comparten key con `Trayectos.jsx`, así `invalidateQueries(['carreras'])` refresca el select de carreras en el modal de trayectos automáticamente.
-   - Modo Demo con `demo_carreras` en `localStorage` + `MOCK_CARRERAS`/`MOCK_TRAYECTOS`, banner "Reconectar API", auto-activación si el backend falla.
-   - Errores 409 (código duplicado) y demás del backend se muestran desde `err.response.data.detail`.
-   - UI: stat cards (total/trayectos vinculados/tipos de distribución/semestrales), búsqueda por nombre-código-tipo, badge de tipo de distribución con color por valor, conteo de trayectos por fila, modal crear/editar y confirmación de borrado.
-2. **Integración:** ruta `/carreras` en `AppRouter.jsx`; ítem en `config/navigation.js` bajo **CATÁLOGO** con `roles: ['ADMIN', 'JEFE-PNF']` (el backend permite escribir a ambos). El breadcrumb/header se genera solo vía `getRouteMeta`.
-3. **Backend sin cambios** (el CRUD de carreras ya estaba completo y registrado). `src/api/carreras.js` ya existía desde la tarea de Trayectos.
-4. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E pendiente manual: login como `admin`, `/carreras`, crear/editar/borrar y verificar el bloqueo de borrado con un trayecto vinculado.
+5. **Verificación pendiente:** `cd backend && source .venv/bin/activate && pytest` (46 tests) + `cd frontend && pnpm test` (69 tests) + `pnpm build` + regeneración manual de horario con grupos de distintos turnos.

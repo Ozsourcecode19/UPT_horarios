@@ -10,6 +10,7 @@ class GrupoBase(BaseModel):
     cantidad_alumnos: int = Field(ge=0) # DRY: Validación con Field
     periodo_id: Optional[int] = None
     activo: bool = True
+    division: str = Field(default='MATUTINO', pattern=r'^(MATUTINO|VESPERTINO|NOCTURNO)$')
 
     # Validación del rango de cantidad_alumnos en el schema (SOLID)
     @field_validator('cantidad_alumnos')
@@ -28,6 +29,7 @@ class GrupoUpdate(BaseModel):
     cantidad_alumnos: Optional[int] = Field(None, ge=0)
     periodo_id: Optional[int] = None
     activo: Optional[bool] = None
+    division: Optional[str] = Field(None, pattern=r'^(MATUTINO|VESPERTINO|NOCTURNO)$')
 
     @field_validator('cantidad_alumnos', mode='before')
     def validate_cantidad_alumnos_update(cls, v):

@@ -44,8 +44,8 @@ const MOCK_TRAYECTOS = [
 ];
 
 const MOCK_GRUPOS = [
-  { id: 1, nombre: "INF-T1-G1", trayecto_id: 1, sede_id: 1, cantidad_alumnos: 35, periodo_id: 1, activo: true },
-  { id: 2, nombre: "INF-T2-G1", trayecto_id: 2, sede_id: 1, cantidad_alumnos: 28, periodo_id: 1, activo: true },
+  { id: 1, nombre: "INF-T1-G1", trayecto_id: 1, sede_id: 1, cantidad_alumnos: 35, periodo_id: 1, division: 'MATUTINO', activo: true },
+  { id: 2, nombre: "INF-T2-G1", trayecto_id: 2, sede_id: 1, cantidad_alumnos: 28, periodo_id: 1, division: 'VESPERTINO', activo: true },
 ];
 
 const Trayectos = () => {

@@ -9,6 +9,7 @@ from typing import Dict, Any
 from datetime import date, datetime, timedelta, time, timezone # Importar timezone y time
 from sqlalchemy import tuple_, func # Importar tuple_ para consultas IN de tuplas y func para agregados
 import logging
+import json
 import models # Importa modelos para consultas
 
 class ScheduleGenerator:
@@ -130,6 +131,16 @@ class ScheduleGenerator:
         # COALESCE(leccion.sede_forzada_id, grupo.sede_id)).
         grupo_sede = {g.id: g.sede_id for g in grupos}
 
+        # Mapa grupo_id -> división
+        grupo_division = {g.id: g.division for g in grupos}
+
+        # Mapa división -> ventana horaria (tomado de configuracion)
+        import json
+        config_db = self.db.query(models.Configuracion).filter(
+            models.Configuracion.clave.in_(['ventana_matutino', 'ventana_vespertino', 'ventana_nocturno'])
+        ).all()
+        ventana_por_turno = {c.clave: json.loads(c.valor) for c in config_db}
+
         # 3. Crear variables de decisión (Booleanas: Leccion-Lugar-Tiempo)
         # La variable x[l_id][b_id][a_id] es True si la leccion l_id se asigna al bloque b_id en la aula a_id
         assignment_vars_local = {} # Dict[(leccion_id, bloque_id, aula_id), Any]
@@ -138,9 +149,23 @@ class ScheduleGenerator:
             if leccion_sede is None:
                 self.logger.warning(f"Lección {leccion.id}: no se pudo determinar su sede; se omite (no tendrá candidatos).")
                 continue
+            # Determinar la ventana horaria para este grupo (intersección jornada global ∩ ventana turno)
+            grupo_div = grupo_division.get(leccion.grupo_id)
+            ventana_turno = ventana_por_turno.get(f'ventana_{grupo_div}')
+            if ventana_turno is None:
+                self.logger.warning(f"Lección {leccion.id}: ventana de turno {grupo_div} no configurada; usando jornada global.")
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue # Saltar bloques en días no laborables
+                # Verificar si el bloque cae dentro de la ventana del turno
+                if ventana_turno:
+                    bloque_inicio = bloque.hora_inicio
+                    bloque_fin_dt = (datetime.combine(datetime.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
+                    ven_inicio = datetime.strptime(ventana_turno['hora_inicio'], '%H:%M:%S').time()
+                    ven_fin = datetime.strptime(ventana_turno['hora_fin'], '%H:%M:%S').time()
+                    # El bloque debe empezar y terminar dentro de la ventana del turno
+                    if bloque_inicio < ven_inicio or bloque_fin_dt > ven_fin:
+                        continue # Bloque fuera de la ventana de este turno
                 for aula in aulas:
                     # Restricción de consistencia de Sede (requisito estricto del trigger
                     # PL/pgSQL fn_validar_sede_horario): Aula, Bloque y Lección deben

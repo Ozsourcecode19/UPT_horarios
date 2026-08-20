@@ -93,6 +93,8 @@ CREATE TABLE grupos (
     sede_id INT NOT NULL REFERENCES sedes(id) ON DELETE CASCADE,
     cantidad_alumnos INT DEFAULT 0 CHECK (cantidad_alumnos >= 0),
     periodo_id INT REFERENCES periodos_academicos(id) ON DELETE CASCADE,
+    division VARCHAR(20) NOT NULL DEFAULT 'MATUTINO'
+        CHECK (division IN ('MATUTINO', 'VESPERTINO', 'NOCTURNO')),
     activo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -793,7 +795,10 @@ INSERT INTO configuracion (clave, valor, descripcion, tipo_dato, editable) VALUE
 ('version_sistema', '"2.1.0"'::jsonb, 'Versión actual del esquema de base de datos', 'string', FALSE),
 ('timezone_default', '"America/Caracas"'::jsonb, 'Timezone por defecto para generación de horarios', 'string', FALSE),
 ('soft_constraint_gap_weight', '10'::jsonb, 'Peso para penalizar huecos libres en docentes', 'integer', TRUE),
-('soft_constraint_compact_weight', '5'::jsonb, 'Peso para preferir bloques consecutivos', 'integer', TRUE);
+('soft_constraint_compact_weight', '5'::jsonb, 'Peso para preferir bloques consecutivos', 'integer', TRUE),
+('ventana_matutino', '{"hora_inicio": "07:00:00", "hora_fin": "12:00:00"}'::jsonb, 'Ventana horaria del turno MATUTINO para generación de horarios', 'json', TRUE),
+('ventana_vespertino', '{"hora_inicio": "13:00:00", "hora_fin": "18:00:00"}'::jsonb, 'Ventana horaria del turno VESPERTINO para generación de horarios', 'json', TRUE),
+('ventana_nocturno', '{"hora_inicio": "18:00:00", "hora_fin": "22:00:00"}'::jsonb, 'Ventana horaria del turno NOCTURNO para generación de horarios', 'json', TRUE);
 
 -- Usuario administrador por defecto
 -- 🔐 PASSWORD: admin123 (CAMBIAR INMEDIATAMENTE EN PRODUCCIÓN)

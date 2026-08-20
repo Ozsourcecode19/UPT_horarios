@@ -16,6 +16,9 @@ const MOCK_CONFIGURACIONES = [
   { clave: 'dias_laborables', valor: [1, 2, 3, 4, 5], descripcion: 'Días de la semana laborables (1=Lunes, 7=Domingo)', tipo_dato: 'array', editable: true, updated_at: new Date().toISOString() },
   { clave: 'hora_inicio_jornada', valor: '07:00:00', descripcion: 'Hora de inicio de jornada académica', tipo_dato: 'string', editable: true, updated_at: new Date().toISOString() },
   { clave: 'hora_fin_jornada', valor: '15:00:00', descripcion: 'Hora de fin de jornada académica', tipo_dato: 'string', editable: true, updated_at: new Date().toISOString() },
+  { clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' }, descripcion: 'Ventana horaria del turno MATUTINO para generación de horarios', tipo_dato: 'json', editable: true, updated_at: new Date().toISOString() },
+  { clave: 'ventana_vespertino', valor: { hora_inicio: '13:00:00', hora_fin: '18:00:00' }, descripcion: 'Ventana horaria del turno VESPERTINO para generación de horarios', tipo_dato: 'json', editable: true, updated_at: new Date().toISOString() },
+  { clave: 'ventana_nocturno', valor: { hora_inicio: '18:00:00', hora_fin: '22:00:00' }, descripcion: 'Ventana horaria del turno NOCTURNO para generación de horarios', tipo_dato: 'json', editable: true, updated_at: new Date().toISOString() },
   { clave: 'duracion_bloque_default', valor: 45, descripcion: 'Duración default de bloque en minutos', tipo_dato: 'integer', editable: true, updated_at: new Date().toISOString() },
   { clave: 'soft_constraint_gap_weight', valor: 10, descripcion: 'Peso para penalizar huecos libres en docentes', tipo_dato: 'integer', editable: true, updated_at: new Date().toISOString() },
   { clave: 'soft_constraint_compact_weight', valor: 5, descripcion: 'Peso para preferir bloques consecutivos', tipo_dato: 'integer', editable: true, updated_at: new Date().toISOString() },
@@ -28,6 +31,9 @@ const WIDGETS = {
   dias_laborables: { widget: 'dias' },
   hora_inicio_jornada: { widget: 'time' },
   hora_fin_jornada: { widget: 'time' },
+  ventana_matutino: { widget: 'ventana' },
+  ventana_vespertino: { widget: 'ventana' },
+  ventana_nocturno: { widget: 'ventana' },
   duracion_bloque_default: { widget: 'select', options: [30, 45, 60, 90, 120] },
   soft_constraint_gap_weight: { widget: 'range', min: 0, max: 100, lowLabel: 'Baja importancia', highLabel: 'Alta importancia' },
   soft_constraint_compact_weight: { widget: 'range', min: 0, max: 100, lowLabel: 'Baja preferencia', highLabel: 'Alta preferencia' },
@@ -40,6 +46,12 @@ const GRUPOS = [
     label: 'Jornada y calendario',
     descripcion: 'Define cuándo puede haber clases: días laborables y ventana horaria global de la jornada académica.',
     icon: CalendarDays,
+  },
+  {
+    id: 'turnos',
+    label: 'Turnos / Divisiones',
+    descripcion: 'Ventanas horarias por turno (matutino/vespertino/nocturno) que restringen la generación de horarios por grupo.',
+    icon: Layers,
   },
   {
     id: 'bloques',
@@ -60,6 +72,9 @@ const CLAVE_GRUPO = {
   dias_laborables: 'jornada',
   hora_inicio_jornada: 'jornada',
   hora_fin_jornada: 'jornada',
+  ventana_matutino: 'turnos',
+  ventana_vespertino: 'turnos',
+  ventana_nocturno: 'turnos',
   duracion_bloque_default: 'bloques',
   soft_constraint_gap_weight: 'solver',
   soft_constraint_compact_weight: 'solver',
@@ -71,6 +86,11 @@ const GRUPO_NOTAS = {
     <>
       La ventana de jornada (<span className="font-semibold">hora_inicio_jornada</span>–<span className="font-semibold">hora_fin_jornada</span>)
       filtra los bloques que el solver y la grilla de disponibilidad consideran (hora de inicio + duración dentro del rango). Esto recorta los bloques fuera de la ventana, incluidos los <span className="font-semibold">15:00–20:00</span> de la sede virtual: sube <span className="font-semibold">hora_fin_jornada</span> a <span className="font-semibold">20:00:00</span> para mostrarlos todos. <span className="font-semibold">dias_laborables</span> limita en qué días se programan clases.
+    </>
+  ),
+  turnos: (
+    <>
+      Cada turno define una <span className="font-semibold">ventana horaria</span> (<span className="font-semibold">hora_inicio</span>–<span className="font-semibold">hora_fin</span>) que el solver respeta al asignar bloques a grupos de esa división. La ventana efectiva es la intersección con la jornada global: un grupo MATUTINO (07:00–12:00) solo recibirá bloques de mañana aunque la jornada global llegue a 15:00. Ajusta las ventanas según los horarios reales de cada turno.
     </>
   ),
   bloques: (
@@ -146,6 +166,7 @@ const buildPayload = (clave, value) => {
   const w = WIDGETS[clave] || {};
   if (w.widget === 'time') return toTimeDb(value);
   if (w.widget === 'range' || w.widget === 'number' || w.widget === 'select') return Number(value);
+  if (w.widget === 'ventana') return value; // JSON object ya serializado
   return value;
 };
 
@@ -368,6 +389,41 @@ const Settings = () => {
             />
           </div>
         );
+      case 'ventana': {
+        const valor = watch(cfg.clave) || { hora_inicio: '00:00:00', hora_fin: '00:00:00' };
+        const horaInicio = valor.hora_inicio?.substring(0, 5) || '00:00';
+        const horaFin = valor.hora_fin?.substring(0, 5) || '00:00';
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Hora Inicio</label>
+              <input
+                type="time"
+                disabled={!isAdmin}
+                value={horaInicio}
+                onChange={(e) => {
+                  const newVal = { ...watch(cfg.clave), hora_inicio: e.target.value + ':00' };
+                  setValue(cfg.clave, newVal, { shouldValidate: true, shouldDirty: true });
+                }}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Hora Fin</label>
+              <input
+                type="time"
+                disabled={!isAdmin}
+                value={horaFin}
+                onChange={(e) => {
+                  const newVal = { ...watch(cfg.clave), hora_fin: e.target.value + ':00' };
+                  setValue(cfg.clave, newVal, { shouldValidate: true, shouldDirty: true });
+                }}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+          </div>
+        );
+      }
       default:
         return (
           <div>
@@ -389,6 +445,7 @@ const Settings = () => {
     if (widget === 'range') return <Gauge className="w-5 h-5 text-purple-600" />;
     if (widget === 'select') return <Timer className="w-5 h-5 text-amber-600" />;
     if (widget === 'number') return <Timer className="w-5 h-5 text-amber-600" />;
+    if (widget === 'ventana') return <Layers className="w-5 h-5 text-pink-600" />;
     return <Layers className="w-5 h-5 text-slate-500" />;
   };
 

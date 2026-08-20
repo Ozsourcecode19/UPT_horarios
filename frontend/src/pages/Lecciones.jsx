@@ -30,6 +30,7 @@ const grupoSchema = z.object({
     .min(0, "La cantidad de alumnos no puede ser negativa")
     .max(200, "La cantidad recomendada por grupo es máximo 200"),
   periodo_id: z.number({ invalid_type_error: "Debe seleccionar un periodo académico" }),
+  division: z.enum(['MATUTINO', 'VESPERTINO', 'NOCTURNO']).default('MATUTINO'),
   activo: z.boolean().default(true),
 });
 
@@ -62,9 +63,9 @@ const MOCK_PERIODOS = [
 ];
 
 const MOCK_GRUPOS = [
-  { id: 1, nombre: "INF-T1-G1", trayecto_id: 1, sede_id: 1, cantidad_alumnos: 35, periodo_id: 1, activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 2, nombre: "INF-T2-G1", trayecto_id: 2, sede_id: 1, cantidad_alumnos: 28, periodo_id: 1, activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 3, nombre: "INF-T3-G2", trayecto_id: 3, sede_id: 2, cantidad_alumnos: 32, periodo_id: 1, activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 1, nombre: "INF-T1-G1", trayecto_id: 1, sede_id: 1, cantidad_alumnos: 35, periodo_id: 1, division: 'MATUTINO', activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 2, nombre: "INF-T2-G1", trayecto_id: 2, sede_id: 1, cantidad_alumnos: 28, periodo_id: 1, division: 'MATUTINO', activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 3, nombre: "INF-T3-G2", trayecto_id: 3, sede_id: 2, cantidad_alumnos: 32, periodo_id: 1, division: 'VESPERTINO', activo: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 const MOCK_LECCIONES = [
@@ -930,6 +931,7 @@ const Lecciones = () => {
                     <th className="py-4 px-6">Grupo de Alumnos</th>
                     <th className="py-4 px-6">Trayecto Académico</th>
                     <th className="py-4 px-6">Ubicación / Sede</th>
+                    <th className="py-4 px-6 text-center">División</th>
                     <th className="py-4 px-6 text-center">Matrícula (Alumnos)</th>
                     <th className="py-4 px-6">Período</th>
                     <th className="py-4 px-6 text-center">Estado</th>
@@ -964,6 +966,16 @@ const Lecciones = () => {
                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span>{sede?.nombre || `Sede ID: #${grupo.sede_id}`}</span>
                           </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            grupo.division === 'MATUTINO' ? 'bg-blue-50 text-blue-700' :
+                            grupo.division === 'VESPERTINO' ? 'bg-emerald-50 text-emerald-700' :
+                            'bg-violet-50 text-violet-700'
+                          }`}>
+                            {grupo.division === 'MATUTINO' ? '🌅' : grupo.division === 'VESPERTINO' ? '🌤️' : '🌙'}
+                            <span>{grupo.division}</span>
+                          </span>
                         </td>
                         <td className="py-4 px-6 text-center font-bold text-slate-700">
                           {grupo.cantidad_alumnos} alumnos
@@ -1096,6 +1108,19 @@ const Lecciones = () => {
                   </select>
                   {errorsGrupo.periodo_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errorsGrupo.periodo_id.message}</span>}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">División / Turno *</label>
+                <select 
+                  {...registerGrupo('division')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
+                >
+                  <option value="MATUTINO">Matutino (07:00–12:00)</option>
+                  <option value="VESPERTINO">Vespertino (13:00–18:00)</option>
+                  <option value="NOCTURNO">Nocturno (18:00–22:00)</option>
+                </select>
+                {errorsGrupo.division && <span className="text-xs text-red-500 font-medium mt-1 block">{errorsGrupo.division.message}</span>}
               </div>
 
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
