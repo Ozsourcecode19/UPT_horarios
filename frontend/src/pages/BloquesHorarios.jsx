@@ -8,6 +8,7 @@ import {
   Database, RefreshCw, Sparkles, Lock, CalendarDays, Power, Trash2, Building2
 } from 'lucide-react';
 import BloquesService from '../api/bloques';
+import { esErrorDeServidor } from '../utils/errors';
 import SedesService from '../api/sedes';
 import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
@@ -155,7 +156,7 @@ const BloquesHorarios = () => {
   }, [demoBloques]);
 
   // --- QUERIES (API) ---
-  const { data: bloquesReal = [], isLoading: isBloquesLoading, isError: isBloquesError, refetch: refetchBloques } = useQuery({
+  const { data: bloquesReal = [], isLoading: isBloquesLoading, isError: isBloquesError, error: bloquesError, refetch: refetchBloques } = useQuery({
     queryKey: ['bloques'],
     queryFn: async () => await BloquesService.getBloques(),
     enabled: !demoMode,
@@ -176,9 +177,9 @@ const BloquesHorarios = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isBloquesError && !demoMode) {
+    if (isBloquesError && esErrorDeServidor(bloquesError) && !demoMode) {
       setDemoMode(true);
       showToast('Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.', 'warning');
     }

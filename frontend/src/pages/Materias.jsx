@@ -9,6 +9,8 @@ import {
   Database, RefreshCw, Sparkles, AlertTriangle, Paintbrush
 } from 'lucide-react';
 import SubjectsService from '../api/subjects';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const materiaSchema = z.object({
@@ -52,6 +54,7 @@ const PRESET_COLORS = [
 
 const Materias = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,6 +86,7 @@ const Materias = () => {
     data: materiasReal = [], 
     isLoading: isMateriasLoading, 
     isError: isMateriasError,
+    error: materiasError,
     refetch: refetchMaterias
   } = useQuery({
     queryKey: ['subjects'],
@@ -94,8 +98,9 @@ const Materias = () => {
   });
 
   // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isMateriasError && !demoMode) {
+    if (isMateriasError && esErrorDeServidor(materiasError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
@@ -148,6 +153,10 @@ const Materias = () => {
 
   // --- MUTACIONES: MUTACIÓN DE CREAR/EDITAR ---
   const handleSaveMateria = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar materias.", "error");
+      return;
+    }
     if (demoMode) {
       if (editingMateria) {
         setDemoMaterias(prev => prev.map(m => m.id === editingMateria.id ? { 
@@ -188,7 +197,13 @@ const Materias = () => {
   // --- MUTACIONES: MUTACIÓN DE ELIMINAR ---
   const handleDeleteMateria = async () => {
     if (!deleteConfirmMateria) return;
-    
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar materias.", "error");
+      setDeleteConfirmMateria(null);
+      return;
+    }
+
     if (demoMode) {
       setDemoMaterias(prev => prev.filter(m => m.id !== deleteConfirmMateria.id));
       showToast("Materia eliminada exitosamente en Modo Demo", "info");

@@ -25,4 +25,14 @@ export const decodeJwt = (token) => {
   }
 };
 
+// Indica si el token está vencido comparando el claim `exp` con la hora actual.
+// Usa un margen de seguridad para evitar usar tokens a punto de expirar.
+// Devuelve true si falta el token o no se puede decodificar (no confiable).
+export const isTokenExpired = (token, margenSegundos = 30) => {
+  if (!token) return true;
+  const payload = decodeJwt(token);
+  if (!payload || typeof payload.exp !== 'number') return false;
+  return payload.exp * 1000 <= Date.now() + margenSegundos * 1000;
+};
+
 export default decodeJwt;

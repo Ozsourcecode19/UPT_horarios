@@ -111,19 +111,34 @@ frontend/src/
 
 ### ✅ Fase 1: Esqueleto y Autenticación
 
-**Archivos clave:** `Login.jsx`, `AppRouter.jsx`, `ProtectedRoute.jsx`, `MainLayout.jsx`, `api/auth.service.js`, `api/client.js`
+**Archivos clave:** `Login.jsx`, `AppRouter.jsx`, `ProtectedRoute.jsx`, `RoleGate.jsx`, `MainLayout.jsx`, `context/AuthContext.jsx`, `api/auth.service.js`, `api/client.js`, `hooks/useCanWrite.js`
 
 **Características implementadas:**
 - Login con `POST /api/token` (OAuth2 Password Flow de FastAPI)
 - Token JWT guardado en `localStorage` como `token` y el usuario como `user`
+- El rol se decodifica del payload del JWT (`utils/jwt.js`), fuente de verdad para la UI
 - `ProtectedRoute` que redirige a `/login` si no hay token
+- **`RoleGate`**: guarda de autorización por ruta; los roles permitidos se leen de `config/navigation.js` vía `getRouteRoles()` y las rutas de gestión (`/carreras`, `/trayectos`, `/lecciones`, `/periodos`, `/bloques`, `/horarios`, `/configuracion`) están envueltas en él
+- **`useCanWrite()`**: hook que devuelve `true` solo para ADMIN/JEFE-PNF; usado para bloquear (a nivel UI, con toast explicativo) generar horarios, drag & drop y CRUDs
 - `apiClient` con interceptor de request (inyecta `Bearer {token}`) y de response (redirect a `/login` en 401)
 - `MainLayout` con sidebar de navegación y área de contenido
 
+**Endurecimiento de seguridad (sesión 2026-08):**
+- `isTokenExpired(token)` en `utils/jwt.js`: al montar, si el token guardado está vencido se limpia la sesión automáticamente (evita sesiones "zombie" hasta el primer 401)
+- El interceptor 401 ya NO redirige cuando la petición fallida es el propio login (`/token`), y guarda la ruta actual en `sessionStorage.auth_return_url` para restaurarla tras re-login
+- `Login.jsx` usa `autocomplete="username"/"current-password"` y no revela el usuario por defecto
+- `AuthService.logout()` elimina también todas las claves `localStorage.demo_*` (pueden contener PII tipeada en Modo Demo)
+- Log de error de login sanitizado (solo código de estado, sin volcar la respuesta)
+
+**Activación del Modo Demo (regla vigente):**
+- Todas las páginas activan el demo SOLO ante fallos de infraestructura usando `esErrorDeServidor(error)` (`src/utils/errors.js`): sin `response` (red caída) o HTTP >= 500
+- Un 401/403 ya NO activa el demo ni simula escrituras locales
+
 **Posibles mejoras:**
-- Implementar `AuthContext` global para evitar lecturas directas a `localStorage` dispersas en los componentes
 - Agregar refresh token para no forzar re-login cada 30 minutos
 - Añadir manejo de `403 Forbidden` en el interceptor global (actualmente solo maneja 401)
+- Mover el token a cookie httpOnly (requiere cambios en backend) para mitigar robo de sesión por XSS
+- Añadir CSP en `index.html` y desactivar sourcemaps en build de producción
 
 ---
 
@@ -300,37 +315,34 @@ Si `dia_semana`, `hora_inicio` o `hora_fin` son `NULL`, el problema está en el 
 
 ---
 
-### 🟡 BUG MENOR: Dashboard con estadísticas estáticas
+### ✅ RESUELTO: Dashboard con estadísticas estáticas
 
-**Síntoma:** Las tarjetas del Dashboard muestran valores hardcodeados (48 docentes, 124 materias, etc.) que no reflejan los datos reales.
+**Estado:** ✅ Corregido (las tarjetas se alimentan de 5 `useQuery` reales desde hace varias sesiones; revisión 2026-08).
 
-**Corrección:** Conectar `Dashboard.jsx` con `useQuery` para cada entidad:
+**Mejoras adicionales de la revisión 2026-08:**
+- El estado de carga usa `isPending` real de cada query (antes se usaba `data.length === 0`, lo que mostraba el skeleton infinito cuando la BD devolvía 0 registros).
+- Botón "Reconectar API" ahora refresca explícitamente las 5 queries con toast (patrón del resto de páginas).
+- Acciones rápidas filtradas por rol con `getRouteRoles`/`isRoleAllowed` (coherente con `RoleGate`).
+- Panel analítico E11 integrado (ver sección siguiente).
 
-```javascript
-// En Dashboard.jsx
-import { useQuery } from '@tanstack/react-query';
-import DocentsService from '../api/docents';
-import SubjectsService from '../api/subjects';
-import AulasService from '../api/aulas';
-import ScheduleService from '../api/schedule';
-import PeriodosService from '../api/periodos';
+---
 
-const { data: docentes = [] } = useQuery({
-  queryKey: ['docents'],
-  queryFn: () => DocentsService.getDocents(0, 1000),
-  retry: 0,
-});
-// Repetir para materias, aulas, periodos...
-// Mostrar docentes.filter(d => d.activo).length en la tarjeta
-```
+### ✅ RESUELTO: Integración del panel analítico E11 en el Dashboard
+
+**Estado:** ✅ Implementado (2026-08).
+
+`src/utils/dashboardStats.js` existía con tests pero no estaba conectado a ninguna vista. Ahora `Dashboard.jsx` lo consume:
+- **Carga Horaria Semanal por Docente:** barras horizontales a partir de los eventos FullCalendar del periodo (`cargaHorariaPorDocente(horariosReal)`).
+- **Distribución por Materia:** chips coloreados por `extendedProps.backgroundColor` (`distribucionPorMateria`).
+- **Salud del Periodo:** badge ok/warn/error/sin-datos + lista de observaciones combinando `GET /schedules/pre-generation-check` y `GET /schedules/generation-status` (`resumenConflictos`). Queries nuevas con errores tragados → `null` (paneles informativos).
+
+Los tres paneles solo se renderizan fuera de Modo Demo y con periodo vigente.
 
 ---
 
 ### 🟡 BUG MENOR: Botón "Generar Horario" en Dashboard no funciona
 
-**Síntoma:** El botón de acción rápida "Generar Nuevo Horario" en `Dashboard.jsx` no hace nada (es un `<button>` sin `onClick`).
-
-**Corrección:** Conectar con `useNavigate` de React Router:
+**Estado:** ✅ Obsoleto — las acciones rápidas ya navegan vía `useNavigate` y, tras la revisión 2026-08, se renderizan desde un array filtrado por rol (`ACCIONES_RAPIDAS`). Se conserva la nota original como referencia histórica:
 
 ```javascript
 import { useNavigate } from 'react-router-dom';

@@ -12,6 +12,8 @@ import {
 import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
 import DocenteTabs from '../components/docentes/DocenteTabs';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const docenteSchema = z.object({
@@ -49,6 +51,7 @@ const MOCK_SEDES = [
 
 const Docentes = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
   const navigate = useNavigate();
   
   // --- ESTADOS LOCALES ---
@@ -97,6 +100,7 @@ const Docentes = () => {
     data: docentesReal = [], 
     isLoading: isDocentesLoading, 
     isError: isDocentesError,
+    error: docentesError,
     refetch: refetchDocentes
   } = useQuery({
     queryKey: ['docents'],
@@ -107,13 +111,13 @@ const Docentes = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isDocentesError && !demoMode) {
+    if (isDocentesError && esErrorDeServidor(docentesError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
-  }, [isDocentesError]);
+  }, [isDocentesError, docentesError]);
 
   const listadoDocentes = demoMode ? demoDocentes : docentesReal;
 
@@ -166,6 +170,10 @@ const Docentes = () => {
 
   // --- MUTACIONES: MUTACIÓN DE CREAR/EDITAR ---
   const handleSaveDocente = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar docentes.", "error");
+      return;
+    }
     const formattedData = {
       ...data,
       // Convertir sede a número si no es null
@@ -215,7 +223,13 @@ const Docentes = () => {
   // --- MUTACIONES: MUTACIÓN DE ELIMINAR ---
   const handleDeleteDocente = async () => {
     if (!deleteConfirmDocente) return;
-    
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar docentes.", "error");
+      setDeleteConfirmDocente(null);
+      return;
+    }
+
     if (demoMode) {
       setDemoDocentes(prev => prev.filter(d => d.id !== deleteConfirmDocente.id));
       showToast("Docente eliminado exitosamente en Modo Demo", "info");

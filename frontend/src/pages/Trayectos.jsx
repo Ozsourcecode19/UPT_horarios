@@ -11,6 +11,8 @@ import {
 import TrayectosService from '../api/trayectos';
 import CarrerasService from '../api/carreras';
 import GruposService from '../api/grupos';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const trayectoSchema = z.object({
@@ -50,6 +52,7 @@ const MOCK_GRUPOS = [
 
 const Trayectos = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,6 +84,7 @@ const Trayectos = () => {
     data: trayectosReal = [], 
     isLoading: isTrayectosLoading, 
     isError: isTrayectosError,
+    error: trayectosError,
     refetch: refetchTrayectos
   } = useQuery({
     queryKey: ['trayectos'],
@@ -111,9 +115,9 @@ const Trayectos = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isTrayectosError && !demoMode) {
+    if (isTrayectosError && esErrorDeServidor(trayectosError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
@@ -170,6 +174,10 @@ const Trayectos = () => {
 
   // --- MUTACIONES: MUTACIÓN DE CREAR/EDITAR ---
   const handleSaveTrayecto = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar trayectos.", "error");
+      return;
+    }
     if (demoMode) {
       if (editingTrayecto) {
         setDemoTrayectos(prev => prev.map(t => t.id === editingTrayecto.id ? { 
@@ -211,6 +219,12 @@ const Trayectos = () => {
   // --- MUTACIONES: MUTACIÓN DE ELIMINAR ---
   const handleDeleteTrayecto = async () => {
     if (!deleteConfirmTrayecto) return;
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar trayectos.", "error");
+      setDeleteConfirmTrayecto(null);
+      return;
+    }
 
     // Bloquear borrado si el trayecto tiene grupos vinculados (evita cascade en BD)
     const gruposVinculados = listadoGrupos.filter(g => g.trayecto_id === deleteConfirmTrayecto.id);

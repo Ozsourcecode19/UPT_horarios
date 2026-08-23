@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import PeriodosService from '../api/periodos';
 import { useAuth } from '../context/AuthContext';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const periodoSchema = z.object({
@@ -103,6 +104,7 @@ const Periodos = () => {
     data: periodosReal = [],
     isLoading: isPeriodosLoading,
     isError: isPeriodosError,
+    error: periodosError,
     refetch: refetchPeriodos
   } = useQuery({
     queryKey: ['periodos'],
@@ -113,13 +115,13 @@ const Periodos = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isPeriodosError && !demoMode) {
+    if (isPeriodosError && esErrorDeServidor(periodosError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
-  }, [isPeriodosError]);
+  }, [isPeriodosError, periodosError]);
 
   const listadoPeriodos = demoMode ? demoPeriodos : periodosReal;
 
