@@ -1,0 +1,20 @@
+/* src/fonts.css
+   Tipografías self-hosted (public/fonts/) para eliminar la dependencia de
+   Google Fonts y permitir una CSP estricta con font-src 'self'.
+   Archivos variables: un solo .woff2 cubre el rango de pesos declarado. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin-300-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/outfit-latin-300-800.woff2') format('woff2');
+}
