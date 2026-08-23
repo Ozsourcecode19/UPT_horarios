@@ -575,6 +575,8 @@ sequenceDiagram
 
 > **Nota de riesgo:** `SECRET_KEY` y credenciales de BD (`DATABASE_URL`) tienen valores por defecto en el código. Para producción deben inyectarse vía variables de entorno y rotarse la clave secreta.
 
+> **✅ Endurecido (2026-08):** `core/security.py` ya no acepta la clave por defecto en producción: si `SECRET_KEY` no está definida y `ENTORNO=production`, la aplicación falla al arrancar con `RuntimeError`. En desarrollo emite un `RuntimeWarning` y usa una clave insegura de desarrollo. Generación de clave: `openssl rand -hex 32`. Ver variables en §9.4.
+
 ---
 
 ## 8. Pruebas
@@ -627,7 +629,8 @@ npm run dev    # http://localhost:3000
 | Variable | Default | Uso |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://postgres:postgresUPT@localhost:5432/horarios_upt` | Conexión a BD. |
-| `SECRET_KEY` | `your_secret_key_here` | Firma de tokens JWT (debe sobrescribirse). |
+| `SECRET_KEY` | (ninguna) | Firma de tokens JWT. **Obligatoria en producción** (`ENTORNO=production` sin ella ⇒ `RuntimeError` al arrancar). Generar con `openssl rand -hex 32`. |
+| `ENTORNO` | `development` | `production` activa validaciones estrictas de arranque. |
 
 ### 9.5 Migraciones
 

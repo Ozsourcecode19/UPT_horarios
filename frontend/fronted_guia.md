@@ -130,6 +130,13 @@ frontend/src/
 - `AuthService.logout()` elimina también todas las claves `localStorage.demo_*` (pueden contener PII tipeada en Modo Demo)
 - Log de error de login sanitizado (solo código de estado, sin volcar la respuesta)
 
+**Fase 3 — Infraestructura de seguridad (2026-08):**
+- **CSP en producción:** plugin inline `cspProd` en `vite.config.js` inyecta `<meta http-equiv="Content-Security-Policy">` solo en `dist/index.html` (`apply: 'build'`; el dev server/HMR queda intacto). Política: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' (FullCalendar inyecta <style> dinámicos); img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`. Limitación documentada: `frame-ancestors` no aplica en `<meta>`; añadir como header HTTP cuando haya reverse-proxy.
+- **Tipografías self-hosted:** Inter y Outfit en `public/fonts/*.woff2` (variables, ~80 KB) declaradas en `src/fonts.css`; eliminados los `<link>` a Google Fonts. `tailwind.config.js` mapea `font-sans: Inter` y `font-display: Outfit`. Beneficio: cero terceros, offline y CSP estricta con `font-src 'self'`.
+- **Sourcemaps desactivados en build:** `build.sourcemap: false` — el código fuente ya no viaja con el bundle de producción. (Alternativa futura si se necesita telemetría: `'hidden'` + servicio externo.)
+- **lucide-react actualizado** `1.17.0 → 1.33.0`: la auditoría inicial lo marcó como sospechoso; verificado contra el registry — la serie 1.x es oficial y el pin era válido (falso positivo). Bump de mantenimiento con suite completa como regresión.
+- **Backend (complemento):** `SECRET_KEY` obligatoria en producción (`ENTORNO=production` sin clave ⇒ `RuntimeError` al arrancar); ver `SDD.md §9.4`.
+
 **Activación del Modo Demo (regla vigente):**
 - Todas las páginas activan el demo SOLO ante fallos de infraestructura usando `esErrorDeServidor(error)` (`src/utils/errors.js`): sin `response` (red caída) o HTTP >= 500
 - Un 401/403 ya NO activa el demo ni simula escrituras locales
@@ -138,7 +145,7 @@ frontend/src/
 - Agregar refresh token para no forzar re-login cada 30 minutos
 - Añadir manejo de `403 Forbidden` en el interceptor global (actualmente solo maneja 401)
 - Mover el token a cookie httpOnly (requiere cambios en backend) para mitigar robo de sesión por XSS
-- Añadir CSP en `index.html` y desactivar sourcemaps en build de producción
+- Entregar la CSP como header HTTP desde reverse-proxy (permite `frame-ancestors`, nonces sin `unsafe-inline`)
 
 ---
 

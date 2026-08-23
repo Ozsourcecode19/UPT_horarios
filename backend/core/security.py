@@ -1,5 +1,6 @@
 # backend/core/security.py
 import os
+import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Optional, cast  # Importamos cast para resolver los tipos de SQLAlchemy
 from jose import JWTError, jwt
@@ -13,7 +14,23 @@ from schemas.auth import TokenData
 from fastapi.security import OAuth2PasswordBearer
 
 # Configuración de seguridad
-SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here") 
+# SECRET_KEY es obligatoria en producción: con la clave por defecto cualquiera
+# podría forjar tokens JWT válidos. Generar una con:  openssl rand -hex 32
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+ENTORNO = os.getenv("ENTORNO", "development").lower()
+if not SECRET_KEY:
+    if ENTORNO == "production":
+        raise RuntimeError(
+            "SECRET_KEY no configurada. Es obligatoria en producción. "
+            "Genere una clave segura con: openssl rand -hex 32 y expórtela como variable de entorno."
+        )
+    SECRET_KEY = "clave-insegura-solo-para-desarrollo-no-usar-en-produccion"
+    warnings.warn(
+        "SECRET_KEY no configurada: usando clave insegura de desarrollo. "
+        "Exporte SECRET_KEY antes de pasar a producción.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
