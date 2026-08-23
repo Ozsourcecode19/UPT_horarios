@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import CarrerasService from '../api/carreras';
 import TrayectosService from '../api/trayectos';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const carreraSchema = z.object({
@@ -55,6 +57,7 @@ const getTipoColor = (tipo) => {
 
 const Carreras = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,6 +89,7 @@ const Carreras = () => {
     data: carrerasReal = [], 
     isLoading: isCarrerasLoading, 
     isError: isCarrerasError,
+    error: carrerasError,
     refetch: refetchCarreras
   } = useQuery({
     queryKey: ['carreras'],
@@ -106,9 +110,9 @@ const Carreras = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isCarrerasError && !demoMode) {
+    if (isCarrerasError && esErrorDeServidor(carrerasError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
@@ -153,6 +157,10 @@ const Carreras = () => {
 
   // --- MUTACIONES: MUTACIÓN DE CREAR/EDITAR ---
   const handleSaveCarrera = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar carreras.", "error");
+      return;
+    }
     if (demoMode) {
       if (editingCarrera) {
         setDemoCarreras(prev => prev.map(c => c.id === editingCarrera.id ? { 
@@ -194,6 +202,12 @@ const Carreras = () => {
   // --- MUTACIONES: MUTACIÓN DE ELIMINAR ---
   const handleDeleteCarrera = async () => {
     if (!deleteConfirmCarrera) return;
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar carreras.", "error");
+      setDeleteConfirmCarrera(null);
+      return;
+    }
 
     // Bloquear borrado si la carrera tiene trayectos vinculados (evita cascade en BD)
     const trayectosVinculados = listadoTrayectos.filter(t => t.carrera_id === deleteConfirmCarrera.id);

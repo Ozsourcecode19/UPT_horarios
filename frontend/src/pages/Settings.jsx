@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- MOCK DATA PARA MODO DEMO ---
 const MOCK_CONFIGURACIONES = [
@@ -201,6 +202,7 @@ const Settings = () => {
     data: configsReal = [],
     isLoading: isConfigsLoading,
     isError: isConfigsError,
+    error: configsError,
     refetch: refetchConfigs
   } = useQuery({
     queryKey: ['configuraciones'],
@@ -209,9 +211,9 @@ const Settings = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isConfigsError && !demoMode) {
+    if (isConfigsError && esErrorDeServidor(configsError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }

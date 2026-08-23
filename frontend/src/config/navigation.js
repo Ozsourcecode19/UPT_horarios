@@ -81,3 +81,18 @@ export const getRouteMeta = (pathname) => {
 
 // Rol autorizado para un ítem
 export const isRoleAllowed = (roles, role) => roles === '*' || (Array.isArray(roles) && roles.includes(role));
+
+// Roles requeridos para una ruta dada (usa la misma fuente que el sidebar).
+// Devuelve '*' si la ruta no está mapeada (acceso para cualquier autenticado).
+export const getRouteRoles = (pathname) => {
+  for (const section of NAVIGATION) {
+    for (const item of section.items) {
+      if (item.path === pathname) return item.roles;
+      if (item.children) {
+        const child = item.children.find((c) => c.path === pathname);
+        if (child) return child.roles;
+      }
+    }
+  }
+  return '*';
+};

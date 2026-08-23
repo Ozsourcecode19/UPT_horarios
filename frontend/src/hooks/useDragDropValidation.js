@@ -18,6 +18,7 @@ export const useDragDropValidation = ({
   bloques,
   selectedPeriodo,
   selectedPeriodoId,
+  puedeEscribir = true, // UX: si es false, bloquea mover/editar/eliminar (backend aplica RBAC real)
   showToast = () => {},
   onInvalidate = () => {},
   scheduleService = ScheduleService,
@@ -56,6 +57,11 @@ export const useDragDropValidation = ({
   // Aplicar un movimiento (demo o real) sobre el evento.
   // Returns true si el movimiento se aplico, false si fue rechazado/revocado.
   const aplicarMovimiento = async ({ horarioId, nuevoBloqueId, nuevaAulaId, revert }) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para modificar horarios.", "error");
+      revert?.();
+      return false;
+    }
     if (demoMode) {
       // Simular movimiento local
       const res = validateMoveMock({
@@ -173,6 +179,11 @@ export const useDragDropValidation = ({
   // Dar de baja/eliminar clase
   const handleDeleteSchedule = async () => {
     if (!selectedEvent) return;
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar clases del horario.", "error");
+      return;
+    }
 
     if (demoMode) {
       setDemoHorarios(prev => prev.filter(e => e.id !== selectedEvent.id));

@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, RefreshCw, Sparkles, Database, CheckCircle, AlertCircle, GraduationCap } from 'lucide-react';
 import DocentsService from '../api/docents';
+import { esErrorDeServidor } from '../utils/errors';
 import DocenteHabilitaciones from '../components/docentes/DocenteHabilitaciones';
 import DocenteTabs from '../components/docentes/DocenteTabs';
 
@@ -29,7 +30,7 @@ const DocenteHabilitacionesPage = () => {
   };
 
   // --- QUERY DE DOCENTES (API) ---
-  const { data: docentesReal = [], isError: isDocentesError, refetch: refetchDocentes } = useQuery({
+  const { data: docentesReal = [], isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => {
       try {
@@ -43,13 +44,13 @@ const DocenteHabilitacionesPage = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isDocentesError && !demoMode) {
+    if (isDocentesError && esErrorDeServidor(docentesError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
-  }, [isDocentesError]);
+  }, [isDocentesError, docentesError]);
 
   const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
 

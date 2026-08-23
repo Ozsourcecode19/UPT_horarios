@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import SedesService from '../api/sedes';
 import AulasService from '../api/aulas';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMAS DE VALIDACIÓN ZOD ---
 const sedeSchema = z.object({
@@ -65,6 +67,7 @@ const AULAS_TYPES = [
 
 const Aulas = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [activeTab, setActiveTab] = useState('aulas'); // 'aulas' o 'sedes'
@@ -112,6 +115,7 @@ const Aulas = () => {
     data: sedesReal = [], 
     isLoading: isSedesLoading, 
     isError: isSedesError,
+    error: sedesError,
     refetch: refetchSedes
   } = useQuery({
     queryKey: ['sedes'],
@@ -123,10 +127,11 @@ const Aulas = () => {
   });
 
   // --- QUERY DE AULAS ---
-  const { 
-    data: aulasReal = [], 
-    isLoading: isAulasLoading, 
+  const {
+    data: aulasReal = [],
+    isLoading: isAulasLoading,
     isError: isAulasError,
+    error: aulasError,
     refetch: refetchAulas
   } = useQuery({
     queryKey: ['aulas'],
@@ -137,13 +142,14 @@ const Aulas = () => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend da error en sedes o aulas
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if ((isSedesError || isAulasError) && !demoMode) {
+    const falloServidor = esErrorDeServidor(sedesError) || esErrorDeServidor(aulasError);
+    if ((isSedesError || isAulasError) && falloServidor && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo de Infraestructura automáticamente.", "warning");
     }
-  }, [isSedesError, isAulasError]);
+  }, [isSedesError, isAulasError, sedesError, aulasError]);
 
   const listadoSedes = demoMode ? demoSedes : sedesReal;
   const listadoAulas = demoMode ? demoAulas : aulasReal;
@@ -211,6 +217,10 @@ const Aulas = () => {
 
   // --- ACCIONES: GUARDAR SEDE ---
   const handleSaveSede = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar sedes.", "error");
+      return;
+    }
     if (demoMode) {
       if (editingSede) {
         setDemoSedes(prev => prev.map(s => s.id === editingSede.id ? { 
@@ -250,6 +260,10 @@ const Aulas = () => {
 
   // --- ACCIONES: GUARDAR AULA ---
   const handleSaveAula = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar aulas.", "error");
+      return;
+    }
     const formattedData = {
       ...data,
       sede_id: Number(data.sede_id),
@@ -296,7 +310,13 @@ const Aulas = () => {
   // --- ACCIONES: ELIMINAR SEDE ---
   const handleDeleteSede = async () => {
     if (!deleteConfirmSede) return;
-    
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar sedes.", "error");
+      setDeleteConfirmSede(null);
+      return;
+    }
+
     // Verificar si hay aulas vinculadas a esta sede
     const aulasVinculadas = listadoAulas.filter(a => a.sede_id === deleteConfirmSede.id);
     if (aulasVinculadas.length > 0) {
@@ -325,6 +345,12 @@ const Aulas = () => {
   // --- ACCIONES: ELIMINAR AULA ---
   const handleDeleteAula = async () => {
     if (!deleteConfirmAula) return;
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar aulas.", "error");
+      setDeleteConfirmAula(null);
+      return;
+    }
 
     if (demoMode) {
       setDemoAulas(prev => prev.filter(a => a.id !== deleteConfirmAula.id));

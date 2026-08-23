@@ -1,6 +1,7 @@
 // src/routes/AppRouter.jsx
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
+import RoleGate from './RoleGate';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import Docentes from '../pages/Docentes';
@@ -33,13 +34,17 @@ const AppRouter = () => {
           <Route path="/docentes/habilitaciones" element={<DocenteHabilitacionesPage />} />
           <Route path="/materias" element={<Materias />} />
           <Route path="/aulas" element={<Aulas />} />
-          <Route path="/carreras" element={<Carreras />} />
-          <Route path="/trayectos" element={<Trayectos />} />
-          <Route path="/lecciones" element={<Lecciones />} />
-          <Route path="/periodos" element={<Periodos />} />
-          <Route path="/bloques" element={<BloquesHorarios />} />
-          <Route path="/horarios" element={<Horarios />} />
-          <Route path="/configuracion" element={<Settings />} />
+
+          {/* Rutas de gestión: solo roles con permisos de escritura según navigation.js */}
+          <Route element={<RoleGate />}>
+            <Route path="/carreras" element={<Carreras />} />
+            <Route path="/trayectos" element={<Trayectos />} />
+            <Route path="/lecciones" element={<Lecciones />} />
+            <Route path="/periodos" element={<Periodos />} />
+            <Route path="/bloques" element={<BloquesHorarios />} />
+            <Route path="/horarios" element={<Horarios />} />
+            <Route path="/configuracion" element={<Settings />} />
+          </Route>
         </Route>
       </Route>
 

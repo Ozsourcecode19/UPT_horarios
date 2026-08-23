@@ -18,6 +18,8 @@ import PeriodosService from '../api/periodos';
 import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
 import SubjectsService from '../api/subjects';
+import useCanWrite from '../hooks/useCanWrite';
+import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMAS DE VALIDACIÓN ZOD ---
 const grupoSchema = z.object({
@@ -100,6 +102,7 @@ const MOCK_MATERIAS = [
 
 const Lecciones = () => {
   const queryClient = useQueryClient();
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [activeTab, setActiveTab] = useState('lecciones'); // 'lecciones' o 'grupos'
@@ -163,10 +166,11 @@ const Lecciones = () => {
   // --- QUERIES DE BASE DE DATOS Y FALLBACKS DE DEMO ---
 
   // 1. Grupos
-  const { 
-    data: gruposReal = [], 
-    isLoading: isGruposLoading, 
+  const {
+    data: gruposReal = [],
+    isLoading: isGruposLoading,
     isError: isGruposError,
+    error: gruposError,
     refetch: refetchGrupos
   } = useQuery({
     queryKey: ['grupos'],
@@ -176,10 +180,11 @@ const Lecciones = () => {
   });
 
   // 2. Lecciones
-  const { 
-    data: leccionesReal = [], 
-    isLoading: isLeccionesLoading, 
+  const {
+    data: leccionesReal = [],
+    isLoading: isLeccionesLoading,
     isError: isLeccionesError,
+    error: leccionesError,
     refetch: refetchLecciones
   } = useQuery({
     queryKey: ['lecciones'],
@@ -255,13 +260,15 @@ const Lecciones = () => {
     retry: 0,
   });
 
-  // Activación automática de modo demo ante errores de red en entidades core
+  // Activación automática de modo demo SOLO ante fallos de infraestructura
+  // (red caída o HTTP 5xx). Un 401/403 no debe simular datos locales.
   useEffect(() => {
-    if ((isGruposError || isLeccionesError) && !demoMode) {
+    const falloServidor = esErrorDeServidor(gruposError) || esErrorDeServidor(leccionesError);
+    if ((isGruposError || isLeccionesError) && falloServidor && !demoMode) {
       setDemoMode(true);
       showToast("Conexión con el servidor API fallida. Se ha activado el Modo Demo interactivo automáticamente.", "warning");
     }
-  }, [isGruposError, isLeccionesError]);
+  }, [isGruposError, isLeccionesError, gruposError, leccionesError]);
 
   // Selección de fuentes de datos según modo activo
   const listadoGrupos = demoMode ? demoGrupos : gruposReal;
@@ -362,6 +369,10 @@ const Lecciones = () => {
 
   // --- CRUD: GUARDAR GRUPO ---
   const handleSaveGrupo = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar grupos.", "error");
+      return;
+    }
     const formattedData = {
       ...data,
       trayecto_id: Number(data.trayecto_id),
@@ -409,6 +420,10 @@ const Lecciones = () => {
 
   // --- CRUD: GUARDAR LECCIÓN ---
   const handleSaveLeccion = async (data) => {
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para crear o editar lecciones.", "error");
+      return;
+    }
     const formattedData = {
       ...data,
       docente_id: Number(data.docente_id),
@@ -461,6 +476,12 @@ const Lecciones = () => {
   const handleDeleteGrupo = async () => {
     if (!deleteConfirmGrupo) return;
 
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar grupos.", "error");
+      setDeleteConfirmGrupo(null);
+      return;
+    }
+
     // Verificar si el grupo tiene lecciones asociadas en el listado activo
     const leccionesVinculadas = listadoLecciones.filter(l => l.grupo_id === deleteConfirmGrupo.id);
     if (leccionesVinculadas.length > 0) {
@@ -489,6 +510,12 @@ const Lecciones = () => {
   // --- CRUD: ELIMINAR LECCIÓN ---
   const handleDeleteLeccion = async () => {
     if (!deleteConfirmLeccion) return;
+
+    if (!puedeEscribir) {
+      showToast("No tienes permisos para eliminar lecciones.", "error");
+      setDeleteConfirmLeccion(null);
+      return;
+    }
 
     if (demoMode) {
       setDemoLecciones(prev => prev.filter(l => l.id !== deleteConfirmLeccion.id));

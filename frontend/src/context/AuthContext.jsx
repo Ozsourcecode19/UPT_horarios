@@ -1,7 +1,7 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useEffect, useContext } from 'react';
 import AuthService from '../api/auth.service';
-import { decodeJwt } from '../utils/jwt';
+import { decodeJwt, isTokenExpired } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
@@ -22,9 +22,16 @@ export const AuthProvider = ({ children }) => {
     // Verificar si hay sesión guardada al cargar; el rol se decodifica del token
     // (fuente de verdad) para no quedar con un rol obsoleto en localStorage.
     if (token) {
-      const userInfo = buildUserFromToken(token);
-      localStorage.setItem('user', JSON.stringify(userInfo));
-      setUser(userInfo);
+      if (isTokenExpired(token)) {
+        // Token vencido: la sesión ya no es válida, se limpia localmente.
+        AuthService.logout();
+        setToken(null);
+        setUser(null);
+      } else {
+        const userInfo = buildUserFromToken(token);
+        localStorage.setItem('user', JSON.stringify(userInfo));
+        setUser(userInfo);
+      }
     }
     setLoading(false);
   }, [token]);
@@ -40,7 +47,8 @@ export const AuthProvider = ({ children }) => {
       setUser(userInfo);
       return true;
     } catch (error) {
-      console.error("Login failed", error);
+      // Log sanitizado: solo el código de estado, sin volcar la respuesta completa.
+      console.error("Login failed:", error?.response?.status ?? error?.message);
       return false;
     }
   };

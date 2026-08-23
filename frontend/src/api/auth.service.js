@@ -17,6 +17,11 @@ const AuthService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Limpiar también los datos del Modo Demo (pueden contener PII tipeada
+    // por el usuario y no deben persistir tras cerrar sesión).
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('demo_'))
+      .forEach((k) => localStorage.removeItem(k));
   }
 };
 

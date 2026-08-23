@@ -22,8 +22,10 @@ import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
 import { useAuth } from '../context/AuthContext';
 import { mapScheduleEvents, filterEvents } from '../utils/schedule';
+import { esErrorDeServidor } from '../utils/errors';
 import useScheduleGeneration from '../hooks/useScheduleGeneration';
 import useDragDropValidation from '../hooks/useDragDropValidation';
+import useCanWrite from '../hooks/useCanWrite';
 
 // --- CONFIGURACIÓN MOCK PARA MODO DEMO ---
 const MOCK_PERIODOS = [
@@ -242,6 +244,8 @@ const Horarios = () => {
   const { user } = useAuth();
   // Solo ADMIN/JEFE-PNF pueden restaurar versiones (el backend también responde 403)
   const canRestore = ['ADMIN', 'JEFE-PNF'].includes(user?.role);
+  // Permisos de escritura para generar/mover/editar/eliminar horarios (UX; RBAC real en backend)
+  const puedeEscribir = useCanWrite();
 
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
@@ -398,7 +402,7 @@ const Horarios = () => {
   const bloques = demoMode || isBloquesError ? MOCK_BLOQUES : bloquesReal;
 
   // 6. Horarios Generados (Eventos)
-  const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, refetch: refetchHorarios } = useQuery({
+  const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, error: horariosError, refetch: refetchHorarios } = useQuery({
     queryKey: ['horarios', selectedPeriodoId],
     queryFn: async () => {
       if (!selectedPeriodoId) return [];
@@ -466,9 +470,9 @@ const Horarios = () => {
     }
   });
 
-  // Activar modo demo automáticamente si falla el fetch de horarios
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isHorariosError && !demoMode) {
+    if (isHorariosError && esErrorDeServidor(horariosError) && !demoMode) {
       setDemoMode(true);
       showToast("API del servidor desconectada. Modo Demo activado con persistencia local.", "warning");
     }
@@ -513,6 +517,7 @@ const Horarios = () => {
     bloques,
     selectedPeriodo,
     selectedPeriodoId,
+    puedeEscribir,
     showToast,
     onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
   });
@@ -650,10 +655,10 @@ const Horarios = () => {
           <p className="text-slate-500">Planificador de clases semanal con soporte drag-and-drop y detección de colisiones.</p>
         </div>
         
-        <button 
+        <button
           onClick={triggerAutoGeneration}
-          disabled={!selectedPeriodoId || isGenerating || !canGenerate}
-          title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : undefined}
+          disabled={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir}
+          title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)}
           className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
         >
           <Sparkles className="w-5 h-5 animate-pulse" />
