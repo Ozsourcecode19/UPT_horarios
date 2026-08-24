@@ -5,7 +5,7 @@
 // Acepta esquema de servicio de API y hook de polling inyectables para testear.
 
 import { useState, useEffect, useRef } from 'react';
-import ScheduleService from '../api/schedule';
+import ScheduleService from '../../../api/schedule';
 import useGenerationPolling from './useGenerationPolling';
 import { generarEventosSimulados } from '../utils/schedule';
 

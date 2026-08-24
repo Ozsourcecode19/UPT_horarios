@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import ScheduleService from '../api/schedule';
+import ScheduleService from '../../../api/schedule';
 import { findNearestBloque, recalcularEventoDemo } from '../utils/schedule';
 import { validateMoveMock } from '../utils/scheduleValidation';
 

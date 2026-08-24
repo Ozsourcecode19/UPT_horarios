@@ -673,6 +673,17 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
+### Contexto de la Sesión Actual (2026-08-24) — E14
+
+1. **E14 — Arquitectura por features (alcance intermedio, completada):**
+   - **`src/features/schedule/` (nueva):** `utils/` (`schedule.js`, `scheduleValidation.js`), `hooks/` (`useScheduleGeneration`, `useDragDropValidation`, `useGenerationPolling`), `__tests__/` (los 5 archivos de test co-ubicados) y `components/` (`FlowStepper.jsx`, `ChecklistPanel.jsx` extraídos del inline de la página). Todo movido con `git mv`; solo se ajustó `'../api/schedule'→'../../../api/schedule'` en los hooks.
+   - **`pages/Horarios.jsx`:** consume `../features/schedule/...`; ~1160 → ~1113 líneas. CalendarView/VersionPanel/modales quedan en la página por alto acoplamiento → candidato **E16** junto a un futuro `features/planning/` para `Lecciones.jsx` (~1400 líneas, mayor monolito actual).
+   - Verificación: 105 tests ✅ · build OK.
+
+### Contexto de la Sesión Actual (2026-08-24) — Bugfix drag & drop
+
+1. **`findNearestBloque` por CONTENCIÓN (antes: inicio-más-cercano <45'):** con grillas reales (bloques de 60' en sede 3, mezcla 30'/45' en sede 4, y último tercio de bloques de 45'), el mapeo viejo elegía el bloque SIGUIENTE al visualizado → el validador rechazaba con conflictos que parecían "drag & drop roto". Ahora: 1º el bloque cuyo `[inicio, inicio+duración)` contiene el minuto soltado (empates: inicio más temprano + duración menor); 2º fallback por cercanía <45' para huecos. Los conflictos que persistan son validaciones reales del backend (docente/grupo/aula ocupados). Tests ajustados +4 nuevos (contención, frontera, mixta) → **109 passed** · build OK.
+
 ### Contexto de la Sesión Actual (2026-08-24) — E13
 
 1. **E13 — Modo Oscuro y Sistema de Temas (completada):**
@@ -778,4 +789,4 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 4. **Documentación:** `SDD.md` (columna `division` y claves `ventana_*`), `fronted_guia.md` (estructura de páginas, Settings con grupo Turnos).
 
-5. **Verificación pendiente:** `cd backend && source .venv/bin/activate && pytest` (46 tests) + `cd frontend && pnpm test` (69 tests) + `pnpm build` + regeneración manual de horario con grupos de distintos turnos.
+5. **Verificación:** ✅ Completada (2026-08-24). La primera regeneración real destapó dos defectos de backend corregidos (ver Bugfix 2026-08-24 en `PLAN_DE_DESARROLLO.md`): doble parseo JSONB (`json.loads` sobre dict) que crasheaba la generación, y lookup de ventana por turno con mismatch de mayúsculas que impedía aplicar las ventanas. Tras el fix: regeneración v2 con 4 horarios ACTIVO, sin advertencias, clases MATUTINO dentro de su ventana 07:00–12:00. Suite backend 49 tests ✅.

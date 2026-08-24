@@ -2,7 +2,7 @@
 // Tests E10 del ciclo de polling encapsulado en useGenerationPolling.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import useGenerationPolling from '../useGenerationPolling';
+import useGenerationPolling from '../hooks/useGenerationPolling';
 
 const makeService = (impl) => ({
   getGenerationStatus: vi.fn(impl),

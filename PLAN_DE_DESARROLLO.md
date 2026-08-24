@@ -36,7 +36,11 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 - ✅ **E13** — Modo Oscuro y Sistema de Temas: `ThemeContext` (claro/oscuro/sistema con persistencia en `localStorage.theme` y reacción a cambios de `prefers-color-scheme`), arranque temprano sin FOUC en `main.jsx` (CSP-safe: módulo externo, no script inline), toggle cíclico en el header del shell (`ThemeToggle.jsx`, iconos Sun/Moon/Monitor), `tailwind.config.js` con `darkMode:'class'`. Cobertura vía estrategia **shim semántico**: bloque `.dark` en `index.css` re-mapea las utilidades claras comunes (~1150 instancias sin tocar), variables `--fc-*` oscuras para FullCalendar, y variantes `dark:` finas en MainLayout/Login donde el shim no alcanza. Impresión (E12) siempre clara. Suite vitest ampliada (7 tests de ThemeContext). Criterio verificado: `pnpm test` → **105 passed**, `pnpm build` OK.
 
-**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E14 (Refactor a `features/schedule/`), E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (E10+E11+E12+E13, 105 tests ✅). `docs/*.pdf` vacíos.
+- ✅ **E14** — Refactor a Arquitectura por Features (alcance intermedio): `src/features/schedule/{utils,hooks,__tests__}` con los 2 utils + 3 hooks + 5 archivos de test movidos con `git mv` (historial preservado); componentes `FlowStepper.jsx` y `ChecklistPanel.jsx` extraídos de `Horarios.jsx` (que baja a ~1113 líneas y ahora importa desde `features/schedule/`). Imports internos casi intactos (solo `'../api/schedule'`→`'../../../api/schedule'`). Criterio verificado: `pnpm test` → **105 passed**, `pnpm build` OK. **Pendiente de E14 (→ candidato E16):** CalendarView/VersionPanel/modales siguen en la página por alto acoplamiento (~30 conexiones de estado).
+
+**Pendientes:** Fase E (Backlog estructurado en ejecuciones): **E16 (candidato)** — extracción completa del módulo horarios (`CalendarView`, `VersionPanel`, modales de evento/guardado) y/o nuevo `features/planning/` para `Lecciones.jsx` (hoy el mayor monolito: ~1400 líneas); E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (105 tests ✅). `docs/*.pdf` vacíos.
+
+**Bugfix (generación + ventanas por turno, 2026-08-24):** la primera generación tras crear la función de división fallaba con `the JSON object must be str, bytes or bytearray, not dict`: `_build_model` hacía `json.loads(c.valor)` sobre la columna JSONB `configuracion.valor`, que SQLAlchemy ya entrega como dict (crash antes de resolver; tracker FAILED). Corregido con el helper `_parse_ventana_config(valor)` que acepta dict o string JSON y devuelve `None` ante cualquier caso no utilizable (fallback a jornada global ya existente). Además se detectó y corrigió un segundo defecto silencioso: el lookup `f'ventana_{grupo_div}'` usaba la división en MAYÚSCULAS (`MATUTINO`) contra claves en minúsculas (`ventana_matutino`), por lo que las ventanas de turno **nunca se aplicaban** — ahora ambas partes se normalizan a minúsculas. Tests: 3 nuevos para el helper (49 total ✅). **Verificado E2E contra BD real:** regeneración del periodo ACTIVO → versión 2 con 4 horarios ACTIVO, sin advertencias de ventana, clases MATUTINO asignadas dentro de su ventana 07:00–12:00.
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
@@ -157,13 +161,17 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Tests: `src/context/__tests__/ThemeContext.test.jsx` (**7 tests**: resolución sistema/persistencia/ciclo/clase dark/reacción al SO con matchMedia mockeado).
 - ✅ Criterio: `pnpm test` → **105 passed**, `pnpm build` OK; alternancia funcional verificada en CSS compilado (shim + dark: variants + fc vars presentes).
 
-### E14 — Refactor a Arquitectura por Features (`features/schedule/`) (~2–3 h)
-- Reorganización del módulo de horarios desde `pages/Horarios.jsx`, `utils/schedule*.js` y `hooks/use*Schedule*.js` hacia `src/features/schedule/`:
-  - `src/features/schedule/components/` (CalendarView, VersionPanel, ChecklistPanel, EventModal).
-  - `src/features/schedule/hooks/` (`useScheduleGeneration`, `useDragDropValidation`, `useGenerationPolling`).
-  - `src/features/schedule/utils/` (`schedule.js`, `scheduleValidation.js`).
-- Actualización de imports en `AppRouter.jsx` y suite vitest.
-- ✅ Criterio: `npx vitest run` (80+ passed) y `pnpm build` OK.
+### E14 — Refactor a Arquitectura por Features (`features/schedule/`) (~2–3 h) ✅ COMPLETADA (alcance intermedio)
+- **Movido con `git mv` (historial preservado):** `utils/schedule.js` + `utils/scheduleValidation.js` → `features/schedule/utils/`; `hooks/useScheduleGeneration.js`, `useDragDropValidation.js`, `useGenerationPolling.js` → `features/schedule/hooks/`; los 5 archivos de test → `features/schedule/__tests__/` (co-ubicados, imports relativos actualizados a `../utils/` y `../hooks/`).
+- **Extraídos como componentes:** `components/FlowStepper.jsx` (con `FLOW_STEPS`) y `components/ChecklistPanel.jsx` (props `{preCheck, onRevalidar}`) desde el inline de la página.
+- **Ajustes de imports:** solo `'../api/schedule'`→`'../../../api/schedule'` en los 3 hooks (la profundidad relativa `hooks/↔utils/` se preservó); `Horarios.jsx` consume vía `../features/schedule/...`.
+- **Queda en la página (alto acoplamiento, ~30 conexiones de estado):** calendario dual FullCalendar, panel de versiones y modales de edición/guardado. `Horarios.jsx`: ~1160 → ~1113 líneas.
+- ✅ Criterio: suite vitest completa (**105 passed**) y `pnpm build` OK. **Verificado.**
+
+### E16 (candidato) — Cierre del módulo horario + features/planning
+- Extracción de `CalendarView`, `VersionPanel` y modales de evento/guardado desde `Horarios.jsx` hacia `features/schedule/components/` (requiere diseñar el contrato de props/contexto por el acoplamiento de estado).
+- Nuevo `features/planning/` para `Lecciones.jsx` (~1400 líneas, hoy el mayor monolito: tabs Grupos/Lecciones + CRUD dual).
+- Opcional: barrel `index.js` por feature si crece el número de consumidores externos.
 
 ### E15 — Tipado de Entidades y Contratos (TypeScript / JSDoc) (~2–3 h)
 - Definición de tipos/contratos centrales de dominio (`Docente`, `Materia`, `Aula`, `Leccion`, `BloqueHorario`, `HorarioGenerado`, `PeriodoAcademico`) en `src/types/` o vía `.d.ts` / JSDoc.

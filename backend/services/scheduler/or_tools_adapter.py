@@ -12,6 +12,26 @@ import logging
 import json
 import models # Importa modelos para consultas
 
+
+def _parse_ventana_config(valor):
+    """
+    Normaliza el valor de una clave `ventana_*` de configuracion a dict.
+
+    La columna `valor` es JSONB, por lo que SQLAlchemy entrega un dict ya
+    deserializado (json.loads sobre un dict lanzaba
+    "the JSON object must be str, bytes or bytearray, not dict"). Se acepta
+    también string JSON por robustez; cualquier otro caso devuelve None para
+    que el modelo caiga al fallback de jornada global.
+    """
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except (ValueError, TypeError):
+            return None
+    if isinstance(valor, dict) and 'hora_inicio' in valor and 'hora_fin' in valor:
+        return valor
+    return None
+
 class ScheduleGenerator:
     def __init__(self, db_session: Session):
         self.db = db_session
@@ -135,11 +155,15 @@ class ScheduleGenerator:
         grupo_division = {g.id: g.division for g in grupos}
 
         # Mapa división -> ventana horaria (tomado de configuracion)
-        import json
+        # La columna `valor` es JSONB: SQLAlchemy ya entrega un dict; se acepta
+        # también string JSON por robustez (entornos con TEXT). Cualquier otro
+        # caso queda en None y cae al fallback de jornada global existente.
         config_db = self.db.query(models.Configuracion).filter(
             models.Configuracion.clave.in_(['ventana_matutino', 'ventana_vespertino', 'ventana_nocturno'])
         ).all()
-        ventana_por_turno = {c.clave: json.loads(c.valor) for c in config_db}
+        # Claves en BD son minúsculas (ventana_matutino); la división del grupo
+        # es MAYÚSCULAS ('MATUTINO') -> normalizar a minúsculas en ambos lados.
+        ventana_por_turno = {c.clave.lower(): _parse_ventana_config(c.valor) for c in config_db}
 
         # 3. Crear variables de decisión (Booleanas: Leccion-Lugar-Tiempo)
         # La variable x[l_id][b_id][a_id] es True si la leccion l_id se asigna al bloque b_id en la aula a_id
@@ -151,7 +175,7 @@ class ScheduleGenerator:
                 continue
             # Determinar la ventana horaria para este grupo (intersección jornada global ∩ ventana turno)
             grupo_div = grupo_division.get(leccion.grupo_id)
-            ventana_turno = ventana_por_turno.get(f'ventana_{grupo_div}')
+            ventana_turno = ventana_por_turno.get(f'ventana_{str(grupo_div).lower()}')
             if ventana_turno is None:
                 self.logger.warning(f"Lección {leccion.id}: ventana de turno {grupo_div} no configurada; usando jornada global.")
             for bloque in bloques:

@@ -2,7 +2,7 @@
 // Tests E10 del hook que encapsula la generacion automatica (modo real + demo + polling).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import useScheduleGeneration from '../useScheduleGeneration';
+import useScheduleGeneration from '../hooks/useScheduleGeneration';
 
 const DEMO_DELAY_MS = 2500;
 

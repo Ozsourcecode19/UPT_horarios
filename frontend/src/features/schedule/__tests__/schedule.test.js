@@ -7,7 +7,7 @@ import {
   filterEvents,
   recalcularEventoDemo,
   generarEventosSimulados,
-} from '../schedule';
+} from '../utils/schedule';
 
 // --- mapeo de colores ---
 describe('mapScheduleEvents', () => {
@@ -72,8 +72,15 @@ describe('findNearestBloque', () => {
     expect(findNearestBloque(sabado, null, bloques)).toBeNull();
   });
 
-  it('devuelve null si la distancia supera 45 minutos', () => {
-    expect(findNearestBloque(lunes(8, 46), 1, bloques)).toBeNull();
+  it('devuelve el bloque que CONTIENE el instante soltado (aunque esté a >45 del inicio)', () => {
+    // 08:46 cae dentro de 08:00-09:00: contención gana sobre cercanía al inicio
+    expect(findNearestBloque(lunes(8, 46), 1, bloques)?.id).toBe(2);
+  });
+
+  it('devuelve null en huecos de grilla (sin bloque que contenga y lejos de todo inicio)', () => {
+    // Lunes 09:50: bloques 07:00-08:00 y 08:00-09:00 no lo contienen; inicio más
+    // cercano (08:00) está a 110 min -> null
+    expect(findNearestBloque(lunes(9, 50), 1, bloques)).toBeNull();
   });
 
   it('mapea domingo (getDay()=0) a dia_semana 7', () => {
@@ -84,6 +91,26 @@ describe('findNearestBloque', () => {
   it('devuelve null con lista vacia o indefinida', () => {
     expect(findNearestBloque(lunes(8, 10), null, [])).toBeNull();
     expect(findNearestBloque(lunes(8, 10), null, undefined)).toBeNull();
+  });
+
+  // --- Contención (E14-fix): el drop cae en el bloque visualizado ---
+  it('último tercio de un bloque de 60\' resuelve al bloque actual, no al siguiente', () => {
+    // Caso que fallaba: drop a las 08:45 (dentro de 08:00-09:00) saltaba a 09:00
+    expect(findNearestBloque(lunes(8, 45), 1, bloques)?.id).toBe(2);
+    expect(findNearestBloque(lunes(8, 59), 1, bloques)?.id).toBe(2);
+  });
+
+  it('la frontera exacta de inicio pertenece al bloque que inicia ahí', () => {
+    expect(findNearestBloque(lunes(8, 0), 1, bloques)?.id).toBe(2);
+  });
+
+  it('grilla mixta 30/45 con mismo inicio: gana duración menor (determinista)', () => {
+    const mixtos = [
+      { id: 10, sede_id: 4, dia_semana: 3, hora_inicio: '10:30:00', duracion_minutos: 45 },
+      { id: 11, sede_id: 4, dia_semana: 3, hora_inicio: '10:30:00', duracion_minutos: 30 },
+    ];
+    const miercoles = new Date('2026-08-26T10:40:00');
+    expect(findNearestBloque(miercoles, 4, mixtos)?.id).toBe(11);
   });
 });
 
