@@ -68,31 +68,97 @@ export const findNearestBloque = (date, sedeId, bloques) => {
   return minDiff < 45 ? bestBlock : null;
 };
 
-// Filtra los eventos generados por tipo de vista (todos/aula/docente/grupo).
+// Filtra los eventos generados por tipo de vista (grupo/docente/aula).
+// Matcheo primero por IDs reales (extendedProps.grupo_id/docente_id/aula_id,
+// enviados por el backend); si el evento no trae IDs (Modo Demo), cae al
+// matcheo legado por nombre para no romper la simulacion local.
 export const filterEvents = (eventos, { filterType = 'todos', filterValue = '', docentes = [], grupos = [] }) => {
   return (eventos || []).filter(evento => {
     if (filterType === 'todos' || !filterValue) return true;
+    const props = evento.extendedProps || {};
     if (filterType === 'aula') {
-      // Comparar aula_id o resourceId
-      const aulaId = evento.extendedProps?.aula_id || parseInt(evento.resourceId?.replace("aula_", ""));
-      return aulaId === Number(filterValue);
+      // Comparar aula_id (prop o resourceId) con fallback legado por nombre
+      if (props.aula_id != null) return Number(props.aula_id) === Number(filterValue);
+      const aulaId = parseInt(evento.resourceId?.replace("aula_", ""));
+      if (aulaId) return aulaId === Number(filterValue);
     }
     if (filterType === 'docente') {
-      // Comparar por coincidencia de nombre o id
-      const docenteNombre = evento.extendedProps?.docente || '';
+      if (props.docente_id != null) return Number(props.docente_id) === Number(filterValue);
+      // Fallback legado: coincidencia por nombre
+      const docenteNombre = props.docente || '';
       const selectedDoc = docentes.find(d => d.id === Number(filterValue));
       if (!selectedDoc) return false;
       const fullDocName = `${selectedDoc.apellido}, ${selectedDoc.nombre}`.toLowerCase();
       return docenteNombre.toLowerCase().includes(fullDocName) || docenteNombre.toLowerCase().includes(selectedDoc.nombre.toLowerCase());
     }
     if (filterType === 'grupo') {
-      const grupoNombre = evento.extendedProps?.grupo || '';
+      if (props.grupo_id != null) return Number(props.grupo_id) === Number(filterValue);
+      // Fallback legado: coincidencia por nombre
+      const grupoNombre = props.grupo || '';
       const selectedGrp = grupos.find(g => g.id === Number(filterValue));
       if (!selectedGrp) return false;
       return grupoNombre.toLowerCase() === selectedGrp.nombre.toLowerCase();
     }
     return true;
   });
+};
+
+// --- VENTANA HORARIA DE LA GRILLA SEGUN EL FILTRO ACTIVO ---
+
+// Ventanas por turno espejo de las claves ventana_* de configuracion
+// (mismas que consume el solver en or_tools_adapter).
+const VENTANAS_TURNO_DEFAULT = {
+  MATUTINO: { inicio: '07:00:00', fin: '12:00:00' },
+  VESPERTINO: { inicio: '13:00:00', fin: '18:00:00' },
+  NOCTURNO: { inicio: '18:00:00', fin: '22:00:00' },
+};
+
+const DIVISIONES_VALIDAS = Object.keys(VENTANAS_TURNO_DEFAULT);
+
+// Normaliza una hora a 'HH:MM:SS'; devuelve null si es invalida.
+const normalizarHora = (valor) => {
+  if (typeof valor !== 'string') return null;
+  const parts = valor.split(':').map(Number);
+  if (parts.length < 2 || parts.some(Number.isNaN)) return null;
+  const [h, m] = parts;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const s = parts[2] != null && !Number.isNaN(parts[2]) ? parts[2] : 0;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+// Extrae { inicio, fin } del valor de una clave ventana_* (objeto JSON o string JSON).
+const extraerVentanaConfig = (raw) => {
+  let obj = raw;
+  if (typeof obj === 'string') {
+    try { obj = JSON.parse(obj); } catch { return null; }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const inicio = normalizarHora(obj.hora_inicio);
+  const fin = normalizarHora(obj.hora_fin);
+  return inicio && fin && fin > inicio ? { inicio, fin } : null;
+};
+
+// Resuelve la ventana [inicio, fin] que debe cubrir la grilla del calendario:
+// - Vista por grupo: la ventana del turno del grupo (ventana_{division} de
+//   configuracion, con fallback a la ventana estandar del turno).
+// - Grupos sin division, docentes y aulas: jornada completa general
+//   (hora_inicio_jornada / hora_fin_jornada), fallback 07:00-19:30.
+export const resolveVentanaGrilla = ({ filterType, item, configs = [] } = {}) => {
+  const buscarConfig = (clave) => configs.find(c => c.clave === clave)?.valor;
+
+  if (filterType === 'grupo') {
+    const division = String(item?.division || '').toUpperCase();
+    if (DIVISIONES_VALIDAS.includes(division)) {
+      const desdeConfig = extraerVentanaConfig(buscarConfig(`ventana_${division.toLowerCase()}`));
+      if (desdeConfig) return desdeConfig;
+      return VENTANAS_TURNO_DEFAULT[division];
+    }
+  }
+
+  // Jornada completa general (docentes, aulas, grupo sin division o datos ausentes)
+  const inicio = normalizarHora(buscarConfig('hora_inicio_jornada')) || '07:00:00';
+  const fin = normalizarHora(buscarConfig('hora_fin_jornada'));
+  return { inicio, fin: fin && fin > inicio ? fin : '19:30:00' };
 };
 
 // Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.

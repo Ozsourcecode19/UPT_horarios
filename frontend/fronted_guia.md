@@ -416,7 +416,7 @@ La vista actual (`timeGridWeek`) no permite ver múltiples aulas en paralelo.
 > - **Theme FullCalendar v6:** theme vía CSS variables `--fc-*` en `frontend/src/styles/index.css` coherente con el diseño de la app: bordes `slate-200`, cabecera de días slate-700 bold uppercase sobre fondo `slate-50`, "today" `blue-50`, botones nativos estilizados (rounded-xl, slate, activo `#3b82f6`), `now-indicator` `#6366f1`, sub-slots con líneas punteadas.
 > - **Colores por materia:** helper `mapScheduleEvents(events)` en `src/utils/schedule.js` que convierte `extendedProps.backgroundColor` → `backgroundColor`/`borderColor`/`textColor` del evento (fallback `#6366f1`); aplicado al prop `events` de ambos calendarios.
 > - **Evento rediseñado:** `renderEventContent` compacto — materia bold + docente siempre; grupo/aula solo cuando el bloque es alto (`isStart && isEnd`, bloques de 90 min); `title`/tooltip con la info completa; `text-[11px]`, `truncate`, `select-none`.
-> - **Extras:** `nowIndicator={true}`, `scrollTime="07:00:00"`, `slotMaxTime="19:30:00"` (respiro visual al bloque de 18:00) y etiqueta "Semana del {día}" en la navegación de la vista por aulas (estado `calWeekStart` alimentado por `datesSet`).
+> - **Extras:** `nowIndicator={true}`, `scrollTime="07:00:00"`, `slotMaxTime="19:30:00"` (respiro visual al bloque de 18:00) y etiqueta "Semana del {día}" en la navegación de la vista por aulas (estado `calWeekStart` alimentado por `datesSet`). **Nota (2026-08-24):** la vista por aulas fue eliminada; hoy existe una sola grilla por filtros con `slotMinTime`/`slotMaxTime`/`scrollTime` dinámicos vía `resolveVentanaGrilla` (ver sección de sesión 2026-08-24).
 > - **Fix drag & drop (sede):** `findNearestBloque(date, sedeId, bloques)` (en `src/utils/schedule.js`) ahora filtra los bloques **solo de la sede del aula** del evento (antes elegía el bloque más cercano por tiempo entre *todas* las sedes, causando `SITE_MISMATCH` intermitente y revert). `handleEventDrop` resuelve `currentAulaId` primero y deriva `sede_id` desde `aulas`. Verificado con BD real: bloques de varias sedes coinciden en la misma hora (p. ej. 08:00 en sedes 1,2,3,4).
 > - **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). E2E visual pendiente en el navegador.
 
@@ -525,7 +525,7 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 | Archivo | Complejidad | Razón |
 |---|---|---|
-| `frontend/src/pages/Horarios.jsx` | 🔴 Alta (~1160 líneas) | FullCalendar + filtros + checklist + versiones + vista por aulas (lógica de gen/DnD extraída a hooks E10) |
+| `frontend/src/pages/Horarios.jsx` | 🟠 Media-Alta (~1016 líneas) | FullCalendar + filtros dinámicos + checklist + versiones (lógica de gen/DnD extraída a hooks E10; vista por aulas y "sin filtros" eliminadas en 2026-08-24) |
 | `backend/services/scheduler/or_tools_adapter.py` | 🔴 Alta | Lógica CP-SAT con muchas variables y restricciones |
 | `backend/crud/horarios_generados.py` | 🟡 Media (338 líneas) | Manejo exhaustivo de excepciones DB |
 | `frontend/src/pages/Docentes.jsx` | 🟡 Media (762 líneas) | 3 tabs + CRUD + Disponibilidad + Habilitaciones |
@@ -672,6 +672,17 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 3. **`src/api/bloques.js`:** `getBloques` (limit 1000) + `createBloque`/`updateBloque`/`deleteBloque` contra el CRUD ya existente en `/bloques-horarios/`.
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
+
+### Contexto de la Sesión Actual (2026-08-24) — Vista dinámica por filtros del calendario
+
+1. **Eliminadas dos vistas de `Horarios.jsx`:** la **vista por Aulas** (columnas paralelas, una por aula — saturaba el área de trabajo) y la opción **"Mostrar Todo (Sin filtros)"** (grilla única 07:00–19:30 fija). Se retiraron junto a su maquinaria: `viewMode`, `resourceCalRefs`, `getActiveCalendarApis`, `goCalendarPrev/Next/Today`, `calWeekStart`/`datesSet`, `aulasColumnas` y los iconos `LayoutGrid`/`ChevronLeft`/`ChevronRight`.
+2. **Nueva vista por filtros:** segmented control `[ Grupos | Docentes | Aulas ]` (**grupos por defecto**) + selector de entidad. Un solo `<FullCalendar timeGridWeek>` cuya ventana horaria es dinámica:
+   - **Grupo con división** → lee `ventana_matutino` / `ventana_vespertino` / `ventana_nocturno` de `configuracion` (mismas claves que consume el solver); fallback a la ventana estándar del turno (`07–12`, `13–18`, `18–22`) si la config falta o está malformada.
+   - **Docentes, aulas y grupos sin división** → jornada completa general (`hora_inicio_jornada`–`hora_fin_jornada`; fallback `07:00–19:30`). Nuevo query `['configuraciones']` (patrón DocenteDisponibilidad, `retry: 0`, desactivado en Demo).
+3. **Helper puro nuevo** `resolveVentanaGrilla({ filterType, item, configs })` en `features/schedule/utils/schedule.js` (+9 tests): normaliza horas, acepta valores JSON objeto o string, valida `fin > inicio`. `slotMinTime`/`slotMaxTime`/`scrollTime` del calendario se alimentan de él (FullCalendar reacciona sin remount).
+4. **`filterEvents` por IDs reales:** matchea primero `extendedProps.grupo_id` / `docente_id` / `aula_id` (comparación numérica tolerante a strings); fallback legado por nombre para el Modo Demo (los eventos simulados no traen IDs).
+5. **Backend (soporte):** `get_horarios_para_calendario` ahora expone en `extendedProps` las claves `grupo_id`, `docente_id`, `aula_id` y `division` (labels añadidos al query; sin cambios de schema ni triggers). Test nuevo `test_extended_props_incluyen_ids_y_division` → suite backend **50 passed**. Efecto colateral positivo: `useDragDropValidation.handleEventDrop` ya leía `extendedProps.aula_id || resourceId`, así que el DnD ahora resuelve el aula directamente.
+6. **Tamaño:** `Horarios.jsx` ~1113 → **~1016 líneas**. Verificación: **122 tests vitest** ✅ · `pnpm build` OK · pytest 50 ✅.
 
 ### Contexto de la Sesión Actual (2026-08-24) — E14
 

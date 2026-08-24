@@ -229,7 +229,10 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
     models.Materia.color_hex.label('materia_color_hex'), # Añadir color
     models.Docente.nombre.label('docente_nombre'),
     models.Docente.apellido.label('docente_apellido'),
+    models.Leccion.docente_id.label('docente_id'),
+    models.Leccion.grupo_id.label('grupo_id'),
     models.Grupo.nombre.label('grupo_nombre'),
+    models.Grupo.division.label('grupo_division'),
     models.Aula.nombre.label('aula_nombre'),
     models.Sede.nombre.label('sede_nombre'),
     models.PeriodoAcademico.fecha_inicio.label('fecha_inicio_periodo')
@@ -263,7 +266,10 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
         materia_color_hex = getattr(row, 'materia_color_hex', '#3B82F6') # Color por defecto
         docente_nombre = getattr(row, 'docente_nombre', 'Docente No Asignado')
         docente_apellido = getattr(row, 'docente_apellido', '')
+        docente_id = getattr(row, 'docente_id', None)
         grupo_nombre = getattr(row, 'grupo_nombre', 'Grupo No Asignado')
+        grupo_id = getattr(row, 'grupo_id', None)
+        grupo_division = getattr(row, 'grupo_division', None)
         aula_nombre = getattr(row, 'aula_nombre', 'Aula No Asignada')
         sede_nombre = getattr(row, 'sede_nombre', 'Sede No Asignada')
         fecha_inicio_periodo = getattr(row, 'fecha_inicio_periodo', None)
@@ -317,13 +323,16 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
                 resourceId=f"aula_{horario_gen.aula_id}",
                 extendedProps={
                     "grupo": grupo_nombre,
+                    "grupo_id": grupo_id,
+                    "division": grupo_division,
                     "docente": f"{docente_apellido}, {docente_nombre}",
+                    "docente_id": docente_id,
                     "materia": materia_nombre,
                     "materia_codigo": materia_codigo, # Usar el valor obtenido del join
                     "backgroundColor": materia_color_hex, # Usar el color obtenido del join
                     "aula": aula_nombre,
+                    "aula_id": horario_gen.aula_id,
                     "sede": sede_nombre,
-                    # Puedes añadir más propiedades aquí si es necesario
                 }
             )
             eventos.append(evento)

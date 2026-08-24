@@ -9,9 +9,9 @@ import esLocale from '@fullcalendar/core/locales/es';
 
 import {
   Calendar, Sparkles, RefreshCw, AlertTriangle, Trash2,
-  Settings, Clock, Users, CheckCircle, CheckCircle2, X, ChevronRight,
+  Settings, Clock, Users, CheckCircle, CheckCircle2, X,
   Info, Plus, Edit2, MapPin, GraduationCap, ArrowRight,
-  AlertCircle, Database, History, LayoutGrid, ChevronLeft,
+  AlertCircle, Database, History,
   Download, Printer
 } from 'lucide-react';
 
@@ -21,8 +21,9 @@ import AulasService from '../api/aulas';
 import DocentsService from '../api/docents';
 import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
+import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
-import { mapScheduleEvents, filterEvents } from '../features/schedule/utils/schedule';
+import { mapScheduleEvents, filterEvents, resolveVentanaGrilla } from '../features/schedule/utils/schedule';
 import { esErrorDeServidor } from '../utils/errors';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useScheduleGeneration from '../features/schedule/hooks/useScheduleGeneration';
@@ -196,25 +197,28 @@ const MOCK_HORARIOS_INICIALES = [
 const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
-  const resourceCalRefs = useRef([]); // Refs de los calendarios por aula (vista 'aulas')
   const { user } = useAuth();
   // Solo ADMIN/JEFE-PNF pueden restaurar versiones (el backend también responde 403)
   const canRestore = ['ADMIN', 'JEFE-PNF'].includes(user?.role);
   // Permisos de escritura para generar/mover/editar/eliminar horarios (UX; RBAC real en backend)
   const puedeEscribir = useCanWrite();
 
+  // Tipos de vista por filtros (segmented control): grupos por defecto
+  const TIPOS_VISTA = [
+    { valor: 'grupo', etiqueta: 'Grupos', Icono: Users },
+    { valor: 'docente', etiqueta: 'Docentes', Icono: GraduationCap },
+    { valor: 'aula', etiqueta: 'Aulas', Icono: MapPin },
+  ];
+
   // --- ESTADOS LOCALES ---
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
-  // Vista de la grilla: 'semana' (timeGridWeek) o 'aulas' (columnas paralelas por aula - E8 custom)
-  const [viewMode, setViewMode] = useState('semana');
-  // Inicializar en 'todos' para reflejar inmediatamente todos los horarios generados de todas las aulas/docentes
-  const [filterType, setFilterType] = useState('todos'); // 'todos', 'aula', 'docente', 'grupo'
+  // Vista por filtros (sin "todos"): 'grupo' | 'docente' | 'aula'. La grilla se
+  // adapta dinámicamente (ventana por turno del grupo / jornada completa).
+  const [filterType, setFilterType] = useState('grupo');
   const [filterValue, setFilterValue] = useState('');
   const [demoMode, setDemoMode] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState(null); // Versión seleccionada para restaurar (E4b)
-  // Fecha visible de la semana en la vista por aulas (E9): se actualiza con datesSet
-  const [calWeekStart, setCalWeekStart] = useState(null);
-  
+
   // Toast
   const [toast, setToast] = useState(null);
   const showToast = (message, type = 'success') => {
@@ -233,14 +237,6 @@ const Horarios = () => {
   useEffect(() => {
     localStorage.setItem('demo_horarios', JSON.stringify(demoHorarios));
   }, [demoHorarios]);
-
-  // Limpiar referencias de los calendarios por aula si el componente se desmonta
-  // (el polling de generación ya se limpia en useGenerationPolling)
-  useEffect(() => {
-    return () => {
-      resourceCalRefs.current = [];
-    };
-  }, []);
 
   // --- APIS REALES Y FALLBACKS ---
 
@@ -268,36 +264,16 @@ const Horarios = () => {
 
   const selectedPeriodo = periodos.find(p => p.id === Number(selectedPeriodoId));
 
-  // Devuelve las APIs de FullCalendar de la vista activa (principal o columnas por aula)
-  const getActiveCalendarApis = () => {
-    if (viewMode === 'aulas') {
-      return resourceCalRefs.current.filter(Boolean).map(ref => ref.getApi());
-    }
-    return calendarRef.current ? [calendarRef.current.getApi()] : [];
-  };
-
   // Sincronizar fecha activa de la grilla de FullCalendar al cambiar de período
   useEffect(() => {
     if (selectedPeriodo?.fecha_inicio) {
       try {
-        getActiveCalendarApis().forEach(api => api.gotoDate(selectedPeriodo.fecha_inicio));
+        calendarRef.current?.getApi().gotoDate(selectedPeriodo.fecha_inicio);
       } catch (err) {
         console.log("Sincronizando fecha del calendario...", err);
       }
     }
-  }, [selectedPeriodoId, selectedPeriodo, viewMode]);
-
-  // Navegación global para la vista por aulas (todas las columnas en paralelo)
-  const goCalendarPrev = () => getActiveCalendarApis().forEach(api => api.prev());
-  const goCalendarNext = () => getActiveCalendarApis().forEach(api => api.next());
-  const goCalendarToday = () => getActiveCalendarApis().forEach(api => api.today());
-
-  // Rastrea el inicio de la semana visible (E9) para mostrar la etiqueta en la vista por aulas
-  const handleDatesSet = (info) => {
-    if (info.view.type === 'timeGridWeek' && info.start) {
-      setCalWeekStart(info.start);
-    }
-  };
+  }, [selectedPeriodoId, selectedPeriodo]);
 
   // 2. Aulas
   const { data: aulasReal = [], isError: isAulasError } = useQuery({
@@ -312,8 +288,6 @@ const Horarios = () => {
     retry: 0
   });
   const aulas = demoMode || isAulasError ? MOCK_AULAS : aulasReal;
-  // Aulas para las columnas paralelas de la vista 'aulas' (E8). MOCK no trae 'activa', se asumen activas.
-  const aulasColumnas = aulas.filter(a => a.activa !== false);
 
   // 3. Docentes
   const { data: docentesReal = [], isError: isDocentesError } = useQuery({
@@ -356,6 +330,22 @@ const Horarios = () => {
     retry: 0
   });
   const bloques = demoMode || isBloquesError ? MOCK_BLOQUES : bloquesReal;
+
+  // 5b. Configuración del sistema (ventanas por turno + jornada general).
+  // La grilla se adapta a estas claves (mismas que consume el solver).
+  const { data: configuracionesReal = [] } = useQuery({
+    queryKey: ['configuraciones'],
+    queryFn: async () => {
+      try {
+        return await ConfiguracionesService.getConfiguraciones();
+      } catch (err) {
+        return [];
+      }
+    },
+    enabled: !demoMode,
+    retry: 0
+  });
+  const configuraciones = demoMode ? [] : configuracionesReal;
 
   // 6. Horarios Generados (Eventos)
   const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, error: horariosError, refetch: refetchHorarios } = useQuery({
@@ -441,7 +431,6 @@ const Horarios = () => {
 
   // --- EXPORTACIÓN (E12): descripción legible del filtro activo + descarga iCal ---
   const descripcionFiltro = useMemo(() => {
-    if (filterType === 'todos') return 'todos';
     const etiqueta = { aula: 'Aula', docente: 'Docente', grupo: 'Grupo' }[filterType] || filterType;
     let valor = filterValue;
     if (filterType === 'aula') {
@@ -476,18 +465,31 @@ const Horarios = () => {
   };
 
 
-  // Limpiar el subfiltro cuando cambia el tipo de filtro
+  // Auto-seleccionar la entidad del filtro activo (grupos por defecto).
+  // Si la entidad seleccionada sigue existiendo tras un refetch, se conserva.
   useEffect(() => {
-    if (filterType === 'todos') {
-      setFilterValue('');
+    const listas = { grupo: grupos, docente: docentes, aula: aulas };
+    const lista = listas[filterType] || [];
+    if (lista.length > 0) {
+      const existe = lista.some(x => String(x.id) === String(filterValue));
+      if (!existe) setFilterValue(lista[0].id);
     } else {
-      // Poner la primera opción del nuevo filtro
-      if (filterType === 'aula' && aulas.length > 0) setFilterValue(aulas[0].id);
-      else if (filterType === 'docente' && docentes.length > 0) setFilterValue(docentes[0].id);
-      else if (filterType === 'grupo' && grupos.length > 0) setFilterValue(grupos[0].id);
-      else setFilterValue('');
+      setFilterValue('');
     }
   }, [filterType, aulas, docentes, grupos]);
+
+  // --- GRILLA DINÁMICA: ventana horaria según el filtro activo ---
+  // Grupo → ventana de su turno (ventana_matutino/vespertino/nocturno);
+  // docente/aula (o grupo sin división) → jornada completa general.
+  const itemSeleccionado = useMemo(() => {
+    if (filterType === 'grupo') return grupos.find(g => String(g.id) === String(filterValue));
+    return null;
+  }, [filterType, filterValue, grupos]);
+
+  const ventanaGrilla = useMemo(
+    () => resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones }),
+    [filterType, itemSeleccionado, configuraciones]
+  );
 
   // --- LÓGICA DE DRAG & DROP Y EDICIÓN DE EVENTOS (E10) ---
   const {
@@ -703,43 +705,55 @@ const Horarios = () => {
           </select>
         </div>
 
-        {/* Tipo de Visualización/Filtro */}
+        {/* Vista por filtros: grupos (por defecto), docentes o aulas */}
         <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 flex-[2]">
-          
-          <div className="space-y-1.5 flex-1">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Filtrar Vista Por</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
-            >
-              <option value="todos">Mostrar Todo (Sin filtros)</option>
-              <option value="aula">Aulas / Salones</option>
-              <option value="docente">Docentes / Profesores</option>
-              <option value="grupo">Grupos / Secciones</option>
-            </select>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl">
+              {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
+                <button
+                  key={valor}
+                  onClick={() => setFilterType(valor)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    filterType === valor
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Icono className="w-4 h-4" />
+                  <span>{etiqueta}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {filterType !== 'todos' && (
-            <div className="space-y-1.5 flex-1 animate-in slide-in-from-left-4 duration-300">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Seleccionar Item</label>
-              <select
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
-              >
-                {filterType === 'aula' && aulas.map(a => (
-                  <option key={a.id} value={a.id}>{a.nombre}</option>
-                ))}
-                {filterType === 'docente' && docentes.map(d => (
-                  <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>
-                ))}
-                {filterType === 'grupo' && grupos.map(g => (
-                  <option key={g.id} value={g.id}>{g.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="space-y-1.5 flex-1 animate-in slide-in-from-left-4 duration-300">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+              {filterType === 'grupo' ? 'Seleccionar Grupo' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
+            </label>
+            <select
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
+            >
+              {filterType === 'grupo' && grupos.map(g => (
+                <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${g.division}` : ''}</option>
+              ))}
+              {filterType === 'docente' && docentes.map(d => (
+                <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>
+              ))}
+              {filterType === 'aula' && aulas.map(a => (
+                <option key={a.id} value={a.id}>{a.nombre}</option>
+              ))}
+            </select>
+            {filterType === 'grupo' && itemSeleccionado?.division && (
+              <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Turno {itemSeleccionado.division} · grilla {ventanaGrilla.inicio.substring(0, 5)}–{ventanaGrilla.fin.substring(0, 5)}
+              </p>
+            )}
+          </div>
 
         </div>
 
@@ -831,125 +845,14 @@ const Horarios = () => {
           </p>
         </div>
 
-        {/* Selector de vista + navegación de la vista por aulas (E8) */}
-        <div className="no-print mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl">
-            <button
-              onClick={() => setViewMode('semana')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                viewMode === 'semana'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Vista Semana</span>
-            </button>
-            <button
-              onClick={() => setViewMode('aulas')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                viewMode === 'aulas'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span>Vista por Aulas</span>
-            </button>
-          </div>
-
-          {viewMode === 'aulas' && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={goCalendarPrev}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
-                title="Semana anterior"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={goCalendarToday}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
-                title="Hoy"
-              >
-                Hoy
-              </button>
-              <button
-                onClick={goCalendarNext}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
-                title="Semana siguiente"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <span className="ml-1 text-sm font-bold text-slate-700 flex flex-col items-end leading-tight">
-                {calWeekStart
-                  ? `Semana del ${calWeekStart.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
-                  : (selectedPeriodo?.nombre || 'Periodo')}
-              </span>
-            </div>
-          )}
-        </div>
-
         {isHorariosLoading && !demoMode ? (
           <div className="py-32 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></div>
             <p className="text-sm font-medium text-slate-400">Cargando grilla horaria...</p>
           </div>
-        ) : viewMode === 'aulas' ? (
-          /* Vista por aulas: una columna de FullCalendar por aula (E8, sin plugin Premium) */
-          <div className="schedule-calendar-wrapper animate-in fade-in duration-300 overflow-x-auto pb-2">
-            <div className="flex gap-4 min-w-max">
-              {aulasColumnas.length === 0 ? (
-                <div className="py-20 px-16 flex flex-col items-center justify-center gap-3 text-center">
-                  <LayoutGrid className="w-10 h-10 text-slate-300" />
-                  <p className="text-sm font-medium text-slate-400">No hay aulas activas para mostrar en columnas.</p>
-                </div>
-              ) : (
-                aulasColumnas.map((aula, idx) => (
-                  <div key={`${calendarKey}-${aula.id}`} className="w-[360px] shrink-0 flex flex-col">
-                    <div className="px-3 py-2.5 mb-3 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200/70 dark:border-slate-700/60 flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                        <MapPin className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-700 truncate">{aula.nombre}</p>
-                        <p className="text-[11px] text-slate-400 truncate">
-                          Sede: {aulas.find(a => a.id === aula.id)?.sede_id === 1 ? 'Principal' : 'Este'}
-                        </p>
-                      </div>
-                    </div>
-                    <FullCalendar
-                      ref={el => { resourceCalRefs.current[idx] = el; }}
-                      plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-                      initialView="timeGridWeek"
-                      initialDate={initialDateString}
-                      locale={esLocale}
-                      headerToolbar={false}
-                      allDaySlot={false}
-                      slotMinTime="07:00:00"
-                      slotMaxTime="19:30:00"
-                      slotDuration="00:15:00"
-                      slotLabelInterval="01:00:00"
-                      weekends={false}
-                      editable={true}
-                      droppable={true}
-                      eventDurationEditable={false}
-                      scrollTime="07:00:00"
-                      nowIndicator={true}
-                      datesSet={handleDatesSet}
-                      events={mapScheduleEvents(listadoHorarios.filter(ev => ev.resourceId === `aula_${aula.id}`))}
-                      eventContent={renderEventContent}
-                      eventDrop={handleEventDrop}
-                      eventClick={handleEventClick}
-                      themeSystem="standard"
-                      height={600}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
         ) : (
+          /* Grilla única por filtros: la ventana horaria se adapta al turno del
+             grupo (ventana_*) o muestra la jornada completa para docentes/aulas. */
           <div className="schedule-calendar-wrapper animate-in fade-in duration-300">
             <FullCalendar
               ref={calendarRef}
@@ -964,15 +867,15 @@ const Horarios = () => {
                 right: 'timeGridWeek,timeGridDay'
               }}
               allDaySlot={false}
-              slotMinTime="07:00:00"
-              slotMaxTime="19:30:00"
+              slotMinTime={ventanaGrilla.inicio}
+              slotMaxTime={ventanaGrilla.fin}
               slotDuration="00:15:00" // Sub-slots para alineación perfecta de 45 o 90 min
               slotLabelInterval="01:00:00"
               weekends={false}
               editable={true}
               droppable={true}
               eventDurationEditable={false} // Evitar cambiar duración arrastrando bordes
-              scrollTime="07:00:00"
+              scrollTime={ventanaGrilla.inicio}
               nowIndicator={true}
               events={mapScheduleEvents(listadoHorarios)}
               eventContent={renderEventContent}
