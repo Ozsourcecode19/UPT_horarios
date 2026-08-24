@@ -22,12 +22,14 @@ import DocentsService from '../api/docents';
 import GruposService from '../api/grupos';
 import BloquesService from '../api/bloques';
 import { useAuth } from '../context/AuthContext';
-import { mapScheduleEvents, filterEvents } from '../utils/schedule';
+import { mapScheduleEvents, filterEvents } from '../features/schedule/utils/schedule';
 import { esErrorDeServidor } from '../utils/errors';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
-import useScheduleGeneration from '../hooks/useScheduleGeneration';
-import useDragDropValidation from '../hooks/useDragDropValidation';
+import useScheduleGeneration from '../features/schedule/hooks/useScheduleGeneration';
+import useDragDropValidation from '../features/schedule/hooks/useDragDropValidation';
 import useCanWrite from '../hooks/useCanWrite';
+import FlowStepper from '../features/schedule/components/FlowStepper';
+import ChecklistPanel from '../features/schedule/components/ChecklistPanel';
 
 // --- CONFIGURACIÓN MOCK PARA MODO DEMO ---
 const MOCK_PERIODOS = [
@@ -191,54 +193,6 @@ const MOCK_HORARIOS_INICIALES = [
 ];
 
 // --- STEADOR DE FLUJO: enlaza los pasos previos a la generación ---
-const FLOW_STEPS = [
-  { id: 1, label: 'Planificación', desc: 'Periodos, bloques y aulas', path: '/periodos', ready: (pc) => pc && pc.bloques > 0 && pc.aulas > 0 },
-  { id: 2, label: 'Recursos', desc: 'Docentes, materias y lecciones', path: '/lecciones', ready: (pc) => pc && pc.lecciones_activas > 0 },
-  { id: 3, label: 'Restricciones', desc: 'Disponibilidad y habilitaciones', path: '/docentes/disponibilidad', ready: (pc) => pc && pc.docentes_con_disponibilidad > 0 && pc.docentes_con_habilitacion > 0 },
-  { id: 4, label: 'Generar', desc: 'Solver y publicación', path: '/horarios', ready: null, current: true },
-];
-
-const FlowStepper = ({ preCheck, demoMode }) => {
-  const navigate = useNavigate();
-  return (
-    <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-0 overflow-x-auto">
-        {FLOW_STEPS.map((step, idx) => {
-          const done = !demoMode && !!preCheck && step.ready ? step.ready(preCheck) : false;
-          const isCurrent = step.current;
-          return (
-            <div key={step.id} className="flex items-center flex-1 min-w-[180px]">
-              <button
-                onClick={() => navigate(step.path)}
-                className={`flex items-center gap-3 ${isCurrent ? 'cursor-default' : 'cursor-pointer group'}`}
-              >
-                <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 transition-all ${
-                  isCurrent
-                    ? 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20'
-                    : done
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600'
-                }`}>
-                  {done ? <CheckCircle2 className="w-5 h-5" /> : step.id}
-                </span>
-                <div className="text-left">
-                  <p className={`text-sm font-bold leading-tight ${isCurrent ? 'text-indigo-700' : 'text-slate-700 group-hover:text-blue-700'}`}>
-                    {step.label}
-                  </p>
-                  <p className="text-xs text-slate-400">{step.desc}</p>
-                </div>
-              </button>
-              {idx < FLOW_STEPS.length - 1 && (
-                <div className="flex-1 h-px bg-slate-200 mx-4 hidden md:block" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 const Horarios = () => {
   const queryClient = useQueryClient();
   const calendarRef = useRef(null);
@@ -791,88 +745,9 @@ const Horarios = () => {
 
       </div>
 
-      {/* CHECKLIST PREVIO A LA GENERACIÓN (E2) */}
+      {/* CHECKLIST PREVIO A LA GENERACIÓN (E2) — componente en features/schedule (E14) */}
       {!demoMode && preCheck && (
-        <div className={`rounded-3xl p-5 border shadow-[0_8px_30px_rgb(0,0,0,0.02)] ${
-          preCheck.listo
-            ? 'bg-emerald-50/50 border-emerald-200/70'
-            : 'bg-amber-50/50 border-amber-200/70'
-        }`}>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              {preCheck.listo
-                ? <CheckCircle className="w-5 h-5 text-emerald-600" />
-                : <AlertTriangle className="w-5 h-5 text-amber-600" />}
-              <h3 className="font-bold text-sm text-slate-700">Checklist previo a la generación</h3>
-            </div>
-            {!preCheck.listo && (
-              <button
-                onClick={() => refetchPreCheck()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Revalidar</span>
-              </button>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {[
-              { label: 'Lecciones activas', value: preCheck.lecciones_activas, critico: preCheck.lecciones_activas === 0 },
-              { label: 'Aulas activas', value: preCheck.aulas, critico: preCheck.aulas === 0 },
-              { label: 'Bloques activos', value: preCheck.bloques, critico: preCheck.bloques === 0 },
-              { label: 'Docentes con habilitación', value: preCheck.docentes_con_habilitacion, critico: preCheck.docentes_con_habilitacion === 0 },
-              { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false },
-              { label: 'Lecciones sin candidatos', value: preCheck.lecciones_sin_candidatos, critico: false }
-            ].map(item => (
-              <div key={item.label} className={`rounded-2xl p-3 border ${
-                item.value === 0
-                  ? item.critico ? 'bg-red-50 border-red-200/70' : 'bg-amber-50 border-amber-200/70'
-                  : 'bg-white border-slate-100'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-                  {item.value > 0
-                    ? <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    : <X className="w-4 h-4 text-amber-500" />}
-                </div>
-                <p className={`mt-1 text-2xl font-extrabold ${item.value === 0 ? 'text-amber-600' : 'text-slate-800'}`}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {!preCheck.listo && (
-            <div className="mt-4 flex items-start gap-2 text-xs text-amber-800">
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                {preCheck.lecciones_activas === 0 && <p>· No hay lecciones activas para este periodo. Crea lecciones antes de generar.</p>}
-                {preCheck.aulas === 0 && <p>· No hay aulas activas en el sistema.</p>}
-                {preCheck.bloques === 0 && <p>· No hay bloques horarios activos.</p>}
-                {preCheck.docentes_con_habilitacion === 0 && <p>· Ningún docente tiene habilitaciones registradas; el solver no puede asignar clases.</p>}
-                {preCheck.docentes_con_disponibilidad === 0 && <p>· Advertencia: ningún docente tiene disponibilidad definida. El solver asumirá disponibilidad total por defecto.</p>}
-                {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} lección(es) sin habilitación para su docente y materia.</p>}
-                {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} lección(es) cuyo docente no define disponibilidad.</p>}
-                {preCheck.lecciones_sin_candidatos > 0 && <p>· {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede (no podrán asignarse; crea aulas/bloques en esa sede).</p>}
-              </div>
-            </div>
-          )}
-
-          {preCheck.listo && (
-            <p className="mt-4 text-xs text-emerald-700 flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4" />
-              Todo listo para la generación inteligente.
-            </p>
-          )}
-
-          {preCheck.listo && preCheck.lecciones_sin_candidatos > 0 && (
-            <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-xl p-3">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p>
-                Advertencia: {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede no podrán asignarse. El solver generará el resto del horario.
-              </p>
-            </div>
-          )}
-        </div>
+        <ChecklistPanel preCheck={preCheck} onRevalidar={refetchPreCheck} />
       )}
 
       {/* PANEL DE VERSIONES DEL HORARIO (E4b) */}

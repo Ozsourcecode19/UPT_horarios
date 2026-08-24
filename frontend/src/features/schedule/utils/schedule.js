@@ -13,38 +13,59 @@ export const mapScheduleEvents = (eventos) => {
   }));
 };
 
-// Busca el bloque mas cercano a un drop de fecha/hora.
+// Busca el bloque correspondiente a un drop de fecha/hora.
 // Solo considera bloques de la misma sede que el aula del evento (evita SITE_MISMATCH
 // al elegir bloques de sedes distintas con la misma hora).
+//
+// Estrategia (E14-fix): primero CONTENCIÓN — el bloque bajo el cursor es aquel cuyo
+// intervalo [hora_inicio, hora_inicio+duración) contiene el minuto soltado. Esto
+// corrige el comportamiento anterior (inicio-más-cercano <45'), que en grillas de
+// 60', mixtas 30'/45' o en el último tercio de un bloque elegía el bloque siguiente
+// al visualizado. Fallback: si ningún bloque contiene el punto (huecos de grilla),
+// el más cercano por hora de inicio con tolerancia <45'.
 export const findNearestBloque = (date, sedeId, bloques) => {
   const jsDay = date.getDay(); // 0 = Dom, 1 = Lun, etc.
   const diaSemana = jsDay === 0 ? 7 : jsDay;
-  const dropTimeMin = date.getHours() * 60 + date.getMinutes(); // drop time in minutes from midnight
+  const dropTimeMin = date.getHours() * 60 + date.getMinutes(); // minutos desde medianoche
 
   // Filtrar los bloques del mismo dia (y de la misma sede si se indica)
-  const dayBlocks = (bloques || []).filter(b =>
-    b.dia_semana === diaSemana && (sedeId == null || b.sede_id === sedeId)
+  const candidatos = (bloques || []).filter(
+    (b) => b.dia_semana === diaSemana && (sedeId == null || b.sede_id === sedeId)
   );
-  if (dayBlocks.length === 0) return null;
+  if (candidatos.length === 0) return null;
 
+  const inicioEnMinutos = (b) => {
+    const [h, m] = String(b.hora_inicio).split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  // 1) Contención: el bloque que contiene el instante soltado.
+  // Empate (grillas mixtas p.ej. 30'/45' con mismo inicio): inicio más temprano
+  // y duración menor -> determinista.
+  const contenedores = candidatos
+    .filter((b) => {
+      const ini = inicioEnMinutos(b);
+      const dur = Number(b.duracion_minutos) || 0;
+      return dur > 0 && dropTimeMin >= ini && dropTimeMin < ini + dur;
+    })
+    .sort(
+      (a, b) =>
+        inicioEnMinutos(a) - inicioEnMinutos(b) ||
+        (Number(a.duracion_minutos) || 0) - (Number(b.duracion_minutos) || 0)
+    );
+  if (contenedores.length > 0) return contenedores[0];
+
+  // 2) Fallback por cercanía (huecos entre bloques); tolerancia máxima 45 min.
   let bestBlock = null;
   let minDiff = 9999;
-
-  dayBlocks.forEach(b => {
-    const [h, m] = b.hora_inicio.split(':').map(Number);
-    const blockTimeMin = h * 60 + m;
-    const diff = Math.abs(dropTimeMin - blockTimeMin);
+  candidatos.forEach((b) => {
+    const diff = Math.abs(dropTimeMin - inicioEnMinutos(b));
     if (diff < minDiff) {
       minDiff = diff;
       bestBlock = b;
     }
   });
-
-  // Validar que no este exageradamente lejos (maximo 45 min de diferencia)
-  if (minDiff < 45) {
-    return bestBlock;
-  }
-  return null;
+  return minDiff < 45 ? bestBlock : null;
 };
 
 // Filtra los eventos generados por tipo de vista (todos/aula/docente/grupo).

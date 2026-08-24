@@ -4,7 +4,7 @@
 // y expone callbacks para que el componente maneje UI/toasts/invalidaciones.
 
 import { useEffect, useRef } from 'react';
-import ScheduleService from '../api/schedule';
+import ScheduleService from '../../../api/schedule';
 
 export const MAX_ATTEMPTS = 10;
 export const POLL_INTERVAL_MS = 3000;

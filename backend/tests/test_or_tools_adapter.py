@@ -223,3 +223,31 @@ def test_parse_hora_jornada_invalido_usa_default(db_session):
     assert generator._parse_hora_jornada("hora_inicio_jornada", time(7, 30)) == time(7, 30)
     # Clave ausente -> default
     assert generator._parse_hora_jornada("hora_fin_jornada", time(15, 0)) == time(15, 0)
+
+# --- _parse_ventana_config (bugfix JSONB: json.loads sobre dict) ---
+
+def test_parse_ventana_acepta_dict_jsonb():
+    """Valor tipico de la columna JSONB: SQLAlchemy entrega un dict."""
+    from services.scheduler.or_tools_adapter import _parse_ventana_config
+    ventana = {"hora_inicio": "07:00:00", "hora_fin": "12:00:00"}
+    assert _parse_ventana_config(ventana) == ventana
+
+
+def test_parse_ventana_acepta_string_json():
+    """Robustez: si el valor viniera como TEXT, se parsea el string JSON."""
+    from services.scheduler.or_tools_adapter import _parse_ventana_config
+    assert _parse_ventana_config('{"hora_inicio": "13:00:00", "hora_fin": "18:00:00"}') == {
+        "hora_inicio": "13:00:00", "hora_fin": "18:00:00"
+    }
+
+
+def test_parse_ventana_casos_invalidos_devuelven_none():
+    """None/strings no-JSON/no-dict y otros tipos caen al fallback (None)."""
+    from services.scheduler.or_tools_adapter import _parse_ventana_config
+    assert _parse_ventana_config(None) is None
+    assert _parse_ventana_config("no-es-json") is None
+    assert _parse_ventana_config("[1, 2, 3]") is None  # JSON valido pero no objeto
+    assert _parse_ventana_config(123) is None
+    # Dict sin las claves requeridas -> no es una ventana utilizable
+    assert _parse_ventana_config({"inicio": "07:00:00"}) is None
+    assert _parse_ventana_config({"hora_inicio": "07:00:00"}) is None

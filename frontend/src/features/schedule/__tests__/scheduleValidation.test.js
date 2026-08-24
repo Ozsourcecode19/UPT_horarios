@@ -1,7 +1,7 @@
 // src/utils/__tests__/scheduleValidation.test.js
 // Tests E10 de la validacion local de movimientos (replica de validate_move del backend).
 import { describe, it, expect, beforeEach } from 'vitest';
-import { validateMoveMock } from '../scheduleValidation';
+import { validateMoveMock } from '../utils/scheduleValidation';
 
 const baseCtx = () => ({
   periodoId: 5,
