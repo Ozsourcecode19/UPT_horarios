@@ -673,6 +673,15 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
+### Contexto de la Sesión Actual (2026-08-24) — E12
+
+1. **E12 — Exportación de Horarios (PDF e iCal .ics, completada):**
+   - **`src/utils/icalExport.js` (nuevo):** generador ICS RFC 5545 puro (`generarICal`/`descargarICal`/`nombreArchivoExport`). Deduplica las sesiones semanales del calendario en `VEVENT` únicos con `RRULE:FREQ=WEEKLY;UNTIL=fin_periodo`; horas UTC explícitas (los ISO del backend son hora Caracas UTC−4 fijo, se suman 4h — sin bloque VTIMEZONE); escaping RFC, CRLF obligatorio, folding a 75 octets y UID determinista por clase.
+   - **`Horarios.jsx`:** botones "Exportar iCal" y "Imprimir / PDF" en la cabecera; exportan el listado filtrado visible (`listadoHorarios`) con `descripcionFiltro` legible (useMemo sobre `filterType/filterValue`); deshabilitados sin clases visibles. Vista de impresión con `.print-area` + `@media print` en `index.css` (`@page` landscape, aislamiento de la tarjeta del calendario, encabezado imprimible propio, alto auto sin scrollers).
+   - Sin dependencias nuevas (PDF = diálogo nativo del navegador). Suite: 18 tests nuevos → **98 passed**; `pnpm build` OK.
+
+**Sesiones 2026-08-22/23 (resumen):** migración `division` aplicada a BD live; endurecimiento de seguridad Fases 1–2 (expiración de token al montar, interceptor 401 con returnUrl, RoleGate por rutas, useCanWrite en CRUDs/generación/drag&drop, demo solo ante fallos de red/5xx, limpieza `demo_*` en logout) y Fase 3 (CSP en build vía plugin inline, tipografías self-hosted Inter/Outfit, sourcemaps off, SECRET_KEY obligatoria en producción); Dashboard corregido (isPending real, integración E11, reconexión consistente, acciones rápidas por rol).
+
 ### Contexto de la Sesión Actual (2026-08-09) — E8: Reorganización de la navegación
 
 1. **Config central de navegación — `src/config/navigation.js` (nuevo):** arreglo `NAVIGATION` con 5 secciones que reflejan el flujo de trabajo, cada ítem declara `label`, `path`, `icon`, `roles` (o `'*'`) y `children`:

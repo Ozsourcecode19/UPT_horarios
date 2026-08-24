@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FullCalendar from '@fullcalendar/react';
@@ -7,11 +7,12 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 
-import { 
-  Calendar, Sparkles, RefreshCw, AlertTriangle, Trash2, 
-  Settings, Clock, Users, CheckCircle, CheckCircle2, X, ChevronRight, 
+import {
+  Calendar, Sparkles, RefreshCw, AlertTriangle, Trash2,
+  Settings, Clock, Users, CheckCircle, CheckCircle2, X, ChevronRight,
   Info, Plus, Edit2, MapPin, GraduationCap, ArrowRight,
-  AlertCircle, Database, History, LayoutGrid, ChevronLeft
+  AlertCircle, Database, History, LayoutGrid, ChevronLeft,
+  Download, Printer
 } from 'lucide-react';
 
 import ScheduleService from '../api/schedule';
@@ -23,6 +24,7 @@ import BloquesService from '../api/bloques';
 import { useAuth } from '../context/AuthContext';
 import { mapScheduleEvents, filterEvents } from '../utils/schedule';
 import { esErrorDeServidor } from '../utils/errors';
+import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useScheduleGeneration from '../hooks/useScheduleGeneration';
 import useDragDropValidation from '../hooks/useDragDropValidation';
 import useCanWrite from '../hooks/useCanWrite';
@@ -483,6 +485,43 @@ const Horarios = () => {
   // --- FILTRADO DE EVENTOS EN MEMORIA ---
   const listadoHorarios = filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos });
 
+  // --- EXPORTACIÓN (E12): descripción legible del filtro activo + descarga iCal ---
+  const descripcionFiltro = useMemo(() => {
+    if (filterType === 'todos') return 'todos';
+    const etiqueta = { aula: 'Aula', docente: 'Docente', grupo: 'Grupo' }[filterType] || filterType;
+    let valor = filterValue;
+    if (filterType === 'aula') {
+      valor = aulas.find(a => String(a.id) === String(filterValue))?.nombre ?? filterValue;
+    } else if (filterType === 'docente') {
+      const d = docentes.find(x => String(x.id) === String(filterValue));
+      valor = d ? `${d.apellido}, ${d.nombre}` : filterValue;
+    } else if (filterType === 'grupo') {
+      const g = grupos.find(x => String(x.id) === String(filterValue));
+      valor = g?.nombre ?? filterValue;
+    }
+    return `${etiqueta}: ${valor}`;
+  }, [filterType, filterValue, aulas, docentes, grupos]);
+
+  const exportarICalActual = () => {
+    if (!listadoHorarios.length) return;
+    try {
+      const contenido = generarICal({
+        eventos: listadoHorarios,
+        periodo: selectedPeriodo,
+        filtroDescripcion: descripcionFiltro,
+      });
+      descargarICal(
+        contenido,
+        nombreArchivoExport(selectedPeriodo?.nombre || '', descripcionFiltro)
+      );
+      showToast(`Calendario .ics exportado (${listadoHorarios.length} clases visibles).`);
+    } catch (err) {
+      console.error('Error exportando iCal:', err?.message);
+      showToast('No se pudo generar el archivo iCal.', 'error');
+    }
+  };
+
+
   // Limpiar el subfiltro cuando cambia el tipo de filtro
   useEffect(() => {
     if (filterType === 'todos') {
@@ -655,15 +694,39 @@ const Horarios = () => {
           <p className="text-slate-500">Planificador de clases semanal con soporte drag-and-drop y detección de colisiones.</p>
         </div>
         
-        <button
-          onClick={triggerAutoGeneration}
-          disabled={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir}
-          title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)}
-          className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
-        >
-          <Sparkles className="w-5 h-5 animate-pulse" />
-          <span>Generación Inteligente</span>
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Exportación (E12) */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportarICalActual}
+              disabled={listadoHorarios.length === 0}
+              title="Descarga el horario visible como archivo .ics (Google Calendar / Outlook)"
+              className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Download className="w-4 h-4" />
+              <span>Exportar iCal</span>
+            </button>
+            <button
+              onClick={() => window.print()}
+              disabled={listadoHorarios.length === 0}
+              title="Imprimir o guardar como PDF el horario visible"
+              className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir / PDF</span>
+            </button>
+          </div>
+
+          <button
+            onClick={triggerAutoGeneration}
+            disabled={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir}
+            title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Sparkles className="w-5 h-5 animate-pulse" />
+            <span>Generación Inteligente</span>
+          </button>
+        </div>
       </div>
 
       {/* STEADOR DE FLUJO: pasos previos a la generación */}
@@ -881,10 +944,20 @@ const Horarios = () => {
       )}
 
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
-        
+      <div className="print-area bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
+
+        {/* Encabezado solo visible al imprimir (E12) */}
+        <div className="hidden print:block mb-4 border-b border-slate-200 pb-3">
+          <h1 className="text-lg font-bold text-slate-800">
+            Horarios UPT{selectedPeriodo ? ` — ${selectedPeriodo.nombre}` : ''}
+          </h1>
+          <p className="text-xs text-slate-500">
+            Filtro: {descripcionFiltro} · Generado: {new Date().toLocaleDateString('es-VE')}
+          </p>
+        </div>
+
         {/* Selector de vista + navegación de la vista por aulas (E8) */}
-        <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="no-print mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl">
             <button
               onClick={() => setViewMode('semana')}

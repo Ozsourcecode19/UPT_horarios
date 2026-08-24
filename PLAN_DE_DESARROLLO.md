@@ -29,10 +29,12 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - ✅ **E6** — Dashboard dinámico: stats hardcodeadas → `useQuery` reales (docentes, materias, aulas, periodos, horarios del periodo vigente) con patrón Modo Demo, hero con `useAuth` y 4 acciones rápidas con `useNavigate`. Criterio verificado: `pnpm build` OK.
 - ✅ **E7** — Settings real conectado a `GET/PUT /api/configuraciones/` (widgets por clave, gateo ADMIN, Modo Demo) + fix de grilla de disponibilidad según `dias_laborables` + ventana de jornada como filtro en solver/grilla + truncamiento de bloques (`limit:1000`) + estado vacío + UI de bloques horarios (`BloquesHorarios.jsx`). Criterio verificado: `pnpm build` OK.
 - ✅ **E8** — Vista de recursos "por Aulas" en FullCalendar: vista custom multi-instancia en `Horarios.jsx` (sin plugin Premium), navegación global sincronizada, DnD intra-columna. Criterio verificado: `pnpm build` OK.
-- ✅ **E9** — Suite de tests backend (pytest + httpx): 46 tests en `backend/tests/` (tracker, `validate_move`, solver OR-Tools, `lunes_base`/mapeo FullCalendar, smoke API) sobre SQLite in-memory con `StaticPool` + fix `JSONB→JSON` en `conftest.py`. Criterio verificado: `cd backend && pytest` → `46 passed`.
-- ✅ **E10** — Refactor + tests frontend: extracción de lógica pura (~293 líneas) a `utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`), `utils/scheduleValidation.js` (`validateMoveMock`) y `hooks/useGenerationPolling.js`; **suite vitest** (54 tests, `pnpm test` ✅). **Cierre E10:** hooks `useScheduleGeneration` y `useDragDropValidation` extraídos; `Horarios.jsx` de ~1460 → **1160 líneas**.
+- ✅ **E9** — Suite de tests backend (pytest + httpx): 46 tests en `backend/tests/` (tracker, `validate_move`, solver OR-Tools, `lunes_base`/mapeo FullCalendar, smoke API) sobre SQLite in-memor- ✅ **E10** — Refactor + tests frontend: extracción de lógica pura (~293 líneas) a `utils/schedule.js` (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`), `utils/scheduleValidation.js` (`validateMoveMock`) y `hooks/useGenerationPolling.js`; **suite vitest** (54 tests, `pnpm test` ✅). **Cierre E10:** hooks `useScheduleGeneration` y `useDragDropValidation` extraídos; `Horarios.jsx` de ~1460 → **1160 líneas**.
+- ✅ **E11** — Analítica del Periodo en Dashboard: `src/utils/dashboardStats.js` (`cargaHorariaPorDocente`, `distribucionPorMateria`, `resumenConflictos`) + integración en `Dashboard.jsx` (paneles horizontales de carga por docente, distribución por materia y resumen de salud combinando `pre-generation-check` y `generation-status`) + suite vitest (15 tests en `src/utils/__tests__/dashboardStats.test.js`). Criterio verificado: `npx vitest run` → **80 passed**.
 
-**Pendientes:** Backlog (opcional, no incluido): migración `Horarios.jsx` → `features/schedule/`, exportación PDF/iCal, modo oscuro, migración TypeScript, gráficas en Dashboard y pestañas pendientes de Settings. `docs/*.pdf` vacíos. Backend testeado (E9, 46 tests ✅); frontend con suite de lógica pura y hooks (E10, 54 tests ✅).
+- ✅ **E12** — Exportación de Horarios (PDF e iCal .ics): `src/utils/icalExport.js` (generador RFC 5545 puro + descarga Blob) con deduplicación semanal (`RRULE:FREQ=WEEKLY;UNTIL=fin_periodo`), horas UTC explícitas (Caracas fijo UTC−4), escaping, folding a 75 octets y UIDs deterministas; botones **Exportar iCal** / **Imprimir / PDF** en la cabecera de `Horarios.jsx` que exportan el listado filtrado visible; vista de impresión vía `@media print` (`.print-area` + `@page` landscape) sin dependencias nuevas; suite vitest ampliada (18 tests de `icalExport`). Criterio verificado: `pnpm test` → **98 passed**, `pnpm build` OK e inspección del ICS generado.
+
+**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E13 (Modo Oscuro), E14 (Refactor a `features/schedule/`), E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (E10+E11+E12, 98 tests ✅). `docs/*.pdf` vacíos.
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
@@ -130,8 +132,46 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
   - Criterio: `pnpm test` → **54 passed** y `pnpm build` OK. **Verificado.**
 - ✅ **Hecho — hooks (cierre 2026-08-20):** `src/hooks/useScheduleGeneration.js` (encapsula `triggerAutoGeneration`, estados `isGenerating`/`genStatusText`, wiring de `useGenerationPolling` y toasts; `scheduleService`/`pollingHook` inyectables, refs de callbacks) y `src/hooks/useDragDropValidation.js` (mutación `validate-move`+`update`, `handleEventDrop`/`handleEventClick`/`handleSaveChangesModal`/`handleDeleteSchedule` y todo el estado del modal). `Horarios.jsx` quedó en **~1160 líneas** (antes ~1460); se eliminó el placeholder vacío `useSchedule.js`. Criterio de cierre: `pnpm test` 54 ✅ y `pnpm build` OK. **Verificado.**
 
-## Backlog (opcional, no incluido)
-Migración final `Horarios.jsx` → `features/schedule/` (al terminar la extracción de E10), exportación PDF/iCal, modo oscuro, migración TypeScript.
+### E11 — Analítica del Periodo en Dashboard (~2 h) ✅ COMPLETADA
+- `src/utils/dashboardStats.js` (`cargaHorariaPorDocente`, `distribucionPorMateria`, `resumenConflictos`) conectado a `Dashboard.jsx` (paneles horizontales de carga por docente, distribución por materia y diagnóstico de salud combinando `pre-generation-check` y `generation-status`).
+- Suite vitest completa (`src/utils/__tests__/dashboardStats.test.js` con 15 tests passed).
+- ✅ Criterio: `npx vitest run` pasa (80 tests totales en frontend). **Verificado.**
+
+## Fase E · Funcionalidades avanzadas y escalabilidad (Backlog)
+
+### E12 — Exportación de Horarios (PDF e iCal .ics) (~3 h) ✅ COMPLETADA
+- **`src/utils/icalExport.js` (nuevo, lógica pura testeable):** `generarICal({eventos, periodo, filtroDescripcion})` produce un `.ics` RFC 5545 completo: `VCALENDAR` (VERSION/PRODID/CALSCALE/METHOD + `X-WR-CALNAME` con periodo y filtro), deduplicación de clases semanales por clave `(día+hora+aula+materia+docente+grupo)` → 1 `VEVENT` con `RRULE:FREQ=WEEKLY;UNTIL=<fin_periodo>`, `SUMMARY` materia (grupo), `DESCRIPTION` docente/código/sede/periodo y `LOCATION` aula, sede. Escaping RFC (`\,` `\;` `\n`), líneas CRLF, folding a 75 caracteres y `UID` determinista (djb2). Horas exportadas en UTC explícito: los ISO del backend son hora pared Caracas (UTC−4 fijo, sin DST) y se suman las 4h — evita el bloque `VTIMEZONE` con idéntica compatibilidad. `descargarICal()` (Blob + anchor) separado del generador puro.
+- **`Horarios.jsx`:** botones **Exportar iCal** y **Imprimir / PDF** en la cabecera (junto a "Generación Inteligente"), deshabilitados sin clases visibles; exporta el `listadoHorarios` filtrado en pantalla (funciona igual en Modo Demo), toast con el total exportado. `descripcionFiltro` (useMemo) traduce `filterType/filterValue` a texto legible ("Aula: A-101", "Docente: Pérez, Juan").
+- **Vista de impresión:** clase `.print-area` en la tarjeta del calendario + bloque `@media print` en `index.css` (`@page A4 landscape`, técnica visibility para aislar la tarjeta, oculta toolbar/navegación/now-indicator, alto auto sin scroller, columnas de la vista por aulas con wrap, `break-inside: avoid` en eventos) y encabezado imprimible propio (periodo + filtros + fecha).
+- Tests: `src/utils/__tests__/icalExport.test.js` (**18 tests**: estructura RFC, CRLF, dedup→RRULE+UNTIL UTC correcto, escaping, folding ≤75, UID estable/distinto, DTSTAMP, slug de filename).
+- ✅ Criterio: `pnpm test` pasa (**98 passed**) y descarga de archivo `.ics` verificada (inspección del contenido generado: dedup, UTC, folding y escaping correctos); PDF vía diálogo nativo del navegador.
+
+### E13 — Modo Oscuro y Sistema de Temas (~2 h)
+- Frontend: `ThemeContext` en `src/context/ThemeContext.jsx` con persistencia en `localStorage` y detección automática de preferencia del sistema (`prefers-color-scheme`).
+- Toggle selector de tema en Header / Sidebar (`MainLayout.jsx`) o `Settings.jsx`.
+- Adaptación con variante `dark:` en Tailwind CSS para componentes principales (Sidebar, Dashboard, Horarios, Modales, variables de tema `--fc-*` en FullCalendar).
+- ✅ Criterio: `pnpm build` OK y alternancia de tema funcional sin romper estilos existentes.
+
+### E14 — Refactor a Arquitectura por Features (`features/schedule/`) (~2–3 h)
+- Reorganización del módulo de horarios desde `pages/Horarios.jsx`, `utils/schedule*.js` y `hooks/use*Schedule*.js` hacia `src/features/schedule/`:
+  - `src/features/schedule/components/` (CalendarView, VersionPanel, ChecklistPanel, EventModal).
+  - `src/features/schedule/hooks/` (`useScheduleGeneration`, `useDragDropValidation`, `useGenerationPolling`).
+  - `src/features/schedule/utils/` (`schedule.js`, `scheduleValidation.js`).
+- Actualización de imports en `AppRouter.jsx` y suite vitest.
+- ✅ Criterio: `npx vitest run` (80+ passed) y `pnpm build` OK.
+
+### E15 — Tipado de Entidades y Contratos (TypeScript / JSDoc) (~2–3 h)
+- Definición de tipos/contratos centrales de dominio (`Docente`, `Materia`, `Aula`, `Leccion`, `BloqueHorario`, `HorarioGenerado`, `PeriodoAcademico`) en `src/types/` o vía `.d.ts` / JSDoc.
+- Tipado de clientes API (`src/api/`) y funciones puras de mapeo de eventos.
+- ✅ Criterio: `pnpm build` OK sin errores y mejor DX con autocompletado en la IDE.
+
+---
+
+## Riesgos a vigilar
+- El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
+- Cualquier cambio en `database/schema_horarios_v2.1.1.sql` debe conservar los triggers PL/pgSQL.
+- Los tests (E9/E10/E11) no deben requerir la BD real con triggers.
+� `features/schedule/` (al terminar la extracción de E10), exportación PDF/iCal, modo oscuro, migración TypeScript.
 
 ---
 
