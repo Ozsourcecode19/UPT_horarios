@@ -1032,7 +1032,7 @@ const Horarios = () => {
               ) : (
                 aulasColumnas.map((aula, idx) => (
                   <div key={`${calendarKey}-${aula.id}`} className="w-[360px] shrink-0 flex flex-col">
-                    <div className="px-3 py-2.5 mb-3 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/70 flex items-center gap-2.5">
+                    <div className="px-3 py-2.5 mb-3 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200/70 dark:border-slate-700/60 flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                         <MapPin className="w-4 h-4" />
                       </div>

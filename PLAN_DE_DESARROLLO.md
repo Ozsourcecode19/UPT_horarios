@@ -34,7 +34,9 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 - ✅ **E12** — Exportación de Horarios (PDF e iCal .ics): `src/utils/icalExport.js` (generador RFC 5545 puro + descarga Blob) con deduplicación semanal (`RRULE:FREQ=WEEKLY;UNTIL=fin_periodo`), horas UTC explícitas (Caracas fijo UTC−4), escaping, folding a 75 octets y UIDs deterministas; botones **Exportar iCal** / **Imprimir / PDF** en la cabecera de `Horarios.jsx` que exportan el listado filtrado visible; vista de impresión vía `@media print` (`.print-area` + `@page` landscape) sin dependencias nuevas; suite vitest ampliada (18 tests de `icalExport`). Criterio verificado: `pnpm test` → **98 passed**, `pnpm build` OK e inspección del ICS generado.
 
-**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E13 (Modo Oscuro), E14 (Refactor a `features/schedule/`), E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (E10+E11+E12, 98 tests ✅). `docs/*.pdf` vacíos.
+- ✅ **E13** — Modo Oscuro y Sistema de Temas: `ThemeContext` (claro/oscuro/sistema con persistencia en `localStorage.theme` y reacción a cambios de `prefers-color-scheme`), arranque temprano sin FOUC en `main.jsx` (CSP-safe: módulo externo, no script inline), toggle cíclico en el header del shell (`ThemeToggle.jsx`, iconos Sun/Moon/Monitor), `tailwind.config.js` con `darkMode:'class'`. Cobertura vía estrategia **shim semántico**: bloque `.dark` en `index.css` re-mapea las utilidades claras comunes (~1150 instancias sin tocar), variables `--fc-*` oscuras para FullCalendar, y variantes `dark:` finas en MainLayout/Login donde el shim no alcanza. Impresión (E12) siempre clara. Suite vitest ampliada (7 tests de ThemeContext). Criterio verificado: `pnpm test` → **105 passed**, `pnpm build` OK.
+
+**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E14 (Refactor a `features/schedule/`), E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (E10+E11+E12+E13, 105 tests ✅). `docs/*.pdf` vacíos.
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
@@ -146,11 +148,14 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Tests: `src/utils/__tests__/icalExport.test.js` (**18 tests**: estructura RFC, CRLF, dedup→RRULE+UNTIL UTC correcto, escaping, folding ≤75, UID estable/distinto, DTSTAMP, slug de filename).
 - ✅ Criterio: `pnpm test` pasa (**98 passed**) y descarga de archivo `.ics` verificada (inspección del contenido generado: dedup, UTC, folding y escaping correctos); PDF vía diálogo nativo del navegador.
 
-### E13 — Modo Oscuro y Sistema de Temas (~2 h)
-- Frontend: `ThemeContext` en `src/context/ThemeContext.jsx` con persistencia en `localStorage` y detección automática de preferencia del sistema (`prefers-color-scheme`).
-- Toggle selector de tema en Header / Sidebar (`MainLayout.jsx`) o `Settings.jsx`.
-- Adaptación con variante `dark:` en Tailwind CSS para componentes principales (Sidebar, Dashboard, Horarios, Modales, variables de tema `--fc-*` en FullCalendar).
-- ✅ Criterio: `pnpm build` OK y alternancia de tema funcional sin romper estilos existentes.
+### E13 — Modo Oscuro y Sistema de Temas (~2 h) ✅ COMPLETADA
+- **`src/context/ThemeContext.jsx` (nuevo):** estado `claro | oscuro | sistema` persistido en `localStorage('theme')`; "sistema" resuelve vía `prefers-color-scheme` y reacciona a sus cambios (`matchMedia` listener); aplica/quitA la clase `dark` en `<html>` (`tailwind.config.js` con `darkMode:'class'`); expone `useTheme()` con `tema/temaEfectivo/setTema/ciclarTema/esOscuro`.
+- **Arranque temprano sin FOUC:** `main.jsx` aplica la clase antes del primer render leyendo localStorage (módulo externo, compatible con CSP `script-src 'self'`; sin script inline).
+- **Toggle:** `src/components/layout/ThemeToggle.jsx` en el header de `MainLayout.jsx`, ciclo claro→oscuro→sistema con iconos Sun/Moon/Monitor y tooltip del estado.
+- **Cobertura — estrategia "shim semántico":** en vez de editar ~1150 clases claras hardcodeadas en 18 archivos, el bloque `.dark` de `index.css` re-mapea las utilidades más comunes (`bg-white/bg-slate-50..200` → superficies slate oscuras, textos `slate-400..900` claros, bordes, hovers clave) + variables `--fc-*` oscuras para FullCalendar (página slate-900, today azul translúcido, botones) + variantes `dark:` finas donde el shim no alcanza: sidebar/header (`bg-white/80`→`dark:bg-slate-900/90`, bordes, gradiente del logo), Login completo. Tradeoff documentado: el shim altera la semántica global de esas utilidades bajo `.dark`; migración futura a tokens semánticos lo reemplazará.
+- **Impresión siempre clara:** neutralización del tema dentro de `@media print` (E12).
+- Tests: `src/context/__tests__/ThemeContext.test.jsx` (**7 tests**: resolución sistema/persistencia/ciclo/clase dark/reacción al SO con matchMedia mockeado).
+- ✅ Criterio: `pnpm test` → **105 passed**, `pnpm build` OK; alternancia funcional verificada en CSS compilado (shim + dark: variants + fc vars presentes).
 
 ### E14 — Refactor a Arquitectura por Features (`features/schedule/`) (~2–3 h)
 - Reorganización del módulo de horarios desde `pages/Horarios.jsx`, `utils/schedule*.js` y `hooks/use*Schedule*.js` hacia `src/features/schedule/`:
