@@ -99,3 +99,14 @@ def test_extended_props_mapean_datos(data, db_session):
     assert ev.extendedProps["materia_codigo"] == "MAT1"
     assert ev.extendedProps["aula"] == "A1"
     assert ev.extendedProps["sede"] == "Sede Principal"
+
+
+def test_extended_props_incluyen_ids_y_division(data, db_session):
+    # Vista por filtros (frontend): filtra por IDs reales y resuelve la
+    # ventana horaria por division (default MATUTINO del modelo).
+    eventos = get_horarios_para_calendario(db_session, periodo_id=data.periodo.id)
+    ev = eventos[0]
+    assert ev.extendedProps["grupo_id"] == data.grupo.id
+    assert ev.extendedProps["docente_id"] == data.docente.id
+    assert ev.extendedProps["aula_id"] == data.aula.id
+    assert ev.extendedProps["division"] == "MATUTINO"

@@ -526,9 +526,9 @@ const { data = [], isLoading, isError } = useQuery({
 **Archivo:** `src/pages/Horarios.jsx` (≈1147 líneas).
 
 - Vista `timeGridWeek`, localización `es`, `weekends: false`, franja 07:00–18:30.
-- **Mapeo de datos:** el backend (`get_horarios_para_calendario`) transforma `HorarioGenerado` + joins en `FullCalendarEvent { id, title, start, end, resourceId, extendedProps }`. La fecha del evento se calcula como `lunes_base = fecha_inicio_periodo - weekday(fecha_inicio_periodo)` y se desplaza según `dia_semana`, evitando proyectar clases en fines de semana.
+- **Mapeo de datos:** el backend (`get_horarios_para_calendario`) transforma `HorarioGenerado` + joins en `FullCalendarEvent { id, title, start, end, resourceId, extendedProps }`. La fecha del evento se calcula como `lunes_base = fecha_inicio_periodo - weekday(fecha_inicio_periodo)` y se desplaza según `dia_semana`, evitando proyectar clases en fines de semana. Desde 2026-08-24 `extendedProps` incluye además las claves `grupo_id`, `docente_id`, `aula_id` y `division` (labels en el query; sin cambios de schema), que el frontend usa para filtrar por IDs reales y resolver la ventana horaria de la grilla según el turno del grupo.
 - **Drag & drop:** al soltar un evento se busca el bloque más cercano (≤45 min de diferencia), se llama a `validate-move` y, si hay conflicto, se hace `revert()` y se muestra el error.
-- **Filtros:** por aula, docente o grupo (`filterType` inicial `'todos'`).
+- **Filtros (2026-08-24):** vista por filtros con segmented control `[Grupos|Docentes|Aulas]`, grupos por defecto; sin opción "todos". La grilla es única y su ventana horaria dinámica: grupo → `ventana_{division}` de `configuracion` (fallback estándar del turno); docente/aula o grupo sin división → jornada general (`hora_inicio_jornada`–`hora_fin_jornada`). Helper puro: `resolveVentanaGrilla` (`frontend/src/features/schedule/utils/schedule.js`). La vista por columnas de aulas fue eliminada.
 - **Selector de periodo:** cambia los eventos y navega con `api.gotoDate(fecha_inicio)`.
 - **Generación:** botón "Generación Inteligente" → `POST /api/schedules/generate` → **polling reactivo** (hasta 10 intentos cada 3 s sobre `refetchHorarios()`) → actualización automática del calendario e invalidación de caché.
 

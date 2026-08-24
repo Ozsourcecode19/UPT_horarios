@@ -7,6 +7,7 @@ import {
   filterEvents,
   recalcularEventoDemo,
   generarEventosSimulados,
+  resolveVentanaGrilla,
 } from '../utils/schedule';
 
 // --- mapeo de colores ---
@@ -181,6 +182,126 @@ describe('filterEvents', () => {
   it('descarta todo si el grupo no existe', () => {
     const filtrados = filterEvents(eventos, { filterType: 'grupo', filterValue: '999', grupos });
     expect(filtrados).toHaveLength(0);
+  });
+
+  // --- matcheo por IDs reales (extendedProps del backend) ---
+  describe('filterEvents por IDs', () => {
+    const eventosConIds = [
+      { id: 10, resourceId: 'aula_1', extendedProps: { aula_id: 1, docente_id: 1, grupo_id: 1 } },
+      { id: 11, resourceId: 'aula_2', extendedProps: { aula_id: 2, docente_id: 2, grupo_id: 2 } },
+    ];
+
+    it('filtra por grupo_id aunque el nombre difiera de la lista local', () => {
+      const filtrados = filterEvents(eventosConIds, { filterType: 'grupo', filterValue: '2' });
+      expect(filtrados).toHaveLength(1);
+      expect(filtrados[0].id).toBe(11);
+    });
+
+    it('filtra por docente_id aunque el nombre difiera', () => {
+      const filtrados = filterEvents(eventosConIds, { filterType: 'docente', filterValue: '2' });
+      expect(filtrados).toHaveLength(1);
+      expect(filtrados[0].id).toBe(11);
+    });
+
+    it('prioriza extendedProps.aula_id sobre resourceId', () => {
+      // resourceId apunta a aula_2 pero el aula real es la 1
+      const cruzado = [{ id: 12, resourceId: 'aula_2', extendedProps: { aula_id: 1 } }];
+      expect(filterEvents(cruzado, { filterType: 'aula', filterValue: '1' })).toHaveLength(1);
+      expect(filterEvents(cruzado, { filterType: 'aula', filterValue: '2' })).toHaveLength(0);
+    });
+
+    it('acepta IDs en string (JSON serializado) comparando numerico', () => {
+      const strIds = [{ id: 13, resourceId: '', extendedProps: { grupo_id: '1', docente_id: '1', aula_id: '1' } }];
+      expect(filterEvents(strIds, { filterType: 'grupo', filterValue: 1 })).toHaveLength(1);
+      expect(filterEvents(strIds, { filterType: 'docente', filterValue: '1' })).toHaveLength(1);
+      expect(filterEvents(strIds, { filterType: 'aula', filterValue: '1' })).toHaveLength(1);
+    });
+  });
+});
+
+// --- ventana horaria dinamica de la grilla ---
+describe('resolveVentanaGrilla', () => {
+  const configsCompletas = [
+    { clave: 'hora_inicio_jornada', valor: '07:00:00' },
+    { clave: 'hora_fin_jornada', valor: '20:00:00' },
+    { clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' } },
+    { clave: 'ventana_vespertino', valor: { hora_inicio: '13:00:00', hora_fin: '18:00:00' } },
+    { clave: 'ventana_nocturno', valor: { hora_inicio: '18:00:00', hora_fin: '22:00:00' } },
+  ];
+
+  it('grupo MATUTINO usa su ventana de configuracion', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 1, division: 'MATUTINO' },
+      configs: configsCompletas,
+    })).toEqual({ inicio: '07:00:00', fin: '12:00:00' });
+  });
+
+  it('grupo NOCTURNO sin configs cae a la ventana estandar del turno', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 3, division: 'NOCTURNO' },
+      configs: [],
+    })).toEqual({ inicio: '18:00:00', fin: '22:00:00' });
+  });
+
+  it('grupo VESPERTINO con config malformada cae al fallback del turno', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 2, division: 'VESPERTINO' },
+      configs: [{ clave: 'ventana_vespertino', valor: '{json-roto' }],
+    })).toEqual({ inicio: '13:00:00', fin: '18:00:00' });
+  });
+
+  it('acepta ventana_* serializada como string JSON', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 1, division: 'MATUTINO' },
+      configs: [{ clave: 'ventana_matutino', valor: '{"hora_inicio":"07:30:00","hora_fin":"11:30:00"}' }],
+    })).toEqual({ inicio: '07:30:00', fin: '11:30:00' });
+  });
+
+  it('division en minusculas se normaliza', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 1, division: 'nocturno' },
+      configs: [],
+    })).toEqual({ inicio: '18:00:00', fin: '22:00:00' });
+  });
+
+  it('grupo sin division muestra la jornada completa general', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 9, division: null },
+      configs: configsCompletas,
+    })).toEqual({ inicio: '07:00:00', fin: '20:00:00' });
+  });
+
+  it('docente y aula siempre muestran la jornada completa general', () => {
+    for (const tipo of ['docente', 'aula']) {
+      expect(resolveVentanaGrilla({
+        filterType: tipo,
+        item: { id: 5 },
+        configs: configsCompletas,
+      })).toEqual({ inicio: '07:00:00', fin: '20:00:00' });
+    }
+  });
+
+  it('sin configs ni item usa fallbacks 07:00-19:30', () => {
+    expect(resolveVentanaGrilla({ filterType: 'docente', item: null, configs: [] }))
+      .toEqual({ inicio: '07:00:00', fin: '19:30:00' });
+    expect(resolveVentanaGrilla(undefined)).toEqual({ inicio: '07:00:00', fin: '19:30:00' });
+  });
+
+  it('jornada invalida (fin <= inicio) cae al fallback 19:30', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'aula',
+      item: { id: 1 },
+      configs: [
+        { clave: 'hora_inicio_jornada', valor: '08:00:00' },
+        { clave: 'hora_fin_jornada', valor: '07:00:00' },
+      ],
+    })).toEqual({ inicio: '08:00:00', fin: '19:30:00' });
   });
 });
 
