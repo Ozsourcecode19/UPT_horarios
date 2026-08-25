@@ -6,6 +6,7 @@ import {
   buscarGrupos,
   buscarLecciones,
   calcularMetricasPlanning,
+  coberturaDivision,
 } from '../utils/planning';
 import {
   grupoSchema,
@@ -138,5 +139,42 @@ describe('defaults y payloads', () => {
     const l = leccionSchema.parse(toPayloadLeccion({ docente_id: 1, grupo_id: 2, materia_id: 3, horas_semanales: 6, prioridad: 8, sede_forzada_id: null, periodo_id: 1 }));
     expect(l.activo).toBe(true);
     expect(() => leccionSchema.parse({ ...l, horas_semanales: 99 })).toThrow();
+  });
+});
+
+// --- coberturaDivision (E17): aviso de división sin bloques en la sede ---
+describe('coberturaDivision', () => {
+  const configs = [
+    { clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' } },
+    { clave: 'ventana_nocturno', valor: { hora_inicio: '18:00:00', hora_fin: '22:00:00' } },
+  ];
+  const bloques = [
+    { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 60, activo: true },
+    { id: 2, sede_id: 1, dia_semana: 2, hora_inicio: '11:45:00', duracion_minutos: 90, activo: true }, // 11:45-13:15 cabe incompleto
+    { id: 3, sede_id: 2, dia_semana: 1, hora_inicio: '19:00:00', duracion_minutos: 45, activo: true }, // otra sede
+    { id: 4, sede_id: 1, dia_semana: 3, hora_inicio: '20:00:00', duracion_minutos: 45, activo: false }, // inactivo
+  ];
+
+  it('cubierto cuando la sede tiene un bloque dentro de la ventana', () => {
+    expect(coberturaDivision({ bloques, sedeId: 1, division: 'MATUTINO', configuraciones: configs }))
+      .toMatchObject({ cubierto: true });
+  });
+
+  it('no cubierto si solo hay bloques que caben incompleto o de otras sedes', () => {
+    expect(coberturaDivision({ bloques, sedeId: 1, division: 'NOCTURNO', configuraciones: configs }))
+      .toEqual({ cubierto: false, ventana: { inicio: '18:00:00', fin: '22:00:00' } });
+  });
+
+  it('ignora bloques inactivos', () => {
+    const soloInactivo = [bloques[3]];
+    expect(coberturaDivision({ bloques: soloInactivo, sedeId: 1, division: 'NOCTURNO', configuraciones: configs }))
+      .toMatchObject({ cubierto: false });
+  });
+
+  it('sin sede o división invalida no restringe', () => {
+    expect(coberturaDivision({ bloques, sedeId: '', division: 'MATUTINO', configuraciones: configs }))
+      .toEqual({ cubierto: true, ventana: null });
+    expect(coberturaDivision({ bloques, sedeId: 1, division: 'RARO', configuraciones: configs }))
+      .toEqual({ cubierto: true, ventana: null });
   });
 });

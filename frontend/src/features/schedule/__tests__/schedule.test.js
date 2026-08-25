@@ -8,6 +8,9 @@ import {
   recalcularEventoDemo,
   generarEventosSimulados,
   resolveVentanaGrilla,
+  resolveVentanaTurno,
+  resolverDivisionEvento,
+  bloqueDentroVentana,
 } from '../utils/schedule';
 
 // --- mapeo de colores ---
@@ -372,5 +375,72 @@ describe('generarEventosSimulados', () => {
       '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B',
     ]);
     expect(evs[0].title).toContain('Mendoza, Luis');
+  });
+});
+// --- ventana por turno, división de evento y contención en ventana (E17) ---
+describe('resolveVentanaTurno', () => {
+  const configs = [
+    { clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' } },
+  ];
+
+  it('devuelve la ventana desde configuracion', () => {
+    expect(resolveVentanaTurno('MATUTINO', configs)).toEqual({ inicio: '07:00:00', fin: '12:00:00' });
+  });
+
+  it('normaliza minusculas y cae al fallback estandar sin config', () => {
+    expect(resolveVentanaTurno('nocturno', [])).toEqual({ inicio: '18:00:00', fin: '22:00:00' });
+  });
+
+  it('division invalida o vacia devuelve null (sin restriccion)', () => {
+    expect(resolveVentanaTurno(null, configs)).toBeNull();
+    expect(resolveVentanaTurno('INEXISTENTE', configs)).toBeNull();
+  });
+});
+
+describe('resolverDivisionEvento', () => {
+  const grupos = [
+    { id: 1, nombre: 'Sección A - Informática', division: 'MATUTINO' },
+    { id: 2, nombre: 'Sección B - Informática', division: 'VESPERTINO' },
+  ];
+
+  it('usa extendedProps.division cuando el backend la envia', () => {
+    expect(resolverDivisionEvento({ division: 'nocturno' }, [])).toBe('NOCTURNO');
+  });
+
+  it('fallback por grupo_id (evento real sin division)', () => {
+    expect(resolverDivisionEvento({ grupo_id: 2 }, grupos)).toBe('VESPERTINO');
+  });
+
+  it('fallback por nombre exacto (Modo Demo sin IDs)', () => {
+    expect(resolverDivisionEvento({ grupo: 'sección a - informática' }, grupos)).toBe('MATUTINO');
+  });
+
+  it('devuelve null si nada se puede resolver', () => {
+    expect(resolverDivisionEvento({}, grupos)).toBeNull();
+    expect(resolverDivisionEvento({ grupo: 'Desconocido' }, grupos)).toBeNull();
+  });
+});
+
+describe('bloqueDentroVentana', () => {
+  const ventana = { inicio: '07:00:00', fin: '12:00:00' };
+
+  it('bloque completamente dentro es valido', () => {
+    expect(bloqueDentroVentana({ hora_inicio: '07:00:00', duracion_minutos: 45 }, ventana)).toBe(true);
+    // frontera exacta: 11:15+45=12:00 cabe
+    expect(bloqueDentroVentana({ hora_inicio: '11:15:00', duracion_minutos: 45 }, ventana)).toBe(true);
+  });
+
+  it('bloque que empieza antes o termina despues es invalido', () => {
+    expect(bloqueDentroVentana({ hora_inicio: '06:30:00', duracion_minutos: 60 }, ventana)).toBe(false);
+    expect(bloqueDentroVentana({ hora_inicio: '18:00:00', duracion_minutos: 45 }, ventana)).toBe(false);
+  });
+
+  it('cabe incompleto (empieza dentro, termina fuera) es invalido — criterio del solver', () => {
+    expect(bloqueDentroVentana({ hora_inicio: '11:45:00', duracion_minutos: 90 }, ventana)).toBe(false);
+  });
+
+  it('sin ventana no hay restriccion', () => {
+    expect(bloqueDentroVentana({ hora_inicio: '23:00:00', duracion_minutos: 60 }, null)).toBe(true);
+    expect(bloqueDentroVentana(null, ventana)).toBe(true);
   });
 });

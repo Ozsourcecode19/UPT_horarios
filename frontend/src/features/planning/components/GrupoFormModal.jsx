@@ -3,12 +3,16 @@
 // El modal es dueño de su formulario (react-hook-form + zod); emite onSubmit(data)
 // ya validado y la página decide cerrar según el resultado del CRUD.
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 
+import BloquesService from '../../../api/bloques';
+import ConfiguracionesService from '../../../api/configuraciones';
 import { grupoSchema, buildGrupoDefaults } from '../schemas';
+import { coberturaDivision } from '../utils/planning';
 
 const GrupoFormModal = ({
   editing = null,          // grupo en edición o null para nuevo
@@ -22,11 +26,46 @@ const GrupoFormModal = ({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(grupoSchema),
     defaultValues: buildGrupoDefaults(),
   });
+
+  // Cobertura horaria de la división elegida en la sede elegida: si la sede no
+  // tiene bloques activos dentro de la ventana del turno, el grupo quedará sin
+  // horario (el solver no tendrá candidatos) y no aparecerá en vista Horarios.
+  const sedeElegida = watch('sede_id');
+  const divisionElegida = watch('division');
+  const { data: bloquesCatalogo = [] } = useQuery({
+    queryKey: ['bloques'],
+    queryFn: async () => {
+      try {
+        return await BloquesService.getBloques();
+      } catch (err) {
+        return [];
+      }
+    },
+    retry: 0,
+  });
+  const { data: configuraciones = [] } = useQuery({
+    queryKey: ['configuraciones'],
+    queryFn: async () => {
+      try {
+        return await ConfiguracionesService.getConfiguraciones();
+      } catch (err) {
+        return [];
+      }
+    },
+    retry: 0,
+  });
+  const cobertura = useMemo(
+    () => coberturaDivision({ bloques: bloquesCatalogo, sedeId: sedeElegida, division: divisionElegida, configuraciones }),
+    [bloquesCatalogo, sedeElegida, divisionElegida, configuraciones]
+  );
+  const mostrarAvisoSinCobertura = sedeElegida != null && sedeElegida !== '' && divisionElegida && !cobertura.cubierto;
+  const nombreSedeElegida = sedes.find(s => Number(s.id) === Number(sedeElegida))?.nombre || 'la sede';
 
   // Prefill al abrir: valores del grupo en edición o defaults con primer catálogo.
   // Nota E16: ahora también se restaura `division` (antes quedaba en MATUTINO
@@ -146,6 +185,17 @@ const GrupoFormModal = ({
               <option value="NOCTURNO">Nocturno (18:00–22:00)</option>
             </select>
             {errors.division && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.division.message}</span>}
+            {mostrarAvisoSinCobertura && (
+              <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200/70 rounded-xl">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <span className="text-xs text-amber-700 leading-relaxed">
+                  La sede <strong>{nombreSedeElegida}</strong> no tiene bloques activos dentro de la ventana{' '}
+                  <strong>{divisionElegida}</strong> ({cobertura.ventana.inicio.slice(0, 5)}–{cobertura.ventana.fin.slice(0, 5)}).
+                  Este grupo quedará sin horario y no aparecerá en la vista de Horarios.
+                  Configure bloques en esa ventana (Bloques Horarios) o elija otra división/sede.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">

@@ -44,7 +44,13 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
   - **Bugfix latente corregido:** el prefill de edición de grupos no restauraba `division` → editar un grupo VESPERTINO/NOCTURNO lo guardaba como MATUTINO. Ahora el formulario restaura el turno.
   - Criterio verificado: `pnpm test` → **145 passed** (+23: utils/payloads planning y useLeccionesCrud con servicios mock), `pnpm build` OK.
 
-**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 50 tests ✅); frontend con suite completa (145 tests ✅). `docs/*.pdf` vacíos.
+- ✅ **E17 — Coherencia división/habilitación entre CRUD y generación (2026-08-25):**
+  - **Movimientos por división:** `validate_move` rechaza `FUERA_VENTANA_DIVISION` (bloque debe caber completo en la ventana del turno; paridad con solver); frontend replica en cliente (`resolveVentanaTurno`/`resolverDivisionEvento`/`bloqueDentroVentana` + chequeo en `aplicarMovimiento`) y el modal de edición lista solo bloques dentro de la ventana.
+  - **LeccionFormModal:** materias filtradas por habilitación vigente del docente elegido (`fecha_hasta` null o ≥ hoy); materia no vigente de una lección editada se conserva marcada. Solo frontend (el solver ya ignora lecciones sin habilitación).
+  - **GrupoFormModal:** banner ámbar si la sede no tiene bloques activos dentro de la ventana de la división elegida (`coberturaDivision`): el grupo quedará sin horario y sin aparición en vista Horarios.
+  - Criterio verificado: pytest **54 passed** (+4), vitest **164 passed** (+19), `pnpm build` OK.
+
+**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E15 (Tipado TypeScript/JSDoc). Backend testeado (E9+validaciones, 54 tests ✅); frontend con suite completa (164 tests ✅). `docs/*.pdf` vacíos.
 
 **Bugfix (generación + ventanas por turno, 2026-08-24):** la primera generación tras crear la función de división fallaba con `the JSON object must be str, bytes or bytearray, not dict`: `_build_model` hacía `json.loads(c.valor)` sobre la columna JSONB `configuracion.valor`, que SQLAlchemy ya entrega como dict (crash antes de resolver; tracker FAILED). Corregido con el helper `_parse_ventana_config(valor)` que acepta dict o string JSON y devuelve `None` ante cualquier caso no utilizable (fallback a jornada global ya existente). Además se detectó y corrigió un segundo defecto silencioso: el lookup `f'ventana_{grupo_div}'` usaba la división en MAYÚSCULAS (`MATUTINO`) contra claves en minúsculas (`ventana_matutino`), por lo que las ventanas de turno **nunca se aplicaban** — ahora ambas partes se normalizan a minúsculas. Tests: 3 nuevos para el helper (49 total ✅). **Verificado E2E contra BD real:** regeneración del periodo ACTIVO → versión 2 con 4 horarios ACTIVO, sin advertencias de ventana, clases MATUTINO asignadas dentro de su ventana 07:00–12:00.
 

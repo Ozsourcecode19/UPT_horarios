@@ -291,3 +291,120 @@ describe('useDragDropValidation', () => {
     expect(result.current.isEditModalOpen).toBe(false);
   });
 });
+describe('useDragDropValidation — ventana por división (E17)', () => {
+  const setupVentana = (overrides = {}) => baseProps({
+    configuraciones: [{ clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' } }],
+    grupos: [{ id: 1, nombre: 'Seccion A', division: 'MATUTINO' }],
+    bloques: [
+      { id: 10, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 60 },
+      { id: 11, sede_id: 1, dia_semana: 1, hora_inicio: '18:00:00', duracion_minutos: 45 },
+    ],
+    ...overrides,
+  });
+
+  it('drop fuera de la ventana del turno revierte con toast y no llama al backend', async () => {
+    const setup = setupVentana();
+    const { result } = render(setup);
+    const revert = vi.fn();
+
+    await act(async () => {
+      await result.current.handleEventDrop({
+        event: {
+          id: '1',
+          start: lunes(18, 10), // cae en el bloque 18:00 — fuera de MATUTINO
+          resourceId: 'aula_1',
+          extendedProps: { aula_id: 1, division: 'MATUTINO' },
+        },
+        revert,
+      });
+    });
+
+    expect(revert).toHaveBeenCalled();
+    expect(setup.scheduleService.validateMove).not.toHaveBeenCalled();
+    expect(setup.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('El turno MATUTINO solo admite bloques entre 07:00 y 12:00'),
+      'error'
+    );
+  });
+
+  it('resuelve la división por catálogo de grupos cuando el evento no la trae (Demo)', async () => {
+    const setup = setupVentana({
+      demoMode: true,
+      demoHorarios: [
+        { id: 1, extendedProps: { docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica', aula_id: 1, bloque_id: 10, periodo_id: 9 } },
+      ],
+    });
+    const { result } = render(setup);
+    const revert = vi.fn();
+
+    await act(async () => {
+      await result.current.handleEventDrop({
+        event: {
+          id: '1',
+          start: lunes(18, 10), // fuera de la ventana; división viene del grupo "Seccion A"
+          resourceId: 'aula_1',
+          extendedProps: { aula_id: 1, grupo: 'Seccion A' },
+        },
+        revert,
+      });
+    });
+
+    expect(revert).toHaveBeenCalled();
+    expect(setup.setDemoHorarios).not.toHaveBeenCalled();
+  });
+
+  it('drop dentro de la ventana sigue el flujo normal (demo aplica movimiento)', async () => {
+    const setup = setupVentana({ demoMode: true });
+    const { result } = render(setup);
+    const revert = vi.fn();
+
+    await act(async () => {
+      await result.current.handleEventDrop({
+        event: {
+          id: '1',
+          start: lunes(8, 10), // dentro de MATUTINO
+          resourceId: 'aula_1',
+          extendedProps: { aula_id: 1, division: 'MATUTINO' },
+        },
+        revert,
+      });
+    });
+
+    expect(revert).not.toHaveBeenCalled();
+    expect(setup.setDemoHorarios).toHaveBeenCalled();
+  });
+
+  it('guardar desde el modal también respeta la ventana del turno', async () => {
+    const setup = setupVentana({ demoMode: true });
+    const { result } = render(setup);
+
+    // Simular evento seleccionado con división MATUTINO
+    await act(async () => {
+      await result.current.handleEventClick({
+        event: {
+          id: '1',
+          start: lunes(8, 0),
+          end: lunes(9, 0),
+          extendedProps: { aula_id: 1, bloque_id: 10, division: 'MATUTINO', docente: '', grupo: '', aula: '', sede: '' },
+        },
+      });
+    });
+
+    // El usuario cambia los selects del modal (estado actualizado antes de guardar)
+    await act(async () => {
+      result.current.setEditAulaId('1');
+      result.current.setEditBloqueId('11'); // bloque nocturno 18:00
+    });
+
+    const { handleSaveChangesModal } = result.current;
+    await act(async () => {
+      await handleSaveChangesModal({ preventDefault: () => {} });
+    });
+
+    expect(setup.setDemoHorarios).not.toHaveBeenCalled();
+    expect(setup.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('solo admite bloques'),
+      'error'
+    );
+  });
+});
