@@ -52,6 +52,10 @@ frontend/src/
 │   │   └── DocenteTabs.jsx            ✅ Pestañas compartidas (Plantilla/Disponibilidad/Habilitaciones)
 │   └── (sin ui/ ni shared/)    ⚠️ Pendiente de organizar
 │
+├── features/
+│   ├── schedule/               ✅ Módulo horarios (E14+E16): utils/ hooks/ components/ __tests__/ demoData.js + index.js (barrel)
+│   └── planning/               ✅ Módulo planificación Grupos+Lecciones (E16): utils/ hooks/ components/ schemas.js __tests__/ demoData.js + index.js (barrel)
+│
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
 │   ├── Dashboard.jsx           ✅ Stats dinámicas (useQuery) + acciones rápidas
@@ -525,7 +529,8 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 | Archivo | Complejidad | Razón |
 |---|---|---|
-| `frontend/src/pages/Horarios.jsx` | 🟠 Media-Alta (~1016 líneas) | FullCalendar + filtros dinámicos + checklist + versiones (lógica de gen/DnD extraída a hooks E10; vista por aulas y "sin filtros" eliminadas en 2026-08-24) |
+| `frontend/src/pages/Horarios.jsx` | 🟡 Media (~649 líneas) | Estados + queries + handlers; UI extraída a `features/schedule/components/` (E16) |
+| `frontend/src/pages/Lecciones.jsx` | 🟡 Media (~559 líneas) | Queries + wiring; lógica/UI extraída a `features/planning/` (E16) |
 | `backend/services/scheduler/or_tools_adapter.py` | 🔴 Alta | Lógica CP-SAT con muchas variables y restricciones |
 | `backend/crud/horarios_generados.py` | 🟡 Media (338 líneas) | Manejo exhaustivo de excepciones DB |
 | `frontend/src/pages/Docentes.jsx` | 🟡 Media (762 líneas) | 3 tabs + CRUD + Disponibilidad + Habilitaciones |
@@ -672,6 +677,23 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 3. **`src/api/bloques.js`:** `getBloques` (limit 1000) + `createBloque`/`updateBloque`/`deleteBloque` contra el CRUD ya existente en `/bloques-horarios/`.
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
+
+### Contexto de la Sesión Actual (2026-08-25) — E16: cierre features/schedule + features/planning
+
+1. **Parte A — `features/schedule` completada (`Horarios.jsx` 1016 → 649 líneas):**
+   - **`components/ScheduleCalendarView.jsx` (nuevo):** grilla única FullCalendar; dueña del ref y del efecto `gotoDate` (props `initialDate`/`calendarKey`). Recibe `ventanaGrilla` (de `resolveVentanaGrilla`) para la ventana dinámica, `eventos`, handlers DnD/click y estado de carga. La página ya no toca la API interna de FullCalendar.
+   - **`components/VersionPanel.jsx` (nuevo):** panel E4b con props controladas (`versiones`, `selectedVersion`, `onSelectVersion`, `onRestore`, `onRefresh`, `restorePending`, `isGenerating`, `canRestore`); retorna `null` sin versiones.
+   - **`components/EditEventModal.jsx` (nuevo):** modal de edición rápida puramente presentacional (`evento`, `editAulaId/editBloqueId` + onChange, `onSave/onDelete/onClose`); constantes `DIAS_NOMBRES` co-ubicadas.
+   - **`demoData.js` (nuevo):** los 6 MOCK_* movidos fuera de la página.
+   - **Barrel `index.js`:** la página consume todo desde `../features/schedule`.
+2. **Parte B — nuevo `features/planning/` (`Lecciones.jsx` 1397 → 559 líneas):**
+   - **`schemas.js`:** `grupoSchema`/`leccionSchema` + factories puras `buildGrupoDefaults`/`buildLeccionDefaults` y coerciones `toPayloadGrupo`/`toPayloadLeccion` (antes inline en los saves).
+   - **`utils/planning.js`:** `buscarGrupos`, `buscarLecciones`, `calcularMetricasPlanning` (las 6 métricas de tarjetas) — puros y testeables.
+   - **`hooks/useLeccionesCrud.js`:** CRUD dual real+Demo con **servicios inyectables** (patrón `useDragDropValidation`); guards de permisos y de "grupo con lecciones vinculadas"; generación demo `max(id)+1`. Los 4 handlers devuelven booleano y la página cierra el modal solo si fue `true` (misma semántica que antes).
+   - **Componentes:** `GruposTable` / `LeccionesTable` (incluyen loading skeleton y estados vacíos con su lógica), `GrupoFormModal` / `LeccionFormModal` (**cada uno dueño de su `useForm`**: prefill vía efecto sobre prop `editing`; emiten `onSubmit(data)` ya validado) y `DeleteConfirmModal` genérico (reemplaza los 2 bloques duplicados).
+   - **Limpieza:** eliminado estado demo muerto (`demoTrayectos`/`demoPeriodos` se persistían pero nunca alimentaban la selección de datos); removido artefacto JSX muerto dentro del select de trayectos.
+3. **Bugfix latente corregido durante la extracción:** el prefill de edición de grupos no restauraba `division` → editar un grupo VESPERTINO o NOCTURNO lo guardaba como MATUTINO. Ahora `GrupoFormModal` restaura el turno (documentado aquí como cambio intencional de comportamiento correctivo).
+4. **Verificación:** suite vitest **145 passed** (+23: `planning.test.js` de utils/payloads/schemas y `useLeccionesCrud.test.jsx` con servicios mock, cubriendo modo real, guards y Modo Demo) · `pnpm build` OK.
 
 ### Contexto de la Sesión Actual (2026-08-24) — Vista dinámica por filtros del calendario
 
