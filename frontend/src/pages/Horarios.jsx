@@ -397,8 +397,19 @@ const Horarios = () => {
   const calendarKey = `${selectedPeriodoId}-${demoMode}`;
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
+  // Semana visible de la grilla (para la cabecera de impresión).
+  // Debe declararse DESPUÉS de initialDateString (depende de él).
+  const [fechaVisibleGrilla, setFechaVisibleGrilla] = useState(null);
+  const lunesImpresion = useMemo(() => {
+    const base = fechaVisibleGrilla || new Date(initialDateString + 'T00:00:00');
+    const d = new Date(base);
+    const dia = d.getDay(); // 0 = domingo
+    d.setDate(d.getDate() + (dia === 0 ? -6 : 1 - dia)); // retroceder al lunes
+    return d;
+  }, [fechaVisibleGrilla, initialDateString]);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+    <div className="horarios-page max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       
       {/* Banner de Modo Demo */}
       {demoMode && (
@@ -611,13 +622,20 @@ const Horarios = () => {
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
       <div className="print-area bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
 
-        {/* Encabezado solo visible al imprimir (E12) */}
-        <div className="hidden print:block mb-4 border-b border-slate-200 pb-3">
-          <h1 className="text-lg font-bold text-slate-800">
+        {/* Encabezado solo visible al imprimir: identifica la entidad de la vista */}
+        <div className="hidden print:block mb-4 border-b border-slate-300 pb-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Horarios UPT{selectedPeriodo ? ` — ${selectedPeriodo.nombre}` : ''}
+          </p>
+          <h1 className="text-2xl font-extrabold text-slate-900 mt-1">
+            {descripcionFiltro}
           </h1>
-          <p className="text-xs text-slate-500">
-            Filtro: {descripcionFiltro} · Generado: {new Date().toLocaleDateString('es-VE')}
+          <p className="text-xs text-slate-600 mt-1.5">
+            {filterType === 'grupo' && itemSeleccionado?.division
+              ? `Turno ${itemSeleccionado.division} · ${ventanaGrilla.inicio.slice(0, 5)}–${ventanaGrilla.fin.slice(0, 5)}`
+              : `Jornada general · ${ventanaGrilla.inicio.slice(0, 5)}–${ventanaGrilla.fin.slice(0, 5)}`}
+            {' · '}Semana del {lunesImpresion.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+            {' · '}Generado: {new Date().toLocaleDateString('es-VE')}
           </p>
         </div>
 
@@ -630,6 +648,9 @@ const Horarios = () => {
           demoMode={demoMode}
           onEventDrop={handleEventDrop}
           onEventClick={handleEventClick}
+          onDatesSet={(start) => setFechaVisibleGrilla(prev =>
+            prev?.getTime() === start.getTime() ? prev : start
+          )}
         />
 
       </div>

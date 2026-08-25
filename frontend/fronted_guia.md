@@ -678,6 +678,22 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
+### Contexto de la Sesión Actual (2026-08-25) — Bugfix: impresión/PDF en blanco (E12-print)
+
+1. **Síntoma:** el botón "Imprimir / PDF" generaba páginas completamente en blanco (solo encabezado/pie del navegador con título y `localhost:3000`); la vista previa también salía vacía, en claro y oscuro.
+2. **Causas identificadas** (latentes desde E12, que se verificó solo con build):
+   - `<main>` del shell tiene **`overflow-hidden`** (`MainLayout.jsx`) → recorta descendientes posicionados al imprimir.
+   - La raíz de `Horarios.jsx` es `relative` → el `position:absolute; top:0` de `.print-area` se anclaba al contenedor del contenido, no al inicio de la hoja.
+   - El CSS de impresión no neutralizaba `position/overflow/height` de los ancestros ni la altura inline de `.fc-view-harness` (FullCalendar v6 fija altura por JS; solo se reseteaba `.fc`).
+3. **Fix (`index.css`, bloque `@media print` reescrito):**
+   - Cadena de contención anulada: `html, body, #root, main, .min-h-screen, .horarios-page { position:static; overflow:visible; height:auto }` (`.horarios-page` = clase marcadora nueva en la raíz de la página).
+   - `.fc-view-harness { height:auto !important }` para que la grilla fluya completa.
+   - **Eventos sobrios sin fondos** (decisión de UX): fondo blanco, texto `#1e293b`, borde fino gris — independiente del checkbox "Background graphics"; el color inline por materia no imprime.
+   - `animation/transition: none !important` global en impresión (descarta snapshots de animaciones de entrada).
+   - Modo oscuro: reset adicional de variables `--fc-*` a valores claros dentro de `.print-area`.
+4. **Verificación pendiente del usuario:** recarga dura → Ctrl+P en claro y oscuro: preview con encabezado propio + grilla completa + eventos legibles; guardar PDF landscape.
+5. **Segunda pasada (misma sesión):** tras el fix de contención la grilla pintaba **colapsada en una fila** — causa: FC v6 posiciona `.fc-view` en absoluto llenando el harness cuando hay altura fija; el `position:static` del hack rompía esa contención. Solución correcta: dejar que **FC se re-layoute él mismo** — `ScheduleCalendarView` escucha `beforeprint`/`afterprint` y alterna `setOption('height','auto')` ↔ `680` (retirado el `position:static` del CSS). Además, la cabecera impresa ahora identifica la entidad de la vista en grande (`descripcionFiltro`: "Grupo:/Docente:/Aula: X") + turno/ventana (grupos) o jornada general, semana visible (nuevo prop opcional `onDatesSet` → `lunesImpresion`) y fecha de generación.
+
 ### Contexto de la Sesión Actual (2026-08-25) — E17: coherencia división/habilitación entre CRUD y generación
 
 1. **Movimientos restringidos por la división del grupo (3 capas, criterio "cabe completo" = solver):**
