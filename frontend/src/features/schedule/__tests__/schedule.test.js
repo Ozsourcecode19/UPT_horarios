@@ -3,7 +3,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapScheduleEvents,
-  findNearestBloque,
   filterEvents,
   recalcularEventoDemo,
   generarEventosSimulados,
@@ -11,8 +10,11 @@ import {
   resolveVentanaTurno,
   resolverDivisionEvento,
   bloqueDentroVentana,
-  etiquetasRangoBloques,
-  aplicarGapEtiquetas,
+  horaAMinutos,
+  construirBandasEje,
+  indiceBloques,
+  resolverBloqueDeCelda,
+  agruparEventosPorCelda,
 } from '../utils/schedule';
 
 // --- mapeo de colores ---
@@ -50,77 +52,7 @@ describe('mapScheduleEvents', () => {
 });
 
 // --- busqueda de bloque mas cercano ---
-describe('findNearestBloque', () => {
-  const bloques = [
-    { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 60 },
-    { id: 2, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 60 },
-    { id: 3, sede_id: 1, dia_semana: 2, hora_inicio: '08:00:00', duracion_minutos: 60 },
-    { id: 4, sede_id: 2, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 60 },
-    { id: 5, sede_id: 1, dia_semana: 7, hora_inicio: '09:00:00', duracion_minutos: 60 },
-  ];
 
-  const lunes = (h, m) => new Date(`2026-08-24T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
-
-  it('elige el bloque mas cercano del mismo dia', () => {
-    expect(findNearestBloque(lunes(8, 10), null, bloques)?.id).toBe(2);
-  });
-
-  it('filtra bloques de la sede dada (consistencia de sede)', () => {
-    // 08:10 en lunes: el bloque 2 (sede 1) y el 4 (sede 2) tienen la misma hora;
-    // con sedeId 1 se descarta el 4.
-    expect(findNearestBloque(lunes(8, 10), 1, bloques)?.id).toBe(2);
-    expect(findNearestBloque(lunes(8, 10), 2, bloques)?.id).toBe(4);
-  });
-
-  it('ignora bloques de otros dias', () => {
-    // Sabado 2026-08-29 (dia 6): no hay bloques
-    const sabado = new Date('2026-08-29T08:10:00');
-    expect(findNearestBloque(sabado, null, bloques)).toBeNull();
-  });
-
-  it('devuelve el bloque que CONTIENE el instante soltado (aunque esté a >45 del inicio)', () => {
-    // 08:46 cae dentro de 08:00-09:00: contención gana sobre cercanía al inicio
-    expect(findNearestBloque(lunes(8, 46), 1, bloques)?.id).toBe(2);
-  });
-
-  it('devuelve null en huecos de grilla (sin bloque que contenga y lejos de todo inicio)', () => {
-    // Lunes 09:50: bloques 07:00-08:00 y 08:00-09:00 no lo contienen; inicio más
-    // cercano (08:00) está a 110 min -> null
-    expect(findNearestBloque(lunes(9, 50), 1, bloques)).toBeNull();
-  });
-
-  it('mapea domingo (getDay()=0) a dia_semana 7', () => {
-    const domingo = new Date('2026-08-30T09:30:00');
-    expect(findNearestBloque(domingo, 1, bloques)?.id).toBe(5);
-  });
-
-  it('devuelve null con lista vacia o indefinida', () => {
-    expect(findNearestBloque(lunes(8, 10), null, [])).toBeNull();
-    expect(findNearestBloque(lunes(8, 10), null, undefined)).toBeNull();
-  });
-
-  // --- Contención (E14-fix): el drop cae en el bloque visualizado ---
-  it('último tercio de un bloque de 60\' resuelve al bloque actual, no al siguiente', () => {
-    // Caso que fallaba: drop a las 08:45 (dentro de 08:00-09:00) saltaba a 09:00
-    expect(findNearestBloque(lunes(8, 45), 1, bloques)?.id).toBe(2);
-    expect(findNearestBloque(lunes(8, 59), 1, bloques)?.id).toBe(2);
-  });
-
-  it('la frontera exacta de inicio pertenece al bloque que inicia ahí', () => {
-    expect(findNearestBloque(lunes(8, 0), 1, bloques)?.id).toBe(2);
-  });
-
-  it('grilla mixta 30/45 con mismo inicio: gana duración menor (determinista)', () => {
-    const mixtos = [
-      { id: 10, sede_id: 4, dia_semana: 3, hora_inicio: '10:30:00', duracion_minutos: 45 },
-      { id: 11, sede_id: 4, dia_semana: 3, hora_inicio: '10:30:00', duracion_minutos: 30 },
-    ];
-    const miercoles = new Date('2026-08-26T10:40:00');
-    expect(findNearestBloque(miercoles, 4, mixtos)?.id).toBe(11);
-  });
-});
-
-// --- filtros de eventos ---
 describe('filterEvents', () => {
   const eventos = [
     {
@@ -448,65 +380,98 @@ describe('bloqueDentroVentana', () => {
 });
 
 // --- eje de tiempo con rangos de bloque (E17-b) ---
-describe('etiquetasRangoBloques', () => {
+
+
+// ============================================================
+// GRILLA POR BANDAS DE BLOQUE (E18) — helpers de la nueva arquitectura
+// ============================================================
+describe('construirBandasEje', () => {
   const bloques = [
-    { id: 1, sede_id: 1, hora_inicio: '08:00:00', duracion_minutos: 45, activo: true },
-    { id: 2, sede_id: 1, hora_inicio: '08:45:00', duracion_minutos: 90, activo: true },
-    { id: 3, sede_id: 2, hora_inicio: '08:00:00', duracion_minutos: 60, activo: true }, // duplicado entre sedes
-    { id: 4, sede_id: 2, hora_inicio: '19:00:00', duracion_minutos: 60, activo: false }, // inactivo
+    { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 45, activo: true },
+    { id: 2, sede_id: 1, dia_semana: 1, hora_inicio: '08:45:00', duracion_minutos: 90, activo: true },
+    { id: 3, sede_id: 2, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 90, activo: true }, // mismo inicio, más largo
+    { id: 4, sede_id: 2, dia_semana: 1, hora_inicio: '19:00:00', duracion_minutos: 60, activo: false },
   ];
 
-  it('genera "H:MM - H:MM" sin cero inicial en la hora', () => {
-    const map = etiquetasRangoBloques(bloques, [1]);
-    expect(map.get(8 * 60).texto).toBe('8:00 - 8:45');
-    expect(map.get(8 * 60 + 45).texto).toBe('8:45 - 10:15');
+  it('una banda por hora de inicio, fin = máximo del grupo, etiqueta "H:MM - H:MM"', () => {
+    const bandas = construirBandasEje(bloques, []);
+    expect(bandas).toHaveLength(2);
+    expect(bandas[0]).toMatchObject({ iniMin: 480, finMin: 570, etiqueta: '8:00 - 9:30' }); // max(45,90)=90
+    expect(bandas[1]).toMatchObject({ iniMin: 525, finMin: 615 });
   });
 
-  it('deduplica inicios iguales entre sedes (queda el primero)', () => {
-    const map = etiquetasRangoBloques(bloques, []);
-    expect(map.size).toBe(2); // 08:00 (dedupe s1+s2) y 08:45; 19:00 inactivo fuera
-    expect(map.get(8 * 60).texto).toBe('8:00 - 8:45'); // primera aparición
+  it('filtra por sedes e ignora inactivos', () => {
+    expect(construirBandasEje(bloques, [2]).map(b => b.etiqueta)).toEqual(['8:00 - 9:30']);
   });
 
-  it('filtra por sedes indicadas e ignora inactivos', () => {
-    const map = etiquetasRangoBloques(bloques, [2]);
-    expect(map.size).toBe(1); // sede 2: solo el bloque activo de 08:00 (60 min)
-    expect(map.get(8 * 60).texto).toBe('8:00 - 9:00');
+  it('recorta a la ventana horaria (jornada/turno)', () => {
+    const bandas = construirBandasEje(
+      [{ id: 9, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 120 }],
+      [1],
+      { inicio: '07:30:00', fin: '08:30:00' }
+    );
+    expect(bandas[0]).toMatchObject({ iniMin: 450, finMin: 510 });
   });
 
-  it('lista vacía devuelve Map vacío', () => {
-    expect(etiquetasRangoBloques([], []).size).toBe(0);
+  it('sin bloques devuelve vacío', () => {
+    expect(construirBandasEje([], [])).toEqual([]);
   });
 });
 
-// --- gap mínimo entre etiquetas del eje (E17-c: anti-hacinamiento) ---
-describe('aplicarGapEtiquetas', () => {
-  const construir = (minutos) => {
-    const m = new Map();
-    minutos.forEach(min => m.set(min, { texto: `${Math.floor(min/60)}:${String(min%60).padStart(2,'0')}` }));
-    return m;
-  };
+describe('indiceBloques y resolverBloqueDeCelda', () => {
+  const bloques = [
+    { id: 10, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 45, activo: true },
+    { id: 11, sede_id: 2, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 45, activo: true },
+    { id: 12, sede_id: 1, dia_semana: 1, hora_inicio: '09:00:00', duracion_minutos: 45, activo: false },
+  ];
 
-  it('omite etiquetas a menos de 30 min del último inicio mantenido', () => {
-    // Inicios 8:00, 8:20 y 9:15: mantiene 8:00, omite 8:20 (20<30), mantiene 9:15
-    const r = aplicarGapEtiquetas(construir([480, 500, 555]), 30);
-    expect([...r.keys()]).toEqual([480, 555]);
+  it('indiceBloques mapea id -> dia/inicio/sede', () => {
+    const idx = indiceBloques(bloques);
+    expect(idx.get(10)).toEqual({ dia: 1, iniMin: 480, sedeId: 1 });
   });
 
-  it('frontera exacta al gap se mantiene (>= y no >)', () => {
-    const r = aplicarGapEtiquetas(construir([480, 510]), 30);
-    expect([...r.keys()]).toEqual([480, 510]);
+  it('resuelve el bloque EXACTO por día+hora+sede', () => {
+    expect(resolverBloqueDeCelda(bloques, { dia: 1, iniMin: 480, sedeId: 2 })?.id).toBe(11);
   });
 
-  it('gap cero mantiene todas; Map vacío devuelve vacío', () => {
-    const todas = construir([480, 500, 520]);
-    expect(aplicarGapEtiquetas(todas, 0).size).toBe(3);
-    expect(aplicarGapEtiquetas(new Map(), 30).size).toBe(0);
-    expect(aplicarGapEtiquetas(undefined).size).toBe(0);
+  it('sede cruzada u hora sin bloque -> null (drop rechazable con mensaje claro)', () => {
+    expect(resolverBloqueDeCelda(bloques, { dia: 1, iniMin: 480, sedeId: 3 })).toBeNull();
+    expect(resolverBloqueDeCelda(bloques, { dia: 1, iniMin: 495, sedeId: 1 })).toBeNull(); // 8:15 no existe
+    expect(resolverBloqueDeCelda(bloques, { dia: 1, iniMin: 540, sedeId: 1 })).toBeNull(); // inactivo
   });
 
-  it('no depende del orden de inserción de las claves', () => {
-    expect([...aplicarGapEtiquetas(construir([555, 480, 500]), 30).keys()])
-      .toEqual([480, 555]);
+  it('horaAMinutos tolera "H:MM" y "H:MM:SS"', () => {
+    expect(horaAMinutos('8:30')).toBe(510);
+    expect(horaAMinutos('08:30:15')).toBe(510);
+  });
+});
+
+describe('agruparEventosPorCelda', () => {
+  const bloques = [
+    { id: 10, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', activo: true },
+    { id: 11, sede_id: 1, dia_semana: 2, hora_inicio: '08:45:00', activo: true },
+  ];
+  const indice = indiceBloques(bloques);
+  const bandas = construirBandasEje(bloques, [1]);
+
+  it('agrupa por bloque_id vía índice (clave "dia|iniMin")', () => {
+    const evs = [
+      { id: 1, extendedProps: { bloque_id: 10 } },
+      { id: 2, extendedProps: { bloque_id: 11 } },
+    ];
+    const celdas = agruparEventosPorCelda(evs, indice, bandas);
+    expect(celdas.get('1|480')).toHaveLength(1);
+    expect(celdas.get('2|525')).toHaveLength(1);
+  });
+
+  it('fallback temporal para eventos Demo sin bloque válido', () => {
+    const evDemo = { id: 9, start: '2026-06-29T08:10:00', end: '2026-06-29T09:00:00', extendedProps: {} };
+    const celdas = agruparEventosPorCelda([evDemo], indice, bandas);
+    expect(celdas.get('1|480')).toContain(evDemo); // solapa la banda 08:00
+  });
+
+  it('eventos imposibles se descartan silenciosamente', () => {
+    const celdas = agruparEventosPorCelda([{ id: 3, start: 'fecha-mala', extendedProps: {} }], indice, bandas);
+    expect(celdas.size).toBe(0);
   });
 });

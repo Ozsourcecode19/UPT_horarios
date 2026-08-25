@@ -13,15 +13,24 @@ const EditEventModal = ({
   aulas = [],
   bloques = [],
   ventanaDivision = null, // ventana del turno del evento (null = jornada global, sin filtro extra)
+  abarca = 1,                    // 1 | 2 bloques (controlado desde la página)
+  onAbarcaChange,                // (valor) => void
+  puedeAbarcarDos = false,       // existe banda consecutiva válida en la sede/ventana
+  previewRango = '',             // texto del rango resultante según "abarca"
   editAulaId,
   onChangeAulaId,
   editBloqueId,
   onChangeBloqueId,
-  onSave,
+  onSave,                // (editAulaId, editBloqueId, abarca)
   onDelete,
   onClose,
 }) => {
   if (!evento) return null;
+
+  const enviar = (e) => {
+    e.preventDefault();
+    onSave(editAulaId, editBloqueId, abarca === 2 && puedeAbarcarDos ? 2 : 1);
+  };
 
   // Bloques de la sede del aula elegida y dentro de la ventana del turno
   // (misma regla que valida el solver y validate_move en backend).
@@ -51,7 +60,7 @@ const EditEventModal = ({
         </div>
 
         {/* Formulario/Detalle */}
-        <form onSubmit={onSave} className="p-6 space-y-6">
+        <form onSubmit={enviar} className="p-6 space-y-6">
 
           {/* Información General */}
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-sm">
@@ -108,6 +117,32 @@ const EditEventModal = ({
                   </option>
                 ))}
             </select>
+          </div>
+
+          {/* Extensión: cuántos bloques abarca la sesión */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Abarca</label>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-max">
+              {[1, 2].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={n === 2 && !puedeAbarcarDos}
+                  onClick={() => onAbarcaChange?.(n)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                    abarca === n
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  } ${n === 2 && !puedeAbarcarDos ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  title={n === 2 && !puedeAbarcarDos ? 'No hay un bloque consecutivo disponible' : undefined}
+                >
+                  {n === 1 ? '1 bloque' : '2 bloques'}
+                </button>
+              ))}
+            </div>
+            {previewRango && (
+              <p className="text-[11px] text-slate-500">Rango resultante: <strong>{previewRango}</strong></p>
+            )}
           </div>
 
           {/* Botones de acción */}

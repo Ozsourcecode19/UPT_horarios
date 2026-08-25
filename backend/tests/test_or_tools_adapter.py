@@ -251,3 +251,37 @@ def test_parse_ventana_casos_invalidos_devuelven_none():
     # Dict sin las claves requeridas -> no es una ventana utilizable
     assert _parse_ventana_config({"inicio": "07:00:00"}) is None
     assert _parse_ventana_config({"hora_inicio": "07:00:00"}) is None
+
+
+def test_generacion_respeta_ventana_de_division(db_session):
+    """Regresión E20: un grupo VESPERTINO solo puede recibir bloques dentro de
+    su ventana configurada (13:00-18:00); los bloques matutinos no son
+    candidatos aunque existan y estén libres."""
+    sede, periodo, docente, materia, grupo = _base(db_session)
+    grupo.division = "VESPERTINO"
+    db_session.commit()
+    _leccion_y_habilitacion(db_session, sede, periodo, docente, materia, grupo)
+
+    db_session.add_all([
+        models.Configuracion(clave="ventana_vespertino",
+                             valor={"hora_inicio": "13:00:00", "hora_fin": "18:00:00"},
+                             descripcion="v", tipo_dato="json"),
+        models.Configuracion(clave="hora_inicio_jornada", valor="07:00:00",
+                             descripcion="j", tipo_dato="string"),
+        models.Configuracion(clave="hora_fin_jornada", valor="18:00:00",
+                             descripcion="j", tipo_dato="string"),
+        models.Aula(nombre="A1", sede_id=sede.id, activa=True),
+        models.BloqueHorario(sede_id=sede.id, dia_semana=1, hora_inicio=time(7, 0),
+                             duracion_minutos=45, orden_visual=1),   # matutino: NO candidato
+        models.BloqueHorario(sede_id=sede.id, dia_semana=1, hora_inicio=time(15, 0),
+                             duracion_minutos=45, orden_visual=2),   # vespertino: candidato
+    ])
+    db_session.commit()
+
+    generator = ScheduleGenerator(db_session)
+    generator.start_generation(periodo.id)
+
+    assert _contar_activos(db_session, periodo.id) == 1
+    horario = db_session.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo.id).one()
+    assert horario.hora_inicio == time(15, 0)  # nunca el bloque de 07:00

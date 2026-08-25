@@ -1,5 +1,7 @@
 # backend/schemas/horario_generado.py
-from pydantic import BaseModel
+from typing import List
+
+from pydantic import BaseModel, Field
 from pydantic import ConfigDict # Importar ConfigDict para from_attributes=True
 from datetime import datetime, time # Asumiendo que 'time' se usa para hora_inicio y hora_fin
 from typing import Optional
@@ -106,3 +108,12 @@ class RestoreResult(BaseModel):
     total_activos: int
     class Config:
         from_attributes = True
+
+# --- E20: asignación manual desde la grilla (mover/extender/crear) ---
+class AsignarManualRequest(BaseModel):
+    """Crea/reemplaza las filas ACTIVO de una lección en el periodo:
+    1 bloque (sesión simple) o 2 bloques CONSECUTIVOS (extensión)."""
+    leccion_id: int
+    aula_id: int
+    periodo_id: int
+    bloque_ids: List[int] = Field(min_length=1, max_length=2)

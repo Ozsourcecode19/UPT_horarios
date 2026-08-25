@@ -19,11 +19,13 @@ import { useAuth } from '../context/AuthContext';
 import { esErrorDeServidor } from '../utils/errors';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useCanWrite from '../hooks/useCanWrite';
+import { DeleteConfirmModal } from '../features/planning';
 import {
-  filterEvents, resolveVentanaGrilla, resolveVentanaTurno, etiquetasRangoBloques,
+  filterEvents, resolveVentanaGrilla, resolveVentanaTurno,
+  construirBandasEje, resolverBloqueDeCelda, horaAMinutos,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
-  ScheduleCalendarView, VersionPanel, EditEventModal,
+  GridSemanalBloques, VersionPanel, EditEventModal,
   MOCK_PERIODOS, MOCK_AULAS, MOCK_DOCENTES, MOCK_GRUPOS, MOCK_BLOQUES, MOCK_HORARIOS_INICIALES,
 } from '../features/schedule';
 
@@ -324,9 +326,10 @@ const Horarios = () => {
     return []; // docente o sin datos: unión de todas las sedes
   }, [filterType, filterValue, itemSeleccionado, aulas]);
 
-  const etiquetasEje = useMemo(
-    () => etiquetasRangoBloques(bloques, sedesEje),
-    [bloques, sedesEje]
+  // Bandas de la grilla (una fila por bloque horario real)
+  const bandas = useMemo(
+    () => construirBandasEje(bloques, sedesEje, ventanaGrilla),
+    [bloques, sedesEje, ventanaGrilla]
   );
 
   // --- LÓGICA DE DRAG & DROP Y EDICIÓN DE EVENTOS (E10) ---
@@ -338,14 +341,17 @@ const Horarios = () => {
     setEditAulaId,
     editBloqueId,
     setEditBloqueId,
-    handleEventDrop,
+    handleMoverCelda,
     handleEventClick,
     handleSaveChangesModal,
     handleDeleteSchedule,
+    guardarAsignacionManual,
+    eliminarHorario,
   } = useDragDropValidation({
     demoMode,
     demoHorarios,
     setDemoHorarios,
+    listadoHorarios,
     aulas,
     bloques,
     configuraciones, // ventanas por turno: restringe movimientos fuera de la división del grupo
@@ -362,6 +368,52 @@ const Horarios = () => {
     () => resolveVentanaTurno(selectedEvent?.division, configuraciones),
     [selectedEvent, configuraciones]
   );
+
+  // --- E20: extensión 1-2 bloques y confirmación de borrado ---
+  const [editAbarca, setEditAbarca] = useState(1);
+  const [confirmEliminar, setConfirmEliminar] = useState(null); // {horario, esSpan}
+
+  // Al abrir el modal: si la clase ya abarca 2 bloques, arrancar en "2"
+  useEffect(() => {
+    if (!isEditModalOpen || !selectedEvent) return;
+    const lid = selectedEvent.leccion_id;
+    const esSpan = lid != null && listadoHorarios.filter(h =>
+      Number(h.extendedProps?.leccion_id) === Number(lid)).length === 2;
+    setEditAbarca(esSpan ? 2 : 1);
+  }, [isEditModalOpen, selectedEvent, listadoHorarios]);
+
+  // Bloque seleccionado en el modal y su consecutivo válido (misma sede/día)
+  const bloqueSeleccionado = useMemo(
+    () => bloques.find(x => x.id === Number(editBloqueId)) || null,
+    [bloques, editBloqueId]
+  );
+  const sedeAulaEdicion = useMemo(
+    () => aulas.find(a => a.id === Number(editAulaId))?.sede_id,
+    [aulas, editAulaId]
+  );
+  const bloqueConsecutivo = useMemo(() => {
+    if (!bloqueSeleccionado) return null;
+    const finMin = horaAMinutos(bloqueSeleccionado.hora_inicio)
+      + (Number(bloqueSeleccionado.duracion_minutos) || 0);
+    const inicioFmt = `${String(Math.floor(finMin / 60)).padStart(2, '0')}:${String(finMin % 60).padStart(2, '0')}`;
+    return bloques.find(b =>
+      b.activo !== false &&
+      Number(b.sede_id) === Number(sedeAulaEdicion) &&
+      b.dia_semana === bloqueSeleccionado.dia_semana &&
+      b.hora_inicio.startsWith(inicioFmt)) || null;
+  }, [bloques, bloqueSeleccionado, sedeAulaEdicion]);
+
+  const puedeAbarcarDos = !!bloqueConsecutivo;
+  const previewRango = useMemo(() => {
+    if (!bloqueSeleccionado) return '';
+    const ini = horaAMinutos(bloqueSeleccionado.hora_inicio);
+    let fin = ini + (Number(bloqueSeleccionado.duracion_minutos) || 0);
+    if (editAbarca === 2 && bloqueConsecutivo) {
+      fin = fin + (Number(bloqueConsecutivo.duracion_minutos) || 0);
+    }
+    const fmt = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    return `${fmt(ini)} - ${fmt(fin)}`;
+  }, [bloqueSeleccionado, bloqueConsecutivo, editAbarca]);
 
   // --- GENERACIÓN AUTOMÁTICA (E10) ---
   const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
@@ -409,20 +461,17 @@ const Horarios = () => {
     );
   };
 
-  // Calcular el inicio del calendario según el periodo seleccionado (Lunes del periodo)
-  const calendarKey = `${selectedPeriodoId}-${demoMode}`;
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
   // Semana visible de la grilla (para la cabecera de impresión).
   // Debe declararse DESPUÉS de initialDateString (depende de él).
-  const [fechaVisibleGrilla, setFechaVisibleGrilla] = useState(null);
+  // Sin navegación la grilla es plantilla fija: la semana impresa es la del periodo
   const lunesImpresion = useMemo(() => {
-    const base = fechaVisibleGrilla || new Date(initialDateString + 'T00:00:00');
-    const d = new Date(base);
+    const d = new Date(initialDateString + 'T00:00:00');
     const dia = d.getDay(); // 0 = domingo
     d.setDate(d.getDate() + (dia === 0 ? -6 : 1 - dia)); // retroceder al lunes
     return d;
-  }, [fechaVisibleGrilla, initialDateString]);
+  }, [initialDateString]);
 
   return (
     <div className="horarios-page max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -655,19 +704,45 @@ const Horarios = () => {
           </p>
         </div>
 
-        <ScheduleCalendarView
+        <GridSemanalBloques
           eventos={listadoHorarios}
-          ventanaGrilla={ventanaGrilla}
-          initialDate={initialDateString}
-          calendarKey={calendarKey}
+          bandas={bandas}
+          bloques={bloques}
           isLoading={isHorariosLoading}
           demoMode={demoMode}
-          etiquetasEje={etiquetasEje}
-          onEventDrop={handleEventDrop}
-          onEventClick={handleEventClick}
-          onDatesSet={(start) => setFechaVisibleGrilla(prev =>
-            prev?.getTime() === start.getTime() ? prev : start
-          )}
+          contextoVista={filterType}
+          onEventoClick={handleEventClick}
+          onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
+          onDropEnCelda={({ horarioId, esSpan, dia, iniMin }) => {
+            const horario = listadoHorarios.find(h => String(h.id) === String(horarioId));
+            if (!horario) return;
+            // Sede del aula del evento: la celda solo es válida si existe un
+            // bloque activo de ESA sede en ese día/hora (consistencia de sede).
+            const aulaId = horario.extendedProps?.aula_id
+              ?? parseInt(horario.resourceId?.replace('aula_', ''));
+            const sedeAula = aulas.find(a => a.id === Number(aulaId))?.sede_id;
+            const bloqueDestino = resolverBloqueDeCelda(bloques, { dia, iniMin, sedeId: sedeAula });
+            if (!bloqueDestino) {
+              showToast("Esa casilla no corresponde a un bloque de la sede del aula de esta clase.", "error");
+              return;
+            }
+            const destinos = [bloqueDestino];
+            if (esSpan) {
+              const finMin = horaAMinutos(bloqueDestino.hora_inicio)
+                + (Number(bloqueDestino.duracion_minutos) || 0);
+              const inicioFmt = `${String(Math.floor(finMin / 60)).padStart(2, '0')}:${String(finMin % 60).padStart(2, '0')}`;
+              const segundo = bloques.find(b =>
+                b.activo !== false && b.sede_id === sedeAula
+                && b.dia_semana === bloqueDestino.dia_semana
+                && b.hora_inicio.startsWith(inicioFmt));
+              if (!segundo) {
+                showToast("No hay un bloque consecutivo disponible para la extensión x2 en esa casilla.", "error");
+                return;
+              }
+              destinos.push(segundo);
+            }
+            guardarAsignacionManual({ horario, aulaId, bloqueDestinos: destinos });
+          }}
         />
 
       </div>
@@ -679,13 +754,39 @@ const Horarios = () => {
           aulas={aulas}
           bloques={bloques}
           ventanaDivision={ventanaDivisionModal}
+          abarca={editAbarca}
+          onAbarcaChange={setEditAbarca}
+          puedeAbarcarDos={puedeAbarcarDos}
+          previewRango={previewRango}
           editAulaId={editAulaId}
           onChangeAulaId={setEditAulaId}
           editBloqueId={editBloqueId}
           onChangeBloqueId={setEditBloqueId}
-          onSave={handleSaveChangesModal}
+          onSave={(aulaId, bloqueId, abarca) => {
+            setEditAulaId(aulaId);
+            setEditBloqueId(bloqueId);
+            handleSaveChangesModal(abarca);
+          }}
           onDelete={handleDeleteSchedule}
           onClose={() => setIsEditModalOpen(false)}
+        />
+      )}
+
+      {/* CONFIRMACIÓN DE ELIMINACIÓN (E20, tarjeta) */}
+      {confirmEliminar && (
+        <DeleteConfirmModal
+          titulo="¿Eliminar esta clase del horario?"
+          mensaje={
+            confirmEliminar.esSpan
+              ? <>La clase abarca <span className="font-semibold text-slate-700">2 bloques</span>: se eliminarán ambas filas. Esta acción no se puede deshacer.</>
+              : "Estás a punto de eliminar esta asignación del horario. Esta acción no se puede deshacer."
+          }
+          onCancel={() => setConfirmEliminar(null)}
+          onConfirm={async () => {
+            const { horario } = confirmEliminar;
+            const ok = await eliminarHorario({ horario });
+            if (ok) setConfirmEliminar(null);
+          }}
         />
       )}
 

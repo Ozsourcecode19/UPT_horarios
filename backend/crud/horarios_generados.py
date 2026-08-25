@@ -1,11 +1,11 @@
 # backend/crud/horarios_generados.py
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 import models, schemas
 from typing import List, Optional
 from datetime import date, time, timedelta, datetime
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DBAPIError 
-from fastapi import HTTPException 
+from fastapi import HTTPException, status 
 from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
 import logging
 
@@ -324,6 +324,7 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
                 extendedProps={
                     "grupo": grupo_nombre,
                     "grupo_id": grupo_id,
+                    "leccion_id": horario_gen.leccion_id,
                     "division": grupo_division,
                     "docente": f"{docente_apellido}, {docente_nombre}",
                     "docente_id": docente_id,
@@ -570,3 +571,89 @@ def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optio
         version_horario=version,
         total_activos=total_activos,
     )
+def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
+                           bloque_ids: List[int], periodo_id: int) -> List[models.HorarioGenerado]:
+    """
+    E20 — Asignación manual desde la grilla: reemplaza (transaccionalmente) las
+    filas ACTIVO de una lección en el periodo por una nueva asignación de 1 o 2
+    bloques CONSECUTIVOS en el aula indicada.
+
+    - Valida cada bloque con validar_asignacion excluyendo las filas previas de
+      la propia lección (ventana de división, disponibilidad, habilitación,
+      cruces docente/grupo/aula, consistencia de sede).
+    - Las filas previas pasan a estado 'ELIMINADO' (soft-delete, mismo criterio
+      que DELETE /{id}); las nuevas heredan su version_horario.
+    """
+    from services.validation.schedule_validation import validar_asignacion
+
+    leccion = db.query(models.Leccion).filter(models.Leccion.id == leccion_id).first()
+    if not leccion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada.")
+    aula = db.query(models.Aula).filter(models.Aula.id == aula_id).first()
+    if not aula:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada.")
+
+    ids_unicos = list(dict.fromkeys(bloque_ids))
+    if not (1 <= len(ids_unicos) <= 2):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail={"error_code": "EXTENSION_INVALIDA",
+                                    "mensaje": "La lección puede abarcar 1 o 2 bloques."})
+
+    from models.bloque_horario import BloqueHorario
+    bloques = db.query(BloqueHorario).filter(BloqueHorario.id.in_(ids_unicos)).all()
+    if len(bloques) != len(ids_unicos):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque horario no encontrado.")
+
+    ordenados = sorted(bloques, key=lambda b: b.hora_inicio)
+
+    # Consistencia de sede con el aula destino
+    if any(b.sede_id != aula.sede_id for b in ordenados):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail={"error_code": "SITE_MISMATCH",
+                                    "mensaje": "Los bloques seleccionados pertenecen a otra sede que el aula."})
+
+    # Consecutividad exacta para extensión de 2 bloques
+    if len(ordenados) == 2:
+        fin_primero = (datetime.combine(date.min, ordenados[0].hora_inicio)
+                       + timedelta(minutes=ordenados[0].duracion_minutos)).time()
+        if ordenados[1].hora_inicio != fin_primero:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail={"error_code": "NO_CONSECUTIVOS",
+                                        "mensaje": "Los dos bloques deben ser consecutivos (el segundo inicia donde termina el primero)."})
+
+    filas_previas = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.leccion_id == leccion_id,
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO',
+    ).all()
+
+    # Validaciones completas excluyendo las filas previas de ESTA lección
+    for bloque in ordenados:
+        res = validar_asignacion(db, leccion=leccion, bloque_objetivo=bloque,
+                                 aula_objetivo=aula, excluir_leccion_id=leccion_id)
+        if not res.valido:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail={"error_code": res.error_code or "ASIGNACION_INVALIDA",
+                                        "mensaje": res.mensaje})
+
+    version = filas_previas[0].version_horario if filas_previas else (
+        (db.query(func.max(models.HorarioGenerado.version_horario))
+           .filter(models.HorarioGenerado.periodo_id == periodo_id).scalar() or 0) + 1)
+
+    for fila in filas_previas:
+        fila.estado = 'ELIMINADO'
+
+    creadas = []
+    for bloque in ordenados:
+        hg = models.HorarioGenerado(
+            leccion_id=leccion_id, aula_id=aula_id, bloque_id=bloque.id,
+            estado='ACTIVO', version_horario=version, periodo_id=periodo_id,
+        )
+        db.add(hg)
+        creadas.append(hg)
+
+    db.commit()
+    for hg in creadas:
+        db.refresh(hg)
+    return creadas

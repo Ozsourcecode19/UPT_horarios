@@ -2,8 +2,8 @@
 // Logica pura del calendario de horarios, extraida de Horarios.jsx (E10)
 // para poder testearla de forma aislada (vitest).
 
-// Convierte los eventos de la API al formato de color de FullCalendar:
-// toma el backgroundColor de extendedProps y lo aplica como color real del evento.
+// Convierte los eventos de la API al formato de color del horario:
+// expone backgroundColor de extendedProps como color real del evento.
 export const mapScheduleEvents = (eventos) => {
   return (eventos || []).map(ev => ({
     ...ev,
@@ -13,60 +13,13 @@ export const mapScheduleEvents = (eventos) => {
   }));
 };
 
-// Busca el bloque correspondiente a un drop de fecha/hora.
-// Solo considera bloques de la misma sede que el aula del evento (evita SITE_MISMATCH
-// al elegir bloques de sedes distintas con la misma hora).
-//
-// Estrategia (E14-fix): primero CONTENCIÓN — el bloque bajo el cursor es aquel cuyo
-// intervalo [hora_inicio, hora_inicio+duración) contiene el minuto soltado. Esto
-// corrige el comportamiento anterior (inicio-más-cercano <45'), que en grillas de
-// 60', mixtas 30'/45' o en el último tercio de un bloque elegía el bloque siguiente
-// al visualizado. Fallback: si ningún bloque contiene el punto (huecos de grilla),
-// el más cercano por hora de inicio con tolerancia <45'.
-export const findNearestBloque = (date, sedeId, bloques) => {
-  const jsDay = date.getDay(); // 0 = Dom, 1 = Lun, etc.
-  const diaSemana = jsDay === 0 ? 7 : jsDay;
-  const dropTimeMin = date.getHours() * 60 + date.getMinutes(); // minutos desde medianoche
-
-  // Filtrar los bloques del mismo dia (y de la misma sede si se indica)
-  const candidatos = (bloques || []).filter(
-    (b) => b.dia_semana === diaSemana && (sedeId == null || b.sede_id === sedeId)
-  );
-  if (candidatos.length === 0) return null;
-
-  const inicioEnMinutos = (b) => {
-    const [h, m] = String(b.hora_inicio).split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  // 1) Contención: el bloque que contiene el instante soltado.
-  // Empate (grillas mixtas p.ej. 30'/45' con mismo inicio): inicio más temprano
-  // y duración menor -> determinista.
-  const contenedores = candidatos
-    .filter((b) => {
-      const ini = inicioEnMinutos(b);
-      const dur = Number(b.duracion_minutos) || 0;
-      return dur > 0 && dropTimeMin >= ini && dropTimeMin < ini + dur;
-    })
-    .sort(
-      (a, b) =>
-        inicioEnMinutos(a) - inicioEnMinutos(b) ||
-        (Number(a.duracion_minutos) || 0) - (Number(b.duracion_minutos) || 0)
-    );
-  if (contenedores.length > 0) return contenedores[0];
-
-  // 2) Fallback por cercanía (huecos entre bloques); tolerancia máxima 45 min.
-  let bestBlock = null;
-  let minDiff = 9999;
-  candidatos.forEach((b) => {
-    const diff = Math.abs(dropTimeMin - inicioEnMinutos(b));
-    if (diff < minDiff) {
-      minDiff = diff;
-      bestBlock = b;
-    }
-  });
-  return minDiff < 45 ? bestBlock : null;
+// Minutos desde medianoche a partir de "H:MM[:SS]".
+export const horaAMinutos = (hms) => {
+  const partes = String(hms).split(':').map(Number);
+  return (partes[0] || 0) * 60 + (partes[1] || 0);
 };
+
+const fmtMinutos = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 
 // Filtra los eventos generados por tipo de vista (grupo/docente/aula).
 // Matcheo primero por IDs reales (extendedProps.grupo_id/docente_id/aula_id,
@@ -186,54 +139,111 @@ export const resolverDivisionEvento = (extendedProps = {}, grupos = []) => {
 // Sin ventana definida no hay restricción (jornada global).
 export const bloqueDentroVentana = (bloque, ventana) => {
   if (!bloque || !ventana) return true;
-  const aMinutos = (hms) => {
-    const partes = String(hms).split(':').map(Number);
-    return (partes[0] || 0) * 60 + (partes[1] || 0);
-  };
-  const ini = aMinutos(bloque.hora_inicio);
+  const ini = horaAMinutos(bloque.hora_inicio);
   const fin = ini + (Number(bloque.duracion_minutos) || 0);
-  return ini >= aMinutos(ventana.inicio) && fin <= aMinutos(ventana.fin);
+  return ini >= horaAMinutos(ventana.inicio) && fin <= horaAMinutos(ventana.fin);
 };
 
-// Etiquetas de rango horario para el eje del calendario ("8:00 - 8:45"):
-// Map minutosDesdeMedianoche -> texto, con un punto por cada hora de inicio de
-// bloque activo de las sedes indicadas (deduplicado entre sedes).
-// sedeIds vacío = sin filtro de sede (unión de todas; vista por docente/Demo).
-export const etiquetasRangoBloques = (bloques = [], sedeIds = []) => {
-  const fmt = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
-  const map = new Map();
+// ============================================================
+// GRILLA SEMANAL POR BANDAS DE BLOQUE (reemplaza a FullCalendar)
+// La unidad visual es el BLOQUE: una banda por cada hora de inicio,
+// filas "Descanso" en los huecos, celdas resolubles a un BloqueHorario
+// exacto. sedeIds vacío = unión de todas las sedes (docente/Demo).
+// ============================================================
+
+// Bandas del eje: agrupa bloques activos por hora de inicio de las sedes
+// indicadas; el fin de la banda es el máximo fin del grupo, recortado a la
+// ventana horaria (jornada/turno). Devuelve [{iniMin, finMin, etiqueta}].
+export const construirBandasEje = (bloques = [], sedeIds = [], ventana = null) => {
+  const porInicio = new Map(); // iniMin -> finMax
   bloques
     .filter(b =>
       b.activo !== false &&
       (!sedeIds || sedeIds.length === 0 ||
         sedeIds.map(Number).includes(Number(b.sede_id))))
     .forEach((b) => {
-      const [h, m] = String(b.hora_inicio).split(':').map(Number);
-      const iniMin = h * 60 + m;
-      if (map.has(iniMin)) return; // dedupe entre sedes / duplicados
-      const finMin = iniMin + (Number(b.duracion_minutos) || 0);
-      map.set(iniMin, { texto: `${fmt(iniMin)} - ${fmt(finMin)}` });
+      const ini = horaAMinutos(b.hora_inicio);
+      const fin = ini + (Number(b.duracion_minutos) || 0);
+      porInicio.set(ini, Math.max(porInicio.get(ini) ?? 0, fin));
     });
+
+  let bandas = Array.from(porInicio.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([iniMin, finMin]) => ({
+      iniMin,
+      finMin,
+      etiqueta: `${fmtMinutos(iniMin)} - ${fmtMinutos(finMin)}`,
+    }));
+
+  if (ventana) {
+    const vIni = horaAMinutos(ventana.inicio);
+    const vFin = horaAMinutos(ventana.fin);
+    bandas = bandas
+      .filter(b => b.finMin > vIni && b.iniMin < vFin)
+      .map(b => ({ ...b, iniMin: Math.max(b.iniMin, vIni), finMin: Math.min(b.finMin, vFin) }));
+  }
+  return bandas;
+};
+
+// Índice id -> {dia, iniMin, sedeId} para resolver eventos/celdas exactamente.
+export const indiceBloques = (bloques = []) => {
+  const map = new Map();
+  (bloques || []).forEach((b) => {
+    map.set(Number(b.id), {
+      dia: b.dia_semana,
+      iniMin: horaAMinutos(b.hora_inicio),
+      sedeId: b.sede_id,
+    });
+  });
   return map;
 };
 
-// Aplica un gap mínimo entre etiquetas del eje para evitar hacinamiento
-// (inicios de bloques muy cercanos, típico en la unión de sedes del docente):
-// recorre los minutos en orden ascendente y omite toda etiqueta que empiece a
-// menos de minGapMinutos del último inicio mantenido. Solo afecta el TEXTO
-// visible; las fronteras de banda (líneas) no se alteran.
-export const aplicarGapEtiquetas = (fronteras, minGapMinutos = 30) => {
-  const filtrado = new Map();
-  let ultimo = -Infinity;
-  Array.from((fronteras || new Map()).keys())
-    .sort((a, b) => a - b)
-    .forEach((min) => {
-      if (min - ultimo >= minGapMinutos) {
-        filtrado.set(min, fronteras.get(min));
-        ultimo = min;
-      }
-    });
-  return filtrado;
+// Bloque activo EXACTO para una celda (día + inicio de banda + sede del aula).
+// null si no existe (hora sin bloque o banda de otra sede) → el drop se rechaza
+// con mensaje claro en lugar de adivinar el bloque más cercano.
+export const resolverBloqueDeCelda = (bloques = [], { dia, iniMin, sedeId } = {}) => {
+  if (dia == null || iniMin == null || sedeId == null) return null;
+  return (bloques || []).find(b =>
+    b.activo !== false &&
+    Number(b.sede_id) === Number(sedeId) &&
+    b.dia_semana === dia &&
+    horaAMinutos(b.hora_inicio) === iniMin) || null;
+};
+
+// Extrae {dia (1..7), min} de un start ISO local ("2026-06-29T08:30:00").
+const diaYMinutoDeISO = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const jsDay = d.getDay();
+  return {
+    dia: jsDay === 0 ? 7 : jsDay,
+    min: d.getHours() * 60 + d.getMinutes(),
+  };
+};
+
+// Agrupa eventos por celda "dia|iniMin". Clave preferente: extendedProps.bloque_id
+// vía indiceBloques (exacto). Fallback temporal por solape con bandas (eventos del
+// Modo Demo sin bloque válido).
+export const agruparEventosPorCelda = (eventos = [], indice = new Map(), bandas = []) => {
+  const celdas = new Map();
+  const push = (clave, ev) => {
+    if (!celdas.has(clave)) celdas.set(clave, []);
+    celdas.get(clave).push(ev);
+  };
+  (eventos || []).forEach((ev) => {
+    const bid = ev.extendedProps?.bloque_id;
+    const info = bid != null ? indice.get(Number(bid)) : null;
+    if (info) {
+      push(`${info.dia}|${info.iniMin}`, ev);
+      return;
+    }
+    const pos = diaYMinutoDeISO(ev.start || '');
+    if (!pos) return;
+    const banda = bandas.find(b => pos.min < b.finMin && pos.min >= b.iniMin)
+      || bandas.find(b => Math.abs(pos.min - b.iniMin) < 15);
+    if (banda) push(`${pos.dia}|${banda.iniMin}`, ev);
+  });
+  return celdas;
 };
 
 // Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.

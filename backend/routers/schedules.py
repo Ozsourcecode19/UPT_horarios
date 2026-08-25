@@ -118,6 +118,22 @@ def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
 
 
 # Endpoint para validar un movimiento manual (drag & drop) 
+@router.post("/asignar-manual", response_model=List[schemas.HorarioGenerado], summary="Asignación manual desde la grilla (1-2 bloques)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def asignar_manual(req: schemas.AsignarManualRequest, db: Session = Depends(get_db)):
+    """
+    E20 — Crea/reemplaza (transaccional) las filas ACTIVO de una lección en el
+    periodo: 1 bloque simple o 2 bloques consecutivos en el aula indicada.
+    Valida ventana del turno, disponibilidad, habilitación y cruces por bloque,
+    excluyendo las filas previas de la propia lección.
+    """
+    return crud.asignar_horario_manual(
+        db,
+        leccion_id=req.leccion_id,
+        aula_id=req.aula_id,
+        bloque_ids=req.bloque_ids,
+        periodo_id=req.periodo_id,
+    )
+
 @router.post("/validate-move", summary="Validar movimiento de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depends(get_db)): # <-- CORREGIDO: Usar ScheduleMoveRequest directamente
     """

@@ -110,3 +110,4 @@ def test_extended_props_incluyen_ids_y_division(data, db_session):
     assert ev.extendedProps["docente_id"] == data.docente.id
     assert ev.extendedProps["aula_id"] == data.aula.id
     assert ev.extendedProps["division"] == "MATUTINO"
+    assert ev.extendedProps["leccion_id"] == data.leccion.id

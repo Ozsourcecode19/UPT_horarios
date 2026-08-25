@@ -133,7 +133,7 @@ const BloquesHorarios = () => {
   const [confirmAction, setConfirmAction] = useState(null); // { bloque, tipo: 'activar'|'desactivar'|'eliminar' }
   const [showGenerarModal, setShowGenerarModal] = useState(false);
   const [generarDuracion, setGenerarDuracion] = useState(45);
-  const [generarOverwrite, setGenerarOverwrite] = useState(false);
+  const [generarModo, setGenerarModo] = useState('completar'); // 'completar' | 'reemplazar'
   const [generarLoading, setGenerarLoading] = useState(false);
 
   // Modo Demo / Fallback local para robustez completa
@@ -343,7 +343,7 @@ const BloquesHorarios = () => {
   // --- GENERAR GRILLA ESTÁNDAR ---
   const openGenerarModal = () => {
     setGenerarDuracion(duracionDefault);
-    setGenerarOverwrite(false);
+    setGenerarModo('completar');
     setShowGenerarModal(true);
   };
 
@@ -367,14 +367,20 @@ const BloquesHorarios = () => {
       const res = await BloquesService.generateBloquesEstandar({
         sede_id: sedeId,
         duracion_minutos: generarDuracion,
-        overwrite: generarOverwrite,
+        modo: generarModo,
       });
       queryClient.invalidateQueries({ queryKey: ['bloques'] });
-      showToast(`${res.creados} bloques creados, ${res.omitidos} omitidos`, 'success');
+      const partes = [`${res.creados} bloque(s) creados`];
+      if (res.actualizados) partes.push(`${res.actualizados} actualizado(s)`);
+      if (res.omitidos) partes.push(`${res.omitidos} omitido(s)`);
+      if (res.desactivados) partes.push(`${res.desactivados} desactivado(s)`);
+      showToast(`${partes.join(', ')} · Ventana ${res.ventana}`, 'success');
       setShowGenerarModal(false);
     } catch (err) {
       console.error(err);
-      showToast(getDetailError(err), 'error');
+      const detalle = getDetailError(err);
+      // 409 BLOQUES_EN_USO llega como objeto {error_code, mensaje, clases_afectadas}
+      showToast(typeof detalle === 'string' ? detalle : (detalle?.mensaje || 'Error al generar la grilla'), 'error');
     } finally {
       setGenerarLoading(false);
     }
@@ -881,10 +887,9 @@ const BloquesHorarios = () => {
             <div>
               <h3 className="text-lg font-bold text-slate-800">Generar grilla estándar</h3>
               <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                Crea los bloques de <span className="font-semibold">Lunes a Viernes</span> de{' '}
-                <span className="font-semibold">08:00 a 16:00</span> para{' '}
-                <span className="font-semibold text-slate-700">{sedeActual?.nombre || 'la sede seleccionada'}</span>,
-                omitiendo los bloques que ya existan en el mismo día y hora.
+                Genera la grilla de{' '}
+                <span className="font-semibold text-slate-700">{sedeActual?.nombre || 'la sede seleccionada'}</span>{' '}
+                usando la <span className="font-semibold">jornada y días laborables configurados en el sistema</span>.
               </p>
             </div>
 
@@ -904,15 +909,39 @@ const BloquesHorarios = () => {
                 </select>
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700 font-medium cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={generarOverwrite}
-                  onChange={(e) => setGenerarOverwrite(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Renumerar orden visual de la sede (1..n por día según hora)
-              </label>
+              <div className="space-y-2">
+                {[
+                  { valor: 'completar', titulo: 'Completar huecos', desc: 'Crea solo los bloques que falten en la serie. No toca bloques existentes de otras duraciones.' },
+                  { valor: 'reemplazar', titulo: 'Reemplazar grilla', desc: 'Desactiva TODOS los bloques activos de la sede y crea una serie uniforme cubriendo la jornada completa (último tramo recortado si sobra).' },
+                ].map(op => (
+                  <label key={op.valor} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    generarModo === op.valor ? 'border-blue-400 bg-blue-50/60' : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="generar-modo"
+                      value={op.valor}
+                      checked={generarModo === op.valor}
+                      onChange={(e) => setGenerarModo(e.target.value)}
+                      className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-bold text-slate-700">{op.titulo}</span>
+                      <span className="block text-xs text-slate-500 leading-relaxed">{op.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {generarModo === 'reemplazar' && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200/70 rounded-xl">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <span className="text-xs text-amber-700 leading-relaxed">
+                    Si hay clases ACTIVAS usando bloques de esta sede, el sistema rechazará la operación (409).
+                    Regenera o libera esos horarios primero.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">

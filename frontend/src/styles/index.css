@@ -26,156 +26,204 @@
   }
 }
 
-/* ==========================================================================
-   THEME FullCalendar v6 (Horarios.jsx) — E9
-   Se estiliza vía CSS variables embebidas en el bundle de @fullcalendar/core.
-   Paleta coherente con el diseño de la app (slate + blue/indigo).
-   ========================================================================== */
-.fc {
-  --fc-border-color: #e2e8f0;
-  --fc-page-bg-color: #ffffff;
-  --fc-neutral-bg-color: #f8fafc;
-  --fc-today-bg-color: #eff6ff;
-  --fc-highlight-color: #eff6ff;
-  --fc-now-indicator-color: #6366f1;
-  --fc-small-font-size: 0.85em;
-
-  /* Toolbar nativa estilizada */
-  --fc-button-bg-color: #f1f5f9;
-  --fc-button-border-color: transparent;
-  --fc-button-text-color: #475569;
-  --fc-button-hover-bg-color: #e2e8f0;
-  --fc-button-hover-border-color: transparent;
-  --fc-button-active-bg-color: #3b82f6;
-  --fc-button-active-border-color: transparent;
-  --fc-button-active-text-color: #ffffff;
-}
-
-.fc-header-toolbar {
-  margin-bottom: 1rem;
-}
-
-.fc .fc-button {
-  border-radius: 0.75rem;
-  font-weight: 600;
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.75rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.fc .fc-button:focus {
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.25);
-}
-
-.fc .fc-button-group .fc-button {
-  margin-right: 0.25rem;
-}
-
-/* Cabecera de días/columnas */
-.fc .fc-col-header-cell {
-  padding: 0.5rem 0.25rem;
-  background: #f8fafc;
-}
-
-.fc .fc-col-header-cell-cushion {
-  font-weight: 700;
-  font-size: 0.75rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #475569;
-  padding: 0.25rem 0.5rem;
-}
-
-/* Día de hoy en la cabecera */
-.fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
-  color: #2563eb;
-}
-
-/* Etiquetas de hora de la columna de tiempo */
-.fc .fc-timegrid-slot-label-cushion {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  white-space: nowrap; /* rangos "8:00 - 8:45" en una línea */
-}
-
 /* ============================================================
-   EJE DE TIEMPO POR BANDAS DE BLOQUE
-   Las filas de 15' no llevan línea propia (más aire y targets de
-   drag & drop amplios); cada bloque horario se cierra con una línea
-   sólida en su fila-inicio y alterna fondo sutilmente (zebra).
-   Clases inyectadas vía slotLaneClassNames (ScheduleCalendarView).
+   GRILLA SEMANAL POR BANDAS DE BLOQUE (GridSemanalBloques, E18)
+   Tabla nativa: una fila por BloqueHorario, etiqueta centrada,
+   zebra por banda, filas "Descanso" en huecos, DnD HTML5.
    ============================================================ */
-.fc .fc-timegrid-slot {
-  border-bottom: none;
-  height: 18px !important; /* aire vertical: etiquetas separadas y DnD preciso */
+.grilla-scroll {
+  height: 680px;
+  overflow-y: auto;
 }
 
-.fc .fc-timegrid-slot.eje-borde-bloque {
-  border-bottom: 2px solid #cbd5e1;
+table.grilla-bloques {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
 }
 
-.fc .fc-timegrid-slot.eje-banda-par {
+.grilla-bloques th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #475569;
+  text-align: center;
+}
+
+.grilla-bloques th.col-hora {
+  left: 0;
+  z-index: 3;
+}
+
+.horarios-page {
+  --alto-banda: 64px; /* estándar cómodo en pantalla */
+}
+
+.grilla-bloques td {
+  border: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.grilla-bloques td.celda-hora {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 104px;
+  min-width: 104px;
+  background-color: #fff;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
+}
+
+.rango-hora {
+  white-space: nowrap;
+}
+
+.grilla-bloques tr.banda-par > td.celda-dia {
   background-color: #fafbfc;
 }
 
-.dark .fc .fc-timegrid-slot.eje-borde-bloque {
-  border-bottom-color: #334155;
+.grilla-bloques tr.fila-banda > td.celda-dia,
+.grilla-bloques tr.fila-banda > td.celda-hora {
+  height: var(--alto-banda);
 }
 
-.dark .fc .fc-timegrid-slot.eje-banda-par {
-  background-color: rgb(30 41 59 / .35);
+.grilla-bloques td.celda-dia {
+  padding: 0.5rem;
+  transition: background-color 0.15s ease;
 }
 
-/* Eventos: tarjetas con borde izquierdo de color y sombra sutil */
-.fc .fc-event {
-  border-radius: 0.5rem;
-  border-color: transparent;
-  box-shadow: 0 2px 6px rgb(15 23 42 / 0.08);
+.grilla-bloques td.celda-droppable {
+  cursor: copy;
 }
 
-.fc .fc-event-main {
+.grilla-bloques td.celda-hover {
+  background-color: #eff6ff !important;
+  outline: 2px dashed #60a5fa;
+  outline-offset: -3px;
+}
+
+.fila-descanso td {
+  height: 18px;
+  padding: 0;
+  background-color: #f1f5f9;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  user-select: none;
+}
+
+.evento-card {
+  display: block;
+  margin-bottom: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-left: 4px solid var(--ev-c, #6366f1);
+  border-radius: 0.4rem;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
+  cursor: grab;
+  line-height: 1.15;
+  user-select: none;
+}
+
+.evento-card:last-child {
+  margin-bottom: 0;
+}
+
+.evento-card {
+  position: relative;
+}
+
+.evento-card .ev-del {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 2px;
+  border-radius: 6px;
+  color: #94a3b8;
+  opacity: 0;
+  transition: opacity .15s ease, color .15s ease, background-color .15s ease;
+}
+
+.evento-card:hover .ev-del {
+  opacity: 1;
+}
+
+.evento-card .ev-del:hover {
+  color: #dc2626;
+  background-color: #fee2e2;
+}
+
+.evento-card .ev-x2 {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.62rem;
+  color: #1d4ed8;
+}
+
+.evento-card.evento-continuacion {
+  opacity: 0.65;
+  border-left-style: dashed;
+  cursor: default;
+}
+
+.evento-card.evento-continuacion .ev-docente,
+.evento-card.evento-continuacion .ev-grupo,
+.evento-card.evento-continuacion .ev-aula {
+  display: none;
+}
+
+.evento-card .ev-materia {
+  display: block;
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #1e293b;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fc .fc-event.fc-event-start.fc-event-end {
-  border-radius: 0.5rem;
+.evento-card .ev-docente {
+  display: block;
+  font-size: 0.65rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Indicador "ahora" */
-.fc .fc-timegrid-now-indicator-line {
-  border-color: #6366f1;
+.evento-card .ev-grupo,
+.evento-card .ev-aula {
+  display: block;
+  font-size: 0.62rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fc .fc-timegrid-now-indicator-arrow {
-  border-color: #6366f1;
+.evento-card .ev-grupo {
+  color: #475569; /* grupo un tono más marcado que el resto de los secundarios */
 }
 
-/* Scrollbar fino dentro del recuadro del calendario */
-.fc .fc-scroller {
-  overflow-y: auto !important;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+.celda-vacia-eje {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #94a3b8;
 }
 
-.fc .fc-scroller::-webkit-scrollbar {
-  width: 8px;
-}
-
-.fc .fc-scroller::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.fc .fc-scroller::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 8px;
-}
-
-.fc .fc-scroller::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
-}
 /* ============================================================
    IMPRESIÓN / EXPORTACIÓN PDF (E12, endurecido en bugfix 2026-08-25)
    Solo se imprime la tarjeta del calendario (.print-area) con
@@ -252,81 +300,53 @@
     /* Rasteriza bordes/fondos completos aunque "Background graphics" esté off */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    zoom: 0.85; /* Ajuste a una sola hoja landscape: semana completa sin cortes */
+    /* Banda de 11mm ⇒ ~17 filas por página: jornada real siempre en 1 hoja,
+       a tamaño natural (zoom 1). Reducir --print-zoom si algún día hiciera falta. */
+    --alto-banda: 11mm;
+    --print-zoom: 1;
+    zoom: var(--print-zoom, 1);
   }
 
-  /* Bordes firmes y grilla sin fragmentar en impresión */
-  .print-area .fc {
-    --fc-border-color: #94a3b8;
+  /* Tabla de la grilla por bandas: bordes firmes, filas íntegras */
+  .print-area .grilla-bloques th,
+  .print-area .grilla-bloques td {
+    border: 1px solid #94a3b8 !important;
+    position: static !important; /* sin sticky en papel */
+    background: transparent !important;
   }
 
-  .print-area .fc .fc-timegrid-slot.eje-borde-bloque {
-    border-bottom: 2px solid #475569 !important;
-  }
-
-  .print-area .fc-scrollgrid {
+  .print-area .grilla-bloques {
     border-collapse: collapse !important;
   }
 
-  .print-area tr,
-  .print-area td,
-  .print-area th {
+  .print-area .grilla-bloques tr,
+  .print-area .grilla-bloques td,
+  .print-area .grilla-bloques th {
     break-inside: avoid;
   }
 
-  /* Etiqueta de rango del eje de tiempo ("8:00 - 8:45") sin salto de línea */
-  .fc .fc-timegrid-slot-label-cushion {
-    white-space: nowrap;
-  }
-
-  /* Controles que no aportan en papel */
-  .no-print,
-  .fc-header-toolbar,
-  .fc-timegrid-now-indicator-line {
-    display: none !important;
-  }
-
-  /* El calendario se expande completo (sin alto fijo ni scroller interno).
-     Clave FullCalendar v6: el harness guarda la altura como estilo inline
-     desde JS; sin este reset la grilla queda recortada al alto de pantalla. */
-  .print-area .fc {
-    height: auto !important;
-  }
-
-  .print-area .fc-view-harness {
-    height: auto !important;
-    max-height: none !important;
-  }
-
-  .print-area .fc-scroller {
-    overflow: visible !important;
-    height: auto !important;
-  }
-
-  /* Columnas/contenedores fluyen en vez de requerir scroll */
-  .print-area .schedule-calendar-wrapper {
-    overflow: visible !important;
-  }
-
-  .print-area .schedule-calendar-wrapper .flex {
-    flex-wrap: wrap;
-  }
-
-  /* Eventos sobrios: sin fondos de color (independiente del checkbox
-     "Background graphics" del navegador), texto oscuro y borde fino.
-     El fondo inline que FullCalendar aplica por materia se anula aquí. */
-  .print-area .fc-event {
+  /* Eventos sobrios en papel: fondo blanco, borde fino y acento de materia */
+  .print-area .evento-card {
     background: #fff !important;
     color: #1e293b !important;
     border: 1px solid #94a3b8 !important;
+    border-left: 4px solid var(--ev-c, #6366f1) !important;
     box-shadow: none !important;
-    text-shadow: none !important;
-    break-inside: avoid;
   }
 
-  .print-area .fc-event .fc-event-main,
-  .print-area .fc-event * {
+  .print-area .evento-card * {
     color: #1e293b !important;
+  }
+
+  /* Controles que no aportan en papel */
+  .no-print {
+    display: none !important;
+  }
+
+  /* La grilla fluye completa (sin alto de pantalla ni scroller) */
+  .print-area .grilla-scroll {
+    height: auto !important;
+    overflow: visible !important;
   }
 }
 
@@ -370,27 +390,34 @@
    azules y los colores de acento (blue/indigo/emerald/amber/red) conservan
    contraste suficiente sin cambios. */
 
-/* ---------- FullCalendar vía variables --fc-* (tematización E9) ---------- */
-.dark {
-  --fc-border-color: #2b3a52;
-  --fc-page-bg-color: #0f172a;
-  --fc-neutral-bg-color: #1e293b;
-  --fc-today-bg-color: rgba(59, 130, 246, 0.12);
-  --fc-highlight-color: rgba(99, 102, 241, 0.18);
-  --fc-now-indicator-color: #818cf8;
-  --fc-button-bg-color: #1e293b;
-  --fc-button-border-color: transparent;
-  --fc-button-text-color: #cbd5e1;
-  --fc-button-hover-bg-color: #334155;
-  --fc-button-hover-border-color: transparent;
-  --fc-button-active-bg-color: #2563eb;
-  --fc-button-active-border-color: #2563eb;
-  --fc-event-border-color: transparent;
+/* ---------- Grilla por bandas: variante oscura ---------- */
+.dark .grilla-bloques th {
+  background-color: #0f172a;
+  color: #94a3b8;
+  border-color: #334155;
 }
 
-/* Cabeceras de día de FullCalendar (estilizadas con clases slate en E9) */
-.dark .fc .fc-col-header-cell-cushion { color: #94a3b8; }
-.dark .fc .fc-day-today { background: rgba(59, 130, 246, 0.08); }
+.dark .grilla-bloques td {
+  border-color: #334155;
+}
+
+.dark .grilla-bloques td.celda-hora {
+  background-color: #0f172a;
+  color: #cbd5e1;
+}
+
+.dark .grilla-bloques tr.banda-par > td {
+  background-color: rgb(30 41 59 / .45);
+}
+
+.dark .fila-descanso td {
+  background-color: rgb(15 23 42 / .8);
+}
+
+.dark .evento-card {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
 
 /* ---------- La impresión (E12) SIEMPRE sale clara ---------- */
 @media print {
@@ -399,19 +426,6 @@
   /* Neutraliza el shim dentro de la hoja impresa */
   html.dark .bg-white { background-color: #fff !important; }
   html.dark .text-slate-800, html.dark .text-slate-900 { color: #1e293b !important; }
-  /* Variables del tema FullCalendar a sus valores claros (en pantalla,
-     el shim oscuro las re-mapea; en papel deben salir claras) */
-  html.dark .print-area .fc {
-    --fc-border-color: #e2e8f0;
-    --fc-page-bg-color: #ffffff;
-    --fc-neutral-bg-color: #f8fafc;
-    --fc-today-bg-color: #eff6ff;
-    --fc-highlight-color: #eff6ff;
-    --fc-button-bg-color: #f1f5f9;
-    --fc-button-text-color: #475569;
-  }
-  html.dark .print-area .fc .fc-col-header-cell-cushion { color: #475569; }
-  html.dark .print-area .fc .fc-timegrid-slot-label-cushion { color: #94a3b8; }
 }
 
 /* ============================================================
@@ -513,21 +527,6 @@
    FullCalendar, caja "¿Cómo configurar?" y barra de ventana de
    Disponibilidad, aviso "Estructura vs. ventana" de Bloques).
    ============================================================ */
-
-/* --- FullCalendar: cabecera de días (E9 dejaba fondo claro fijo) --- */
-.dark .fc .fc-col-header-cell {
-  background: #16213b;
-}
-.dark .fc .fc-col-header-cell.fc-day-today {
-  background: rgba(59, 130, 246, 0.12);
-}
-.dark .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
-  color: #93c5fd;
-}
-/* Sub-slots punteados: línea clara casi invisible sobre oscuro */
-.dark .fc .fc-timegrid-slot {
-  border-bottom-color: rgb(51 65 85 / .55);
-}
 
 /* --- Neutros con opacidad aún sin mapear --- */
 .dark .bg-slate-50\/20 { background-color: rgb(11 18 32 / .2); }
