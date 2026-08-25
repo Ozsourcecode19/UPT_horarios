@@ -195,6 +195,47 @@ export const bloqueDentroVentana = (bloque, ventana) => {
   return ini >= aMinutos(ventana.inicio) && fin <= aMinutos(ventana.fin);
 };
 
+// Etiquetas de rango horario para el eje del calendario ("8:00 - 8:45"):
+// Map minutosDesdeMedianoche -> texto, con un punto por cada hora de inicio de
+// bloque activo de las sedes indicadas (deduplicado entre sedes).
+// sedeIds vacío = sin filtro de sede (unión de todas; vista por docente/Demo).
+export const etiquetasRangoBloques = (bloques = [], sedeIds = []) => {
+  const fmt = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+  const map = new Map();
+  bloques
+    .filter(b =>
+      b.activo !== false &&
+      (!sedeIds || sedeIds.length === 0 ||
+        sedeIds.map(Number).includes(Number(b.sede_id))))
+    .forEach((b) => {
+      const [h, m] = String(b.hora_inicio).split(':').map(Number);
+      const iniMin = h * 60 + m;
+      if (map.has(iniMin)) return; // dedupe entre sedes / duplicados
+      const finMin = iniMin + (Number(b.duracion_minutos) || 0);
+      map.set(iniMin, { texto: `${fmt(iniMin)} - ${fmt(finMin)}` });
+    });
+  return map;
+};
+
+// Aplica un gap mínimo entre etiquetas del eje para evitar hacinamiento
+// (inicios de bloques muy cercanos, típico en la unión de sedes del docente):
+// recorre los minutos en orden ascendente y omite toda etiqueta que empiece a
+// menos de minGapMinutos del último inicio mantenido. Solo afecta el TEXTO
+// visible; las fronteras de banda (líneas) no se alteran.
+export const aplicarGapEtiquetas = (fronteras, minGapMinutos = 30) => {
+  const filtrado = new Map();
+  let ultimo = -Infinity;
+  Array.from((fronteras || new Map()).keys())
+    .sort((a, b) => a - b)
+    .forEach((min) => {
+      if (min - ultimo >= minGapMinutos) {
+        filtrado.set(min, fronteras.get(min));
+        ultimo = min;
+      }
+    });
+  return filtrado;
+};
+
 // Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.
 // Devuelve el evento actualizado (puro; la mutacion del estado la hace el componente).
 export const recalcularEventoDemo = (evento, targetBlock, aulaId, fechaBase, aulas = []) => {

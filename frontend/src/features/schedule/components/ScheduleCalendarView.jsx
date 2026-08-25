@@ -1,18 +1,18 @@
 // src/features/schedule/components/ScheduleCalendarView.jsx
 // Grilla única del gestor de horarios (FullCalendar timeGridWeek), extraída de
-// pages/Horarios.jsx (E16). La ventana horaria es dinámica vía `ventanaGrilla`
-// (resolveVentanaGrilla): se adapta al turno del grupo o muestra la jornada completa.
-// El ref de FullCalendar vive aquí dentro; la página solo pasa props y handlers.
+// pages/Horarios.jsx (E16). Semana plantilla: sin navegación ni vista por día;
+// cabeceras solo con el nombre del día; eje de tiempo con el rango de cada
+// bloque ("8:00 - 8:45") vía etiquetasEje. Ventana horaria dinámica vía
+// `ventanaGrilla` (resolveVentanaGrilla). El ref vive aquí dentro.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 import { GraduationCap, Users, MapPin } from 'lucide-react';
 
-import { mapScheduleEvents } from '../utils/schedule';
+import { mapScheduleEvents, aplicarGapEtiquetas } from '../utils/schedule';
 
 const ScheduleCalendarView = ({
   eventos = [],
@@ -21,22 +21,13 @@ const ScheduleCalendarView = ({
   calendarKey,
   isLoading = false,
   demoMode = false,
+  etiquetasEje = null, // Map minutos -> { texto: "8:00 - 8:45" } (fronteras de banda); vacío/null = eje horario clásico
+  gapEtiquetas = 30,   // separación mínima (min) entre textos del eje para evitar hacinamiento
   onEventDrop,
   onEventClick,
   onDatesSet, // opcional: informa el inicio del rango visible (para encabezados de impresión)
 }) => {
   const calendarRef = useRef(null);
-
-  // Sincronizar la fecha visible cuando cambia el periodo seleccionado.
-  // El try/catch cubre el caso de ref aún no montada (primer render).
-  useEffect(() => {
-    if (!initialDate) return;
-    try {
-      calendarRef.current?.getApi().gotoDate(initialDate);
-    } catch (err) {
-      console.log("Sincronizando fecha del calendario...", err);
-    }
-  }, [initialDate]);
 
   // Impresión/PDF: FullCalendar debe re-layoutarse él mismo para papel.
   // Con altura fija, FC posiciona .fc-view en absoluto llenando el harness;
@@ -60,6 +51,42 @@ const ScheduleCalendarView = ({
       window.removeEventListener('afterprint', afterPrint);
     };
   }, []);
+
+  // Eje de tiempo por bandas de bloque: cada inicio de bloque abre una banda
+  // (línea sólida + zebra sutil); el texto de rango se muestra con un gap
+  // mínimo para no amontonarse. Sin fronteras → eje horario clásico.
+  const tieneFronterasEje = !!(etiquetasEje && etiquetasEje.size > 0);
+  const etiquetasConGap = useMemo(
+    () => aplicarGapEtiquetas(etiquetasEje, gapEtiquetas),
+    [etiquetasEje, gapEtiquetas]
+  );
+  const fronterasOrdenadas = useMemo(
+    () => Array.from(etiquetasEje?.keys?.() ?? []).sort((a, b) => a - b),
+    [etiquetasEje]
+  );
+
+  const slotLabelContent = tieneFronterasEje
+    ? (arg) => {
+        const mins = arg.date.getHours() * 60 + arg.date.getMinutes();
+        return etiquetasConGap.get(mins)?.texto || '';
+      }
+    : undefined;
+
+  const slotLaneClassNames = tieneFronterasEje
+    ? (arg) => {
+        const mins = arg.date.getHours() * 60 + arg.date.getMinutes();
+        let idx = -1; // índice de la banda vigente (última frontera <= minuto)
+        for (let i = 0; i < fronterasOrdenadas.length; i++) {
+          if (fronterasOrdenadas[i] <= mins) idx = i;
+          else break;
+        }
+        if (idx === -1) return ['eje-fuera-banda'];
+        return [
+          'eje-banda-' + (idx % 2 === 0 ? 'par' : 'impar'),
+          ...(fronterasOrdenadas[idx] === mins ? ['eje-borde-bloque'] : []),
+        ];
+      }
+    : undefined;
 
   const renderEventContent = (eventInfo) => {
     const { title, extendedProps } = eventInfo.event;
@@ -109,20 +136,19 @@ const ScheduleCalendarView = ({
       <FullCalendar
         ref={calendarRef}
         key={calendarKey}
-        plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
+        plugins={[timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         initialDate={initialDate}
         locale={esLocale}
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'timeGridWeek,timeGridDay'
-        }}
+        headerToolbar={{ left: '', center: 'title', right: '' }}
+        dayHeaderFormat={{ weekday: 'long' }} // Solo LUNES…VIERNES, sin fechas
         allDaySlot={false}
         slotMinTime={ventanaGrilla.inicio}
         slotMaxTime={ventanaGrilla.fin}
         slotDuration="00:15:00" // Sub-slots para alineación perfecta de 45 o 90 min
-        slotLabelInterval="01:00:00"
+        slotLabelInterval={tieneFronterasEje ? '00:15:00' : '01:00:00'}
+        slotLabelContent={slotLabelContent}
+        slotLaneClassNames={slotLaneClassNames}
         weekends={false}
         editable={true}
         droppable={true}

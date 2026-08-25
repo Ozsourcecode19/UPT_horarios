@@ -98,11 +98,35 @@
   font-weight: 600;
   color: #94a3b8;
   text-transform: uppercase;
+  white-space: nowrap; /* rangos "8:00 - 8:45" en una línea */
 }
 
-/* Líneas de los sub-slots (punteadas para separar bloques de 15 min) */
+/* ============================================================
+   EJE DE TIEMPO POR BANDAS DE BLOQUE
+   Las filas de 15' no llevan línea propia (más aire y targets de
+   drag & drop amplios); cada bloque horario se cierra con una línea
+   sólida en su fila-inicio y alterna fondo sutilmente (zebra).
+   Clases inyectadas vía slotLaneClassNames (ScheduleCalendarView).
+   ============================================================ */
 .fc .fc-timegrid-slot {
-  border-bottom: 1px dashed #eef2f7;
+  border-bottom: none;
+  height: 18px !important; /* aire vertical: etiquetas separadas y DnD preciso */
+}
+
+.fc .fc-timegrid-slot.eje-borde-bloque {
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.fc .fc-timegrid-slot.eje-banda-par {
+  background-color: #fafbfc;
+}
+
+.dark .fc .fc-timegrid-slot.eje-borde-bloque {
+  border-bottom-color: #334155;
+}
+
+.dark .fc .fc-timegrid-slot.eje-banda-par {
+  background-color: rgb(30 41 59 / .35);
 }
 
 /* Eventos: tarjetas con borde izquierdo de color y sombra sutil */
@@ -164,8 +188,12 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 10mm;
+    margin: 0; /* Sin zona de márgenes: el navegador omite título/URL/pie (localhost:3000) */
   }
+
+  /* Los elementos marcados .no-print se colapsan por completo (display:none
+     viene de la regla más abajo), de modo que el documento termina donde
+     termina la tabla → sin páginas sobrantes. */
 
   /* Sin animaciones/transiciones durante el renderizado de impresión
      (evita snapshots de las animaciones de entrada en opacidad 0) */
@@ -220,7 +248,35 @@
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    padding: 0 !important;
+    padding: 8mm !important; /* margen propio (la @page no tiene) */
+    /* Rasteriza bordes/fondos completos aunque "Background graphics" esté off */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    zoom: 0.85; /* Ajuste a una sola hoja landscape: semana completa sin cortes */
+  }
+
+  /* Bordes firmes y grilla sin fragmentar en impresión */
+  .print-area .fc {
+    --fc-border-color: #94a3b8;
+  }
+
+  .print-area .fc .fc-timegrid-slot.eje-borde-bloque {
+    border-bottom: 2px solid #475569 !important;
+  }
+
+  .print-area .fc-scrollgrid {
+    border-collapse: collapse !important;
+  }
+
+  .print-area tr,
+  .print-area td,
+  .print-area th {
+    break-inside: avoid;
+  }
+
+  /* Etiqueta de rango del eje de tiempo ("8:00 - 8:45") sin salto de línea */
+  .fc .fc-timegrid-slot-label-cushion {
+    white-space: nowrap;
   }
 
   /* Controles que no aportan en papel */
