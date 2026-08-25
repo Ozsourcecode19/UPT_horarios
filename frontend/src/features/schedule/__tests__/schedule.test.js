@@ -11,6 +11,8 @@ import {
   resolveVentanaTurno,
   resolverDivisionEvento,
   bloqueDentroVentana,
+  etiquetasRangoBloques,
+  aplicarGapEtiquetas,
 } from '../utils/schedule';
 
 // --- mapeo de colores ---
@@ -442,5 +444,69 @@ describe('bloqueDentroVentana', () => {
   it('sin ventana no hay restriccion', () => {
     expect(bloqueDentroVentana({ hora_inicio: '23:00:00', duracion_minutos: 60 }, null)).toBe(true);
     expect(bloqueDentroVentana(null, ventana)).toBe(true);
+  });
+});
+
+// --- eje de tiempo con rangos de bloque (E17-b) ---
+describe('etiquetasRangoBloques', () => {
+  const bloques = [
+    { id: 1, sede_id: 1, hora_inicio: '08:00:00', duracion_minutos: 45, activo: true },
+    { id: 2, sede_id: 1, hora_inicio: '08:45:00', duracion_minutos: 90, activo: true },
+    { id: 3, sede_id: 2, hora_inicio: '08:00:00', duracion_minutos: 60, activo: true }, // duplicado entre sedes
+    { id: 4, sede_id: 2, hora_inicio: '19:00:00', duracion_minutos: 60, activo: false }, // inactivo
+  ];
+
+  it('genera "H:MM - H:MM" sin cero inicial en la hora', () => {
+    const map = etiquetasRangoBloques(bloques, [1]);
+    expect(map.get(8 * 60).texto).toBe('8:00 - 8:45');
+    expect(map.get(8 * 60 + 45).texto).toBe('8:45 - 10:15');
+  });
+
+  it('deduplica inicios iguales entre sedes (queda el primero)', () => {
+    const map = etiquetasRangoBloques(bloques, []);
+    expect(map.size).toBe(2); // 08:00 (dedupe s1+s2) y 08:45; 19:00 inactivo fuera
+    expect(map.get(8 * 60).texto).toBe('8:00 - 8:45'); // primera aparición
+  });
+
+  it('filtra por sedes indicadas e ignora inactivos', () => {
+    const map = etiquetasRangoBloques(bloques, [2]);
+    expect(map.size).toBe(1); // sede 2: solo el bloque activo de 08:00 (60 min)
+    expect(map.get(8 * 60).texto).toBe('8:00 - 9:00');
+  });
+
+  it('lista vacía devuelve Map vacío', () => {
+    expect(etiquetasRangoBloques([], []).size).toBe(0);
+  });
+});
+
+// --- gap mínimo entre etiquetas del eje (E17-c: anti-hacinamiento) ---
+describe('aplicarGapEtiquetas', () => {
+  const construir = (minutos) => {
+    const m = new Map();
+    minutos.forEach(min => m.set(min, { texto: `${Math.floor(min/60)}:${String(min%60).padStart(2,'0')}` }));
+    return m;
+  };
+
+  it('omite etiquetas a menos de 30 min del último inicio mantenido', () => {
+    // Inicios 8:00, 8:20 y 9:15: mantiene 8:00, omite 8:20 (20<30), mantiene 9:15
+    const r = aplicarGapEtiquetas(construir([480, 500, 555]), 30);
+    expect([...r.keys()]).toEqual([480, 555]);
+  });
+
+  it('frontera exacta al gap se mantiene (>= y no >)', () => {
+    const r = aplicarGapEtiquetas(construir([480, 510]), 30);
+    expect([...r.keys()]).toEqual([480, 510]);
+  });
+
+  it('gap cero mantiene todas; Map vacío devuelve vacío', () => {
+    const todas = construir([480, 500, 520]);
+    expect(aplicarGapEtiquetas(todas, 0).size).toBe(3);
+    expect(aplicarGapEtiquetas(new Map(), 30).size).toBe(0);
+    expect(aplicarGapEtiquetas(undefined).size).toBe(0);
+  });
+
+  it('no depende del orden de inserción de las claves', () => {
+    expect([...aplicarGapEtiquetas(construir([555, 480, 500]), 30).keys()])
+      .toEqual([480, 555]);
   });
 });

@@ -678,6 +678,19 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
+### Contexto de la Sesión Actual (2026-08-25) — Bandas de bloque en el eje + PDF nítido
+
+1. **Pantalla — diseño "bandas de bloque":** fuera las líneas punteadas entre sub-slots de 15' (ruido que amontonaba etiquetas y confundía el drag & drop). Ahora cada bloque horario abre una **banda**: fila-inicio con línea sólida `2px #cbd5e1` (clase `eje-borde-bloque` vía nuevo callback `slotLaneClassNames`) + zebra sutil por paridad (`eje-banda-par`, fondo `#fafbfc`; variante dark translúcida). Slots a `height:18px` para aire vertical y targets DnD amplios. Etiquetas de rango con **gap mínimo anti-hacinamiento**: helper puro `aplicarGapEtiquetas(map, minGap=30)` (omite inicios a <30' del último mantenido; las líneas de banda no se afectan) — clave en vista docente por unión de sedes.
+2. **PDF — grilla completa y profesional:** `print-color-adjust:exact` en `.print-area` (bordes se rasterizan aunque "Background graphics" esté off), `--fc-border-color:#94a3b8` y bandas `2px #475569` (firmes, sin hairlines rotas), `border-collapse:collapse` explícito, `break-inside:avoid` en filas y **zoom 0.85** para garantizar la semana completa en una hoja landscape sin fragmentación.
+3. **Verificación:** vitest **172 passed** (+4 gap) · build OK. E2E visual pendiente del usuario.
+
+### Contexto de la Sesión Actual (2026-08-25) — Grilla semanal plantilla + eje con rangos + PDF acotado
+
+1. **Semana plantilla sin navegación (`ScheduleCalendarView`):** toolbar reducida a título centrado (fuera prev/next/today y la vista `timeGridDay`); `dayHeaderFormat:{weekday:'long'}` → cabeceras LUNES…VIERNES **sin fechas**. Eliminados el efecto `gotoDate` (la navegación ya no existe; los cambios de periodo siguen cubiertos por `calendarKey`) y el import de `dayGridPlugin`.
+2. **Eje de tiempo con rangos de bloque:** helper puro `etiquetasRangoBloques(bloques, sedeIds)` (Map minutos → `"8:00 - 8:45"`, dedupe entre sedes, ignora inactivos, hora sin cero inicial). Ámbito por vista en `Horarios.jsx`: grupo → sede del grupo; aula → sede del aula; docente/Demo-sin-sede → unión de todas. En el calendario, `slotLabelInterval` pasa a 15 min con `slotLabelContent` que imprime el rango solo en los inicios de bloque; sin datos cae al eje horario clásico. CSS `white-space:nowrap` en `.fc-timegrid-slot-label-cushion`.
+3. **PDF: sin cabeceras del navegador ni páginas sobrantes:** `@page { margin:0 }` hace que Chrome/Edge omitan título/URL/pie ("localhost:3000"); `.print-area` lleva padding propio (8mm). Estrategia de colapso real: clase `no-print` añadida a todos los hermanos del área de impresión (banner demo, toast, overlay, cabecera, stepper, filtros, checklist, versiones) y a `<aside>`/`<header>` del shell (`MainLayout`) — como `.no-print{display:none!important}`, el documento termina donde termina la tabla.
+4. **Verificación:** vitest **168 passed** (+4 del helper; corregidas 2 expectativas mal calculadas en el test nuevo) · `pnpm build` OK. E2E visual pendiente del usuario.
+
 ### Contexto de la Sesión Actual (2026-08-25) — Bugfix: impresión/PDF en blanco (E12-print)
 
 1. **Síntoma:** el botón "Imprimir / PDF" generaba páginas completamente en blanco (solo encabezado/pie del navegador con título y `localhost:3000`); la vista previa también salía vacía, en claro y oscuro.

@@ -20,7 +20,7 @@ import { esErrorDeServidor } from '../utils/errors';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useCanWrite from '../hooks/useCanWrite';
 import {
-  filterEvents, resolveVentanaGrilla, resolveVentanaTurno,
+  filterEvents, resolveVentanaGrilla, resolveVentanaTurno, etiquetasRangoBloques,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
   ScheduleCalendarView, VersionPanel, EditEventModal,
@@ -313,6 +313,22 @@ const Horarios = () => {
     [filterType, itemSeleccionado, configuraciones]
   );
 
+  // Eje de tiempo con rangos de bloque ("8:00 - 8:45"): ámbito según la vista —
+  // grupo → sede del grupo; aula → sede del aula; docente/otros → todas las sedes.
+  const sedesEje = useMemo(() => {
+    if (filterType === 'grupo' && itemSeleccionado?.sede_id != null) return [itemSeleccionado.sede_id];
+    if (filterType === 'aula') {
+      const aula = aulas.find(a => String(a.id) === String(filterValue));
+      return aula?.sede_id != null ? [aula.sede_id] : [];
+    }
+    return []; // docente o sin datos: unión de todas las sedes
+  }, [filterType, filterValue, itemSeleccionado, aulas]);
+
+  const etiquetasEje = useMemo(
+    () => etiquetasRangoBloques(bloques, sedesEje),
+    [bloques, sedesEje]
+  );
+
   // --- LÓGICA DE DRAG & DROP Y EDICIÓN DE EVENTOS (E10) ---
   const {
     selectedEvent,
@@ -413,7 +429,7 @@ const Horarios = () => {
       
       {/* Banner de Modo Demo */}
       {demoMode && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-4 flex items-center justify-between gap-4 text-amber-800 shadow-[0_4px_20px_rgba(245,158,11,0.05)]">
+        <div className="no-print bg-amber-500/10 border border-amber-500/20 rounded-3xl p-4 flex items-center justify-between gap-4 text-amber-800 shadow-[0_4px_20px_rgba(245,158,11,0.05)]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
               <AlertTriangle className="w-5 h-5" />
@@ -444,7 +460,7 @@ const Horarios = () => {
       {/* Toast de Notificaciones */}
       {/* CORRECCIÓN DE BUG GRÁFICO: Se eleva el z-index a z-[60] para evitar que la notificación aparezca detrás del backdrop-blur de los modales (z-50) */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
+        <div className={`no-print fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border animate-in slide-in-from-bottom-5 duration-300 ${
           toast.type === 'error' 
             ? 'bg-red-50 border-red-100 text-red-800' 
             : toast.type === 'warning'
@@ -463,7 +479,7 @@ const Horarios = () => {
 
       {/* Overlay de Carga durante Generación */}
       {isGenerating && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
+        <div className="no-print fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
           <div className="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 flex flex-col items-center max-w-sm text-center">
             <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mb-4 animate-spin">
               <RefreshCw className="w-10 h-10" />
@@ -482,7 +498,7 @@ const Horarios = () => {
       )}
 
       {/* CABECERA */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="no-print flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
             <Calendar className="w-8 h-8 text-blue-600" />
@@ -527,10 +543,10 @@ const Horarios = () => {
       </div>
 
       {/* STEADOR DE FLUJO: pasos previos a la generación */}
-      <FlowStepper preCheck={preCheck} demoMode={demoMode} />
+      <div className="no-print"><FlowStepper preCheck={preCheck} demoMode={demoMode} /></div>
 
       {/* FILTROS Y CONTROLES */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col md:flex-row items-center gap-6 justify-between">
+      <div className="no-print bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col md:flex-row items-center gap-6 justify-between">
         
         {/* Selector de Periodo */}
         <div className="w-full md:w-auto space-y-1.5 flex-1 max-w-sm">
@@ -602,12 +618,12 @@ const Horarios = () => {
 
       {/* CHECKLIST PREVIO A LA GENERACIÓN (E2) — componente en features/schedule (E14) */}
       {!demoMode && preCheck && (
-        <ChecklistPanel preCheck={preCheck} onRevalidar={refetchPreCheck} />
+        <div className="no-print"><ChecklistPanel preCheck={preCheck} onRevalidar={refetchPreCheck} /></div>
       )}
 
       {/* PANEL DE VERSIONES DEL HORARIO (E4b) */}
       {!demoMode && (
-        <VersionPanel
+        <div className="no-print"><VersionPanel
           versiones={versiones}
           selectedVersion={selectedVersion}
           onSelectVersion={setSelectedVersion}
@@ -616,7 +632,7 @@ const Horarios = () => {
           restorePending={restoreVersionMutation.isPending}
           isGenerating={isGenerating}
           canRestore={canRestore}
-        />
+        /></div>
       )}
 
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
@@ -646,6 +662,7 @@ const Horarios = () => {
           calendarKey={calendarKey}
           isLoading={isHorariosLoading}
           demoMode={demoMode}
+          etiquetasEje={etiquetasEje}
           onEventDrop={handleEventDrop}
           onEventClick={handleEventClick}
           onDatesSet={(start) => setFechaVisibleGrilla(prev =>
