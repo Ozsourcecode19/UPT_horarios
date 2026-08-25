@@ -1,6 +1,6 @@
 # backend/schemas/bloque_horario.py
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, time
 
 class BloqueHorarioBase(BaseModel):
@@ -59,7 +59,7 @@ class BloqueHorario(BloqueHorarioBase):
 class BloqueGenerarRequest(BaseModel):
     sede_id: int
     duracion_minutos: int = 45
-    overwrite: bool = False
+    modo: str = Field(default='completar', pattern='^(completar|reemplazar)$')
 
     @field_validator('duracion_minutos')
     def validate_duracion_generar(cls, v):
@@ -69,5 +69,9 @@ class BloqueGenerarRequest(BaseModel):
 
 class BloqueGenerarResult(BaseModel):
     creados: int
+    actualizados: int = 0
     omitidos: int
+    desactivados: int = 0
     duracion_minutos: int
+    ventana: str = ''
+    dias: List[int] = []

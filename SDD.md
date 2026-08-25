@@ -380,7 +380,8 @@ sequenceDiagram
 | CRUD | `/usuarios/` | Público (endpoints sin dependencia de rol) | Gestión de usuarios. |
 | CRUD | `/sedes/`, `/carreras/`, `/trayectos-academicos/`, `/periodos-academicos/` | Escritura: ADMIN (algunos ADMIN/JEFE-PNF); Lectura: autenticados | Datos maestros académicos. |
 | CRUD | `/docentes/`, `/materias/`, `/aulas/`, `/grupos/`, `/lecciones/`, `/bloques-horarios/`, `/habilitaciones-docentes/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Datos maestros y restricciones. |
-| POST | `/bloques-horarios/estandar` | ADMIN/JEFE-PNF | Genera la grilla estándar L-V 08:00–16:00 de una sede. Idempotente: omite bloques existentes (`creados`/`omitidos`); `overwrite` renumera `orden_visual`. |
+| POST | `/schedules/asignar-manual` | ADMIN/JEFE-PNF | E20: reemplazo transaccional de las filas ACTIVO de una lección por 1-2 bloques consecutivos (valida ventana división, disponibilidad, habilitación, cruces excluyendo filas propias). |
+| POST | `/bloques-horarios/estandar` | ADMIN/JEFE-PNF | Generador dinámico (E19): ventana y días desde `configuracion`; modos `completar` / `reemplazar` (409 BLOQUES_EN_USO si hay clases ACTIVO referenciadas); último tramo recortado para cubrir jornada completa. |
 | POST/PUT/DELETE | `/disponibilidades-docentes/` | ADMIN/JEFE-PNF/**DOCENTE** | Disponibilidad (el docente gestiona la suya). |
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
 | POST | `/schedules/generate?periodo_id=` | ADMIN/JEFE-PNF | Dispara generación asíncrona (202). |

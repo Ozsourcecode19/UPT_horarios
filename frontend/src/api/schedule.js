@@ -58,6 +58,14 @@ const ScheduleService = {
     return response.data;
   },
 
+  // E20: asignación manual desde la grilla — reemplazo transaccional de las filas
+  // ACTIVO de una lección por 1 o 2 bloques consecutivos en el aula indicada
+  asignarManual: async (payload) => {
+    // payload: { leccion_id: number, aula_id: number, periodo_id: number, bloque_ids: number[] }
+    const response = await apiClient.post('/schedules/asignar-manual', payload);
+    return response.data;
+  },
+
   // Actualiza manualmente un horario (por ejemplo, después de una validación exitosa de movimiento)
   updateSchedule: async (horarioId, updateData) => {
     // updateData: { estado?: string, bloque_id?: number, aula_id?: number }

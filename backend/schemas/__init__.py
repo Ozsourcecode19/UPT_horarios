@@ -14,6 +14,7 @@ from .configuracion import Configuracion, ConfiguracionCreate, ConfiguracionUpda
 from .bloque_horario import BloqueHorario, BloqueHorarioCreate, BloqueHorarioUpdate, BloqueGenerarRequest, BloqueGenerarResult
 from .leccion import Leccion, LeccionCreate, LeccionUpdate
 from .horario_generado import HorarioGenerado, HorarioGeneradoCreate, HorarioGeneradoUpdate, FullCalendarEvent, GenerationStatus, PreGenerationCheck, HorarioVersion, RestoreRequest, RestoreResult
+from .horario_generado import AsignarManualRequest
 
 __all__ = [
     "Usuario", "UsuarioCreate", "UsuarioUpdate",
