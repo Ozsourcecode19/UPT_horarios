@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
-import { findNearestBloque, recalcularEventoDemo } from '../utils/schedule';
+import { findNearestBloque, recalcularEventoDemo, resolveVentanaTurno, bloqueDentroVentana, resolverDivisionEvento } from '../utils/schedule';
 import { validateMoveMock } from '../utils/scheduleValidation';
 
 export const useDragDropValidation = ({
@@ -16,6 +16,8 @@ export const useDragDropValidation = ({
   setDemoHorarios,
   aulas,
   bloques,
+  configuraciones = [], // ventanas por turno (configuracion) para restringir movimientos por división
+  grupos = [],          // catálogo de grupos: fallback de división para eventos sin extendedProps.division (Demo)
   selectedPeriodo,
   selectedPeriodoId,
   puedeEscribir = true, // UX: si es false, bloquea mover/editar/eliminar (backend aplica RBAC real)
@@ -55,13 +57,29 @@ export const useDragDropValidation = ({
   });
 
   // Aplicar un movimiento (demo o real) sobre el evento.
+  // divisionEvento: división del grupo del evento (para restringir por ventana de turno).
   // Returns true si el movimiento se aplico, false si fue rechazado/revocado.
-  const aplicarMovimiento = async ({ horarioId, nuevoBloqueId, nuevaAulaId, revert }) => {
+  const aplicarMovimiento = async ({ horarioId, nuevoBloqueId, nuevaAulaId, divisionEvento, revert }) => {
     if (!puedeEscribir) {
       showToast("No tienes permisos para modificar horarios.", "error");
       revert?.();
       return false;
     }
+
+    // Restricción por ventana del turno (misma regla del solver y de validate_move
+    // en backend): el bloque objetivo debe caber completo dentro de la ventana de
+    // la división. Sin división resuelta o sin config => sin restricción adicional.
+    const targetBlockVentana = bloques.find(b => b.id === Number(nuevoBloqueId));
+    const ventanaTurno = resolveVentanaTurno(divisionEvento, configuraciones);
+    if (ventanaTurno && targetBlockVentana && !bloqueDentroVentana(targetBlockVentana, ventanaTurno)) {
+      showToast(
+        `El turno ${divisionEvento} solo admite bloques entre ${ventanaTurno.inicio.slice(0, 5)} y ${ventanaTurno.fin.slice(0, 5)}.`,
+        "error"
+      );
+      revert?.();
+      return false;
+    }
+
     if (demoMode) {
       // Simular movimiento local
       const res = validateMoveMock({
@@ -117,6 +135,7 @@ export const useDragDropValidation = ({
       horarioId,
       nuevoBloqueId: targetBlock.id,
       nuevaAulaId: currentAulaId,
+      divisionEvento: resolverDivisionEvento(event.extendedProps, grupos),
       revert
     });
   };
@@ -142,7 +161,9 @@ export const useDragDropValidation = ({
       aula: evProps.aula,
       sede: evProps.sede,
       aula_id: cAulaId,
-      bloque_id: cBloqueId
+      bloque_id: cBloqueId,
+      // División del grupo del evento (para filtrar bloques y validar movimientos por turno)
+      division: resolverDivisionEvento(evProps, grupos),
     });
 
     setEditAulaId(cAulaId);
@@ -167,7 +188,8 @@ export const useDragDropValidation = ({
     const aplicado = await aplicarMovimiento({
       horarioId: selectedEvent.id,
       nuevoBloqueId: blockId,
-      nuevaAulaId: roomId
+      nuevaAulaId: roomId,
+      divisionEvento: selectedEvent.division || null,
     });
 
     if (aplicado) {

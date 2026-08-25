@@ -2,6 +2,8 @@
 // Logica pura de la gestion academica (Grupos + Lecciones), extraida de
 // pages/Lecciones.jsx (E16) para poder testearla de forma aislada (vitest).
 
+import { resolveVentanaTurno, bloqueDentroVentana } from '../../schedule/utils/schedule';
+
 // Busqueda de grupos por nombre + trayecto + sede (insensible a mayusculas).
 export const buscarGrupos = (grupos = [], trayectos = [], sedes = [], term = '') => {
   const q = String(term).toLowerCase();
@@ -35,3 +37,17 @@ export const calcularMetricasPlanning = (lecciones = [], grupos = []) => ({
   totalAlumnosMatriculados: grupos.reduce((acc, curr) => acc + curr.cantidad_alumnos, 0),
   gruposActivosCount: grupos.filter(g => g.activo).length,
 });
+
+// Cobertura de una división/turno en una sede: ¿existe al menos un bloque activo
+// que quepa COMPLETO dentro de la ventana del turno (mismo criterio del solver)?
+// Si la división no es válida o no hay config, no hay restricción => cubierto.
+export const coberturaDivision = ({ bloques = [], sedeId, division, configuraciones = [] } = {}) => {
+  const ventana = resolveVentanaTurno(division, configuraciones);
+  if (!ventana || sedeId == null || sedeId === '') return { cubierto: true, ventana: null };
+  const cubierto = bloques.some(b =>
+    b.activo !== false &&
+    Number(b.sede_id) === Number(sedeId) &&
+    bloqueDentroVentana(b, ventana)
+  );
+  return { cubierto, ventana };
+};

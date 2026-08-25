@@ -64,6 +64,44 @@ def validate_move(db_session: Session, horario_id: int, nuevo_bloque_id: Optiona
     if not bloque_objetivo or not aula_objetivo:
         return ValidationResult(False, "Bloque o aula objetivo no encontrado.", "INVALID_TARGET")
 
+    # 1b. Validar ventana horaria del turno del grupo (misma regla del solver,
+    # or_tools_adapter.py): el bloque debe caber COMPLETO dentro de la ventana
+    # de la división del grupo. Sin división válida o sin config => jornada
+    # global, sin restricción adicional.
+    grupo_mov = db_session.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
+    if grupo_mov and grupo_mov.division:
+        clave_ventana = f'ventana_{str(grupo_mov.division).lower()}'
+        cfg_ventana = db_session.query(models.Configuracion).filter(
+            models.Configuracion.clave == clave_ventana
+        ).first()
+        ventana = None
+        if cfg_ventana is not None:
+            # La columna valor es JSONB (ya dict); aceptar string JSON por robustez.
+            v = cfg_ventana.valor
+            if isinstance(v, str):
+                try:
+                    import json as _json
+                    v = _json.loads(v)
+                except (ValueError, TypeError):
+                    v = None
+            if isinstance(v, dict) and v.get('hora_inicio') and v.get('hora_fin'):
+                ventana = (str(v['hora_inicio']), str(v['hora_fin']))
+        if ventana:
+            def _a_minutos(hms):
+                partes = [int(x) for x in str(hms).split(':')]
+                return partes[0] * 60 + (partes[1] if len(partes) > 1 else 0)
+
+            ven_ini = _a_minutos(ventana[0])
+            ven_fin = _a_minutos(ventana[1])
+            bloque_ini = _a_minutos(bloque_objetivo.hora_inicio)
+            bloque_fin = bloque_ini + (bloque_objetivo.duracion_minutos or 0)
+            if bloque_ini < ven_ini or bloque_fin > ven_fin:
+                return ValidationResult(
+                    False,
+                    f"El turno {grupo_mov.division} solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}.",
+                    "FUERA_VENTANA_DIVISION"
+                )
+
     # 2. Validar disponibilidad del docente en el nuevo bloque.
     # Consistente con el solver (or_tools_adapter.py): sin franjas DISPONIBLE explícitas
     # el docente se considera disponible por defecto; solo se bloquea lo que esté

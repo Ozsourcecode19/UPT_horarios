@@ -20,7 +20,7 @@ import { esErrorDeServidor } from '../utils/errors';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useCanWrite from '../hooks/useCanWrite';
 import {
-  filterEvents, resolveVentanaGrilla,
+  filterEvents, resolveVentanaGrilla, resolveVentanaTurno,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
   ScheduleCalendarView, VersionPanel, EditEventModal,
@@ -332,12 +332,20 @@ const Horarios = () => {
     setDemoHorarios,
     aulas,
     bloques,
+    configuraciones, // ventanas por turno: restringe movimientos fuera de la división del grupo
+    grupos,
     selectedPeriodo,
     selectedPeriodoId,
     puedeEscribir,
     showToast,
     onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
   });
+
+  // Ventana del turno del evento en edición (filtra el select de bloques del modal)
+  const ventanaDivisionModal = useMemo(
+    () => resolveVentanaTurno(selectedEvent?.division, configuraciones),
+    [selectedEvent, configuraciones]
+  );
 
   // --- GENERACIÓN AUTOMÁTICA (E10) ---
   const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
@@ -632,6 +640,7 @@ const Horarios = () => {
           evento={selectedEvent}
           aulas={aulas}
           bloques={bloques}
+          ventanaDivision={ventanaDivisionModal}
           editAulaId={editAulaId}
           onChangeAulaId={setEditAulaId}
           editBloqueId={editBloqueId}

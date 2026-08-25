@@ -678,6 +678,16 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Backend sin cambios** (el CRUD de bloques ya existía; solo faltaba la UI). Ruta `/bloques` registrada en `AppRouter.jsx`.
 5. **Verificación:** `pnpm build` OK (solo warning preexistente de chunk size). **E2E superado** (2026-08-09): el escenario "EV-004 sin bloques" quedó cubierto por el generador de grilla estándar (sede 4 con 50 bloques L-V 08:00-14:45). Equivalente verificado: crear un bloque nuevo en sede 4 → aparece en `GET /bloques-horarios/` (51 bloques) → eliminado tras la prueba (de vuelta a 50).
 
+### Contexto de la Sesión Actual (2026-08-25) — E17: coherencia división/habilitación entre CRUD y generación
+
+1. **Movimientos restringidos por la división del grupo (3 capas, criterio "cabe completo" = solver):**
+   - **Backend:** `validate_move` rechaza con `FUERA_VENTANA_DIVISION` bloques que no caben completos en `ventana_{division}` del grupo (paridad con `or_tools_adapter`; sin config/división → jornada global sin restricción). +4 tests pytest (bloque nocturno, cabe-incompleto 11:45–13:15, dentro de ventana, sin config) → **54 passed**.
+   - **Frontend cliente:** helpers puros nuevos en `features/schedule/utils/schedule.js` — `resolveVentanaTurno(division, configs)` (refactor extraído de `resolveVentanaGrilla`), `resolverDivisionEvento(extendedProps, grupos)` (fallback id→nombre para Demo) y `bloqueDentroVentana(bloque, ventana)`; chequeo único en `useDragDropValidation.aplicarMovimiento` (cubre drag & drop **y** guardar desde el modal) → toast "El turno X solo admite bloques entre HH–HH" + revert. El hook recibe ahora `configuraciones` y `grupos`.
+   - **Modal:** `EditEventModal` filtra el select de bloques por sede **y** ventana del turno (prop `ventanaDivision` calculada en la página).
+2. **Materias habilitadas en LeccionFormModal (solo frontend):** al elegir docente se consulta `GET /habilitaciones-docentes/?docente_id=`; solo materias con habilitación vigente (`fecha_hasta` null o ≥ hoy) son seleccionables; si la lección editada tiene una materia ya no vigente se conserva visible marcada "— sin habilitación vigente"; hint cuando no hay docente elegido y aviso ámbar si el docente no tiene habilitaciones.
+3. **Aviso de cobertura en GrupoFormModal:** helper puro `coberturaDivision({bloques, sedeId, division, configuraciones})` en `features/planning/utils/planning.js` (reutiliza los helpers de schedule). El modal consulta `['bloques']`+`['configuraciones']` internamente y muestra un banner ámbar cuando la sede no tiene bloques activos dentro de la ventana del turno: *"Este grupo quedará sin horario y no aparecerá en la vista de Horarios"*.
+4. **Verificación:** vitest **164 passed** (+19: resolveVentanaTurno/resolverDivisionEvento/bloqueDentroVentana, coberturaDivision, y 4 casos del hook — drop fuera de ventana real y Demo, flujo normal, guardado por modal) · backend pytest **54 passed** · `pnpm build` OK.
+
 ### Contexto de la Sesión Actual (2026-08-25) — E16: cierre features/schedule + features/planning
 
 1. **Parte A — `features/schedule` completada (`Horarios.jsx` 1016 → 649 líneas):**

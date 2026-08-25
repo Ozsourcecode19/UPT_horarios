@@ -216,3 +216,53 @@ def test_site_mismatch(data, db_session):
     res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_sede2.id)
     assert res.valido is False
     assert res.error_code == "SITE_MISMATCH"
+
+# --- Ventana horaria del turno (FUERA_VENTANA_DIVISION) ---
+
+def _config_ventana_matutino(db, inicio="07:00:00", fin="12:00:00"):
+    cfg = models.Configuracion(
+        clave="ventana_matutino",
+        valor={"hora_inicio": inicio, "hora_fin": fin},
+        descripcion="Ventana del turno MATUTINO",
+        tipo_dato="json",
+    )
+    db.add(cfg)
+    db.commit()
+    return cfg
+
+
+def test_fuera_ventana_division_bloque_nocturno(data, db_session):
+    # Grupo MATUTINO + ventana 07:00-12:00 configurada: mover a un bloque de
+    # 18:00 debe rechazarse con FUERA_VENTANA_DIVISION.
+    _config_ventana_matutino(db_session)
+    bloque_nocturno = _nuevo_bloque(db_session, data.sede, dia=3, hora=time(18, 0))
+    res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_nocturno.id)
+    assert res.valido is False
+    assert res.error_code == "FUERA_VENTANA_DIVISION"
+    assert "MATUTINO" in res.mensaje
+
+
+def test_fuera_ventana_division_bloque_cabe_incompleto(data, db_session):
+    # Criterio "cabe completo": un bloque 11:45-13:15 empieza dentro de la
+    # ventana pero termina fuera -> rechazado.
+    _config_ventana_matutino(db_session)
+    bloque_parcial = _nuevo_bloque(db_session, data.sede, dia=3, hora=time(11, 45), duracion=90)
+    res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_parcial.id)
+    assert res.valido is False
+    assert res.error_code == "FUERA_VENTANA_DIVISION"
+
+
+def test_dentro_de_ventana_division_sigue_valido(data, db_session):
+    # Con la ventana configurada, mover a otro bloque dentro de ella es válido.
+    _config_ventana_matutino(db_session)
+    bloque_manana = _nuevo_bloque(db_session, data.sede, dia=3, hora=time(9, 0))
+    res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_manana.id)
+    assert res.valido is True
+
+
+def test_sin_config_ventana_no_restringe(data, db_session):
+    # Sin ventana_matutino en configuracion: jornada global, sin restricción
+    # por división (paridad con el solver).
+    bloque_tarde = _nuevo_bloque(db_session, data.sede, dia=3, hora=time(18, 0))
+    res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_tarde.id)
+    assert res.valido is True

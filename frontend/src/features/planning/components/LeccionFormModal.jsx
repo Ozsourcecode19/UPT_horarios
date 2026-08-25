@@ -2,11 +2,13 @@
 // Modal de registro/edición de Lecciones Académicas, extraido de pages/Lecciones.jsx (E16).
 // Dueño de su formulario (react-hook-form + zod); emite onSubmit(data) ya validado.
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 
+import HabilitacionesService from '../../../api/habilitaciones';
 import { leccionSchema, buildLeccionDefaults } from '../schemas';
 
 const LeccionFormModal = ({
@@ -33,6 +35,43 @@ const LeccionFormModal = ({
   // Badges en vivo de los sliders (horas/prioridad)
   const currentPrioridadValue = watch('prioridad', 5);
   const currentHorasValue = watch('horas_semanales', 4);
+  const docenteSeleccionado = watch('docente_id');
+
+  // Habilitaciones del docente elegido: solo esas materias son seleccionables.
+  const { data: habilitaciones = [] } = useQuery({
+    queryKey: ['habilitaciones-docente', Number(docenteSeleccionado)],
+    queryFn: async () => {
+      try {
+        return await HabilitacionesService.getHabilitaciones(Number(docenteSeleccionado));
+      } catch (err) {
+        return [];
+      }
+    },
+    enabled: !!docenteSeleccionado,
+    retry: 0,
+  });
+
+  // Vigencia temporal: fecha_hasta null = indefinida; vencidas se excluyen.
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const materiasHabilitadasIds = useMemo(
+    () => new Set(habilitaciones
+      .filter(h => !h.fecha_hasta || String(h.fecha_hasta) >= hoyISO)
+      .map(h => Number(h.materia_id))),
+    [habilitaciones, hoyISO]
+  );
+
+  // Opciones del select de materia. Si la lección en edición tiene una materia
+  // que ya no está vigente, se conserva visible y marcada (no se pierde en silencio).
+  const opcionesMateria = useMemo(() => {
+    if (!docenteSeleccionado) return [];
+    const lista = materias.filter(m => materiasHabilitadasIds.has(Number(m.id)));
+    const actualId = editing ? Number(editing.materia_id) : null;
+    if (actualId && !lista.some(m => Number(m.id) === actualId)) {
+      const actual = materias.find(m => Number(m.id) === actualId);
+      if (actual) return [...lista, { ...actual, sinVigencia: true }];
+    }
+    return lista;
+  }, [docenteSeleccionado, materias, materiasHabilitadasIds, editing]);
 
   // Prefill al abrir: valores de la lección en edición o defaults con primer catálogo.
   useEffect(() => {
@@ -88,19 +127,29 @@ const LeccionFormModal = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Materia *</label>
-              <select
-                {...register('materia_id', { valueAsNumber: true })}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
-              >
-                <option value="">Seleccione...</option>
-                {materias.map(m => (
-                  <option key={m.id} value={m.id}>{m.nombre} ({m.codigo})</option>
-                ))}
-              </select>
-              {errors.materia_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.materia_id.message}</span>}
-            </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Materia *</label>
+                <select
+                  {...register('materia_id', { valueAsNumber: true })}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
+                  disabled={!docenteSeleccionado}
+                >
+                  <option value="">
+                    {docenteSeleccionado ? 'Seleccione...' : 'Seleccione un docente primero...'}
+                  </option>
+                  {opcionesMateria.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.nombre} ({m.codigo}){m.sinVigencia ? ' — sin habilitación vigente' : ''}
+                    </option>
+                  ))}
+                </select>
+                {docenteSeleccionado && opcionesMateria.length === 0 && (
+                  <span className="text-xs text-amber-600 font-medium mt-1 block">
+                    Este docente no tiene materias habilitadas vigentes. Configúrelas en Docentes → Habilitaciones.
+                  </span>
+                )}
+                {errors.materia_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.materia_id.message}</span>}
+              </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Grupo *</label>

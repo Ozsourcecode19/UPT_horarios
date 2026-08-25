@@ -138,27 +138,61 @@ const extraerVentanaConfig = (raw) => {
   return inicio && fin && fin > inicio ? { inicio, fin } : null;
 };
 
+// Resuelve la ventana [inicio, fin] de un turno concreto (MATUTINO/VESPERTINO/
+// NOCTURNO): lee ventana_{division} de configuracion y cae a la ventana estandar
+// si falta o está malformada. Devuelve null si la división no es válida.
+export const resolveVentanaTurno = (division, configs = []) => {
+  const div = String(division || '').toUpperCase();
+  if (!DIVISIONES_VALIDAS.includes(div)) return null;
+  const desdeConfig = extraerVentanaConfig((configs || []).find(c => c.clave === `ventana_${div.toLowerCase()}`)?.valor);
+  return desdeConfig || VENTANAS_TURNO_DEFAULT[div];
+};
+
 // Resuelve la ventana [inicio, fin] que debe cubrir la grilla del calendario:
 // - Vista por grupo: la ventana del turno del grupo (ventana_{division} de
 //   configuracion, con fallback a la ventana estandar del turno).
 // - Grupos sin division, docentes y aulas: jornada completa general
 //   (hora_inicio_jornada / hora_fin_jornada), fallback 07:00-19:30.
 export const resolveVentanaGrilla = ({ filterType, item, configs = [] } = {}) => {
-  const buscarConfig = (clave) => configs.find(c => c.clave === clave)?.valor;
-
   if (filterType === 'grupo') {
-    const division = String(item?.division || '').toUpperCase();
-    if (DIVISIONES_VALIDAS.includes(division)) {
-      const desdeConfig = extraerVentanaConfig(buscarConfig(`ventana_${division.toLowerCase()}`));
-      if (desdeConfig) return desdeConfig;
-      return VENTANAS_TURNO_DEFAULT[division];
-    }
+    const ventana = resolveVentanaTurno(item?.division, configs);
+    if (ventana) return ventana;
   }
 
   // Jornada completa general (docentes, aulas, grupo sin division o datos ausentes)
-  const inicio = normalizarHora(buscarConfig('hora_inicio_jornada')) || '07:00:00';
-  const fin = normalizarHora(buscarConfig('hora_fin_jornada'));
+  const inicio = normalizarHora((configs || []).find(c => c.clave === 'hora_inicio_jornada')?.valor) || '07:00:00';
+  const fin = normalizarHora((configs || []).find(c => c.clave === 'hora_fin_jornada')?.valor);
   return { inicio, fin: fin && fin > inicio ? fin : '19:30:00' };
+};
+
+// División efectiva de un evento de horario: extendedProps.division (backend)
+// o lookup en el catálogo de grupos por id y luego por nombre (Modo Demo).
+// Devuelve la división en MAYÚSCULAS o null si no se puede resolver.
+export const resolverDivisionEvento = (extendedProps = {}, grupos = []) => {
+  if (extendedProps?.division) return String(extendedProps.division).toUpperCase();
+  let grupo = null;
+  if (extendedProps?.grupo_id != null) {
+    grupo = grupos.find(g => Number(g.id) === Number(extendedProps.grupo_id));
+  }
+  if (!grupo && extendedProps?.grupo) {
+    const nombre = String(extendedProps.grupo).toLowerCase();
+    grupo = grupos.find(g => String(g.nombre).toLowerCase() === nombre);
+  }
+  return grupo ? String(grupo.division || '').toUpperCase() || null : null;
+};
+
+// ¿El bloque cabe COMPLETO dentro de la ventana? Mismo criterio que el solver
+// (or_tools_adapter): bloque_inicio >= ven_inicio Y bloque_fin <= ven_fin.
+// Sin ventana definida no hay restricción (jornada global).
+export const bloqueDentroVentana = (bloque, ventana) => {
+  if (!bloque || !ventana) return true;
+  const aMinutos = (hms) => {
+    const partes = String(hms).split(':').map(Number);
+    return (partes[0] || 0) * 60 + (partes[1] || 0);
+  };
+  const ini = aMinutos(bloque.hora_inicio);
+  const fin = ini + (Number(bloque.duracion_minutos) || 0);
+  return ini >= aMinutos(ventana.inicio) && fin <= aMinutos(ventana.fin);
 };
 
 // Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.

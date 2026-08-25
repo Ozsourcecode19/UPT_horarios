@@ -4,6 +4,7 @@
 // (guardar/eliminar) llegan controladas desde useDragDropValidation vía la página.
 
 import { X, Clock, Trash2 } from 'lucide-react';
+import { bloqueDentroVentana } from '../utils/schedule';
 
 const DIAS_NOMBRES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -11,6 +12,7 @@ const EditEventModal = ({
   evento,
   aulas = [],
   bloques = [],
+  ventanaDivision = null, // ventana del turno del evento (null = jornada global, sin filtro extra)
   editAulaId,
   onChangeAulaId,
   editBloqueId,
@@ -20,6 +22,13 @@ const EditEventModal = ({
   onClose,
 }) => {
   if (!evento) return null;
+
+  // Bloques de la sede del aula elegida y dentro de la ventana del turno
+  // (misma regla que valida el solver y validate_move en backend).
+  const bloquesDisponibles = bloques.filter(b =>
+    b.sede_id === aulas.find(au => au.id === Number(editAulaId))?.sede_id &&
+    bloqueDentroVentana(b, ventanaDivision)
+  );
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -93,9 +102,7 @@ const EditEventModal = ({
               onChange={(e) => onChangeBloqueId(e.target.value)}
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
             >
-              {bloques
-                .filter(b => b.sede_id === aulas.find(au => au.id === Number(editAulaId))?.sede_id) // Mostrar bloques de la sede del aula elegida
-                .map(b => (
+              {bloquesDisponibles.map(b => (
                   <option key={b.id} value={b.id}>
                     {DIAS_NOMBRES[b.dia_semana]} - {b.hora_inicio.substring(0, 5)} ({b.duracion_minutos} min)
                   </option>

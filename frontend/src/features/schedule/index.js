@@ -3,7 +3,7 @@
 // Las páginas consumen desde aquí en lugar de rutas internas profundas.
 
 // Utils (lógica pura)
-export { mapScheduleEvents, findNearestBloque, filterEvents, resolveVentanaGrilla, recalcularEventoDemo, generarEventosSimulados } from './utils/schedule';
+export { mapScheduleEvents, findNearestBloque, filterEvents, resolveVentanaGrilla, resolveVentanaTurno, resolverDivisionEvento, bloqueDentroVentana, recalcularEventoDemo, generarEventosSimulados } from './utils/schedule';
 export { validateMoveMock } from './utils/scheduleValidation';
 
 // Hooks
