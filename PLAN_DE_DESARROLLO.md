@@ -38,7 +38,13 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 - ✅ **E14** — Refactor a Arquitectura por Features (alcance intermedio): `src/features/schedule/{utils,hooks,__tests__}` con los 2 utils + 3 hooks + 5 archivos de test movidos con `git mv` (historial preservado); componentes `FlowStepper.jsx` y `ChecklistPanel.jsx` extraídos de `Horarios.jsx` (que baja a ~1113 líneas y ahora importa desde `features/schedule/`). Imports internos casi intactos (solo `'../api/schedule'`→`'../../../api/schedule'`). Criterio verificado: `pnpm test` → **105 passed**, `pnpm build` OK. **Pendiente de E14 (→ candidato E16):** CalendarView/VersionPanel/modales siguen en la página por alto acoplamiento (~30 conexiones de estado).
 
-**Pendientes:** Fase E (Backlog estructurado en ejecuciones): **E16 (candidato)** — extracción completa del módulo horarios (`CalendarView`, `VersionPanel`, modales de evento/guardado) y/o nuevo `features/planning/` para `Lecciones.jsx` (hoy el mayor monolito: ~1400 líneas); E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 46 tests ✅); frontend con suite completa (105 tests ✅). `docs/*.pdf` vacíos.
+- ✅ **E16 — Cierre del módulo horario + features/planning (2026-08-25):**
+  - **Parte A (`features/schedule`, Horarios.jsx 1016 → 649 líneas):** extraídos `components/ScheduleCalendarView.jsx` (grilla FullCalendar única, dueña de su ref y del efecto `gotoDate`; ventana dinámica vía prop `ventanaGrilla`), `components/VersionPanel.jsx` (props controladas), `components/EditEventModal.jsx` (presentacional) y `demoData.js` (MOCK_*); barrel `index.js`.
+  - **Parte B (nuevo `features/planning/`, Lecciones.jsx 1397 → 559 líneas):** `demoData.js`, `schemas.js` (zod + factories puras `build*Defaults`/`toPayload*`), `utils/planning.js` (`buscarGrupos`, `buscarLecciones`, `calcularMetricasPlanning`), `hooks/useLeccionesCrud.js` (CRUD dual real+Demo con servicios inyectables; devuelve booleano y la página cierra el modal), componentes `GruposTable`, `LeccionesTable`, `GrupoFormModal`/`LeccionFormModal` (cada modal dueño de su `useForm`, prefill vía efecto sobre `editing`) y `DeleteConfirmModal` genérico; barrel `index.js`. Se eliminó estado demo muerto (`demoTrayectos`/`demoPeriodos` persistidos pero nunca usados en la selección de datos).
+  - **Bugfix latente corregido:** el prefill de edición de grupos no restauraba `division` → editar un grupo VESPERTINO/NOCTURNO lo guardaba como MATUTINO. Ahora el formulario restaura el turno.
+  - Criterio verificado: `pnpm test` → **145 passed** (+23: utils/payloads planning y useLeccionesCrud con servicios mock), `pnpm build` OK.
+
+**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E15 (Tipado TypeScript/JSDoc). Backend testeado (E9, 50 tests ✅); frontend con suite completa (145 tests ✅). `docs/*.pdf` vacíos.
 
 **Bugfix (generación + ventanas por turno, 2026-08-24):** la primera generación tras crear la función de división fallaba con `the JSON object must be str, bytes or bytearray, not dict`: `_build_model` hacía `json.loads(c.valor)` sobre la columna JSONB `configuracion.valor`, que SQLAlchemy ya entrega como dict (crash antes de resolver; tracker FAILED). Corregido con el helper `_parse_ventana_config(valor)` que acepta dict o string JSON y devuelve `None` ante cualquier caso no utilizable (fallback a jornada global ya existente). Además se detectó y corrigió un segundo defecto silencioso: el lookup `f'ventana_{grupo_div}'` usaba la división en MAYÚSCULAS (`MATUTINO`) contra claves en minúsculas (`ventana_matutino`), por lo que las ventanas de turno **nunca se aplicaban** — ahora ambas partes se normalizan a minúsculas. Tests: 3 nuevos para el helper (49 total ✅). **Verificado E2E contra BD real:** regeneración del periodo ACTIVO → versión 2 con 4 horarios ACTIVO, sin advertencias de ventana, clases MATUTINO asignadas dentro de su ventana 07:00–12:00.
 
@@ -168,10 +174,10 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - **Queda en la página (alto acoplamiento, ~30 conexiones de estado):** calendario dual FullCalendar, panel de versiones y modales de edición/guardado. `Horarios.jsx`: ~1160 → ~1113 líneas.
 - ✅ Criterio: suite vitest completa (**105 passed**) y `pnpm build` OK. **Verificado.**
 
-### E16 (candidato) — Cierre del módulo horario + features/planning
-- Extracción de `CalendarView`, `VersionPanel` y modales de evento/guardado desde `Horarios.jsx` hacia `features/schedule/components/` (requiere diseñar el contrato de props/contexto por el acoplamiento de estado).
-- Nuevo `features/planning/` para `Lecciones.jsx` (~1400 líneas, hoy el mayor monolito: tabs Grupos/Lecciones + CRUD dual).
-- Opcional: barrel `index.js` por feature si crece el número de consumidores externos.
+### ✅ E16 — Cierre del módulo horario + features/planning (completada 2026-08-25, ver resumen arriba)
+- Extracción de `CalendarView`, `VersionPanel` y modal de edición desde `Horarios.jsx` hacia `features/schedule/components/` con props controladas (sin contexto global; el ref del calendario vive en `ScheduleCalendarView`).
+- Nuevo `features/planning/` para `Lecciones.jsx`: utils puros testables, schemas/factories, hook CRUD dual inyectable, tablas y formularios como componentes, `DeleteConfirmModal` genérico.
+- Barrels `index.js` en ambas features.
 
 ### E15 — Tipado de Entidades y Contratos (TypeScript / JSDoc) (~2–3 h)
 - Definición de tipos/contratos centrales de dominio (`Docente`, `Materia`, `Aula`, `Leccion`, `BloqueHorario`, `HorarioGenerado`, `PeriodoAcademico`) en `src/types/` o vía `.d.ts` / JSDoc.
