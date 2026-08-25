@@ -23,6 +23,7 @@ const ScheduleCalendarView = ({
   demoMode = false,
   onEventDrop,
   onEventClick,
+  onDatesSet, // opcional: informa el inicio del rango visible (para encabezados de impresión)
 }) => {
   const calendarRef = useRef(null);
 
@@ -36,6 +37,29 @@ const ScheduleCalendarView = ({
       console.log("Sincronizando fecha del calendario...", err);
     }
   }, [initialDate]);
+
+  // Impresión/PDF: FullCalendar debe re-layoutarse él mismo para papel.
+  // Con altura fija, FC posiciona .fc-view en absoluto llenando el harness;
+  // al pasar height:'auto' antes de imprimir, el view pasa a flujo normal
+  // (columnas y eventos bien distribuidos) y se restaura al terminar.
+  useEffect(() => {
+    const beforePrint = () => {
+      try {
+        calendarRef.current?.getApi().setOption('height', 'auto');
+      } catch (err) { /* ref no montada */ }
+    };
+    const afterPrint = () => {
+      try {
+        calendarRef.current?.getApi().setOption('height', 680);
+      } catch (err) { /* ref no montada */ }
+    };
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', beforePrint);
+      window.removeEventListener('afterprint', afterPrint);
+    };
+  }, []);
 
   const renderEventContent = (eventInfo) => {
     const { title, extendedProps } = eventInfo.event;
@@ -105,6 +129,7 @@ const ScheduleCalendarView = ({
         eventDurationEditable={false} // Evitar cambiar duración arrastrando bordes
         scrollTime={ventanaGrilla.inicio}
         nowIndicator={true}
+        datesSet={onDatesSet ? (info) => onDatesSet(info.start) : undefined}
         events={mapScheduleEvents(eventos)}
         eventContent={renderEventContent}
         eventDrop={onEventDrop}

@@ -153,9 +153,13 @@
   background-color: #94a3b8;
 }
 /* ============================================================
-   IMPRESIÓN / EXPORTACIÓN PDF (E12)
+   IMPRESIÓN / EXPORTACIÓN PDF (E12, endurecido en bugfix 2026-08-25)
    Solo se imprime la tarjeta del calendario (.print-area) con
    un encabezado propio; el resto de la app queda oculto.
+   Fix página en blanco: se neutraliza la cadena de contención
+   (overflow-hidden de <main>, position:relative de la raíz de la
+   página) para que el position:absolute de .print-area se ancle
+   al inicio de la primera hoja y ningún ancestro recorte.
    ============================================================ */
 @media print {
   @page {
@@ -163,8 +167,39 @@
     margin: 10mm;
   }
 
+  /* Sin animaciones/transiciones durante el renderizado de impresión
+     (evita snapshots de las animaciones de entrada en opacidad 0) */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
   body {
     background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Neutralizar TODA la cadena de contención entre body y el calendario:
+     - #root y el shell del layout (min-h-screen flex)
+     - <main> tiene overflow-hidden en pantalla (MainLayout)
+     - .horarios-page es relative en pantalla; estático aquí hace que el
+       absolute de .print-area se ancle al inicio de la hoja */
+  #root,
+  main,
+  .min-h-screen,
+  .horarios-page {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   /* Ocultar toda la app y mostrar únicamente el área de impresión */
@@ -195,9 +230,16 @@
     display: none !important;
   }
 
-  /* El calendario se expande completo (sin alto fijo ni scroller interno) */
+  /* El calendario se expande completo (sin alto fijo ni scroller interno).
+     Clave FullCalendar v6: el harness guarda la altura como estilo inline
+     desde JS; sin este reset la grilla queda recortada al alto de pantalla. */
   .print-area .fc {
     height: auto !important;
+  }
+
+  .print-area .fc-view-harness {
+    height: auto !important;
+    max-height: none !important;
   }
 
   .print-area .fc-scroller {
@@ -205,7 +247,7 @@
     height: auto !important;
   }
 
-  /* En vista por aulas, las columnas fluyen en vez de requerir scroll X */
+  /* Columnas/contenedores fluyen en vez de requerir scroll */
   .print-area .schedule-calendar-wrapper {
     overflow: visible !important;
   }
@@ -214,9 +256,21 @@
     flex-wrap: wrap;
   }
 
-  /* Evitar cortes feos de eventos entre páginas */
+  /* Eventos sobrios: sin fondos de color (independiente del checkbox
+     "Background graphics" del navegador), texto oscuro y borde fino.
+     El fondo inline que FullCalendar aplica por materia se anula aquí. */
   .print-area .fc-event {
+    background: #fff !important;
+    color: #1e293b !important;
+    border: 1px solid #94a3b8 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
     break-inside: avoid;
+  }
+
+  .print-area .fc-event .fc-event-main,
+  .print-area .fc-event * {
+    color: #1e293b !important;
   }
 }
 
@@ -289,6 +343,19 @@
   /* Neutraliza el shim dentro de la hoja impresa */
   html.dark .bg-white { background-color: #fff !important; }
   html.dark .text-slate-800, html.dark .text-slate-900 { color: #1e293b !important; }
+  /* Variables del tema FullCalendar a sus valores claros (en pantalla,
+     el shim oscuro las re-mapea; en papel deben salir claras) */
+  html.dark .print-area .fc {
+    --fc-border-color: #e2e8f0;
+    --fc-page-bg-color: #ffffff;
+    --fc-neutral-bg-color: #f8fafc;
+    --fc-today-bg-color: #eff6ff;
+    --fc-highlight-color: #eff6ff;
+    --fc-button-bg-color: #f1f5f9;
+    --fc-button-text-color: #475569;
+  }
+  html.dark .print-area .fc .fc-col-header-cell-cushion { color: #475569; }
+  html.dark .print-area .fc .fc-timegrid-slot-label-cushion { color: #94a3b8; }
 }
 
 /* ============================================================
