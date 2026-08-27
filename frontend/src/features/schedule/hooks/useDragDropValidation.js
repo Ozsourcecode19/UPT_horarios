@@ -166,7 +166,7 @@ export const useDragDropValidation = ({
       }
     }
 
-    const leccionId = horario.extendedProps?.leccion_id;
+    const leccionId = horario.leccion_id ?? horario.extendedProps?.leccion_id;
     if (!leccionId) {
       showToast("No se pudo identificar la lección de esta clase.", "error");
       return false;
@@ -257,18 +257,19 @@ export const useDragDropValidation = ({
   };
 
   const _abrirEditor = (clickInfo) => {
-    const { event } = clickInfo;
-    const evProps = event.extendedProps;
+    // clickInfo es un objeto plano {id, start, end, extendedProps} enviado por
+    // GridSemanalBloques (ya no envuelve { event: ... } como hacía FullCalendar).
+    const evProps = clickInfo.extendedProps;
 
-    const evId = parseInt(event.id);
-    const cAulaId = evProps.aula_id || parseInt(event.resourceId?.replace("aula_", ""));
+    const evId = parseInt(clickInfo.id);
+    const cAulaId = evProps.aula_id || parseInt(clickInfo.resourceId?.replace("aula_", ""));
     const cBloqueId = evProps.bloque_id;
 
     setSelectedEvent({
       id: evId,
-      title: event.title,
-      start: event.start,
-      end: event.end,
+      title: clickInfo.title || evProps.materia,
+      start: clickInfo.start,
+      end: clickInfo.end,
       materia: evProps.materia,
       materia_codigo: evProps.materia_codigo,
       docente: evProps.docente,
@@ -277,8 +278,7 @@ export const useDragDropValidation = ({
       sede: evProps.sede,
       aula_id: cAulaId,
       bloque_id: cBloqueId,
-      leccion_id: evProps.leccion_id,
-      // División del grupo del evento (para filtrar bloques y validar movimientos por turno)
+      leccion_id: evProps.leccion_id ?? evProps.leccion ?? null,
       division: resolverDivisionEvento(evProps, grupos),
     });
 
@@ -289,11 +289,13 @@ export const useDragDropValidation = ({
 
   // Guardar cambios desde el modal. `abarca` llega como número (1|2); los tests
   // legados pasan un evento de form → se trata como 1.
-  const handleSaveChangesModal = async (abarcaArg) => {
+  // aulaIdParam/bloqueIdParam: valores frescos del modal (evitan el stale state
+  // causado por React batch en el onSave del padre).
+  const handleSaveChangesModal = async (abarcaArg, aulaIdParam, bloqueIdParam) => {
     if (!selectedEvent) return;
     const abarca = abarcaArg === 2 ? 2 : 1;
-    const roomId = Number(editAulaId);
-    const targetBlock = bloques.find(b => b.id === Number(editBloqueId));
+    const roomId = Number(aulaIdParam ?? editAulaId);
+    const targetBlock = bloques.find(b => b.id === Number(bloqueIdParam ?? editBloqueId));
 
     if (!targetBlock) {
       showToast("Bloque horario seleccionado no es válido.", "error");
