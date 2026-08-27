@@ -469,15 +469,6 @@ const Horarios = () => {
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
   // Semana visible de la grilla (para la cabecera de impresión).
-  // Debe declararse DESPUÉS de initialDateString (depende de él).
-  // Sin navegación la grilla es plantilla fija: la semana impresa es la del periodo
-  const lunesImpresion = useMemo(() => {
-    const d = new Date(initialDateString + 'T00:00:00');
-    const dia = d.getDay(); // 0 = domingo
-    d.setDate(d.getDate() + (dia === 0 ? -6 : 1 - dia)); // retroceder al lunes
-    return d;
-  }, [initialDateString]);
-
   return (
     <div className="horarios-page max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       
@@ -706,7 +697,6 @@ const Horarios = () => {
             {filterType === 'grupo' && itemSeleccionado?.division
               ? `Turno ${itemSeleccionado.division} · ${ventanaGrilla.inicio.slice(0, 5)}–${ventanaGrilla.fin.slice(0, 5)}`
               : `Jornada general · ${ventanaGrilla.inicio.slice(0, 5)}–${ventanaGrilla.fin.slice(0, 5)}`}
-            {' · '}Semana del {lunesImpresion.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
             {' · '}Generado: {new Date().toLocaleDateString('es-VE')}
           </p>
         </div>
