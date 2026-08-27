@@ -470,7 +470,7 @@ const Horarios = () => {
 
   // Semana visible de la grilla (para la cabecera de impresión).
   return (
-    <div className="horarios-page max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+    <div className="horarios-page max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       
       {/* Banner de Modo Demo */}
       {demoMode && (
@@ -683,7 +683,7 @@ const Horarios = () => {
       )}
 
       {/* GRILLA DEL CALENDARIO PRINCIPAL */}
-      <div className="print-area bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
+      <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
 
         {/* Encabezado solo visible al imprimir: identifica la entidad de la vista */}
         <div className="hidden print:block mb-4 border-b border-slate-300 pb-3">
