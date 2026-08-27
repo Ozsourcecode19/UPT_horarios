@@ -11,6 +11,7 @@ import {
 import CarrerasService from '../api/carreras';
 import TrayectosService from '../api/trayectos';
 import useCanWrite from '../hooks/useCanWrite';
+import ModalPortal from '../components/ui/ModalPortal';
 import { esErrorDeServidor } from '../utils/errors';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
@@ -478,6 +479,7 @@ const Carreras = () => {
 
       {/* MODAL REGISTRAR / EDITAR */}
       {isModalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
             
@@ -556,10 +558,12 @@ const Carreras = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE ELIMINAR */}
       {deleteConfirmCarrera && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
             
@@ -594,6 +598,7 @@ const Carreras = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>

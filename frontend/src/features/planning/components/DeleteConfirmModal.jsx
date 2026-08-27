@@ -3,6 +3,7 @@
 // Reemplaza los dos bloques duplicados (grupo / lección) con el mismo aspecto.
 
 import { AlertTriangle } from 'lucide-react';
+import ModalPortal from '../../../components/ui/ModalPortal';
 
 const DeleteConfirmModal = ({
   titulo,
@@ -11,7 +12,8 @@ const DeleteConfirmModal = ({
   onConfirm,
 }) => {
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <ModalPortal>
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
         <div className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center">
           <AlertTriangle className="w-6 h-6" />
@@ -30,6 +32,7 @@ const DeleteConfirmModal = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

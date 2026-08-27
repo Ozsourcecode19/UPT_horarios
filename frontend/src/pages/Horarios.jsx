@@ -17,6 +17,7 @@ import BloquesService from '../api/bloques';
 import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
 import { esErrorDeServidor } from '../utils/errors';
+import ModalPortal from '../components/ui/ModalPortal';
 import { generarICal, descargarICal, nombreArchivoExport } from '../utils/icalExport';
 import useCanWrite from '../hooks/useCanWrite';
 import { DeleteConfirmModal } from '../features/planning';
@@ -532,6 +533,7 @@ const Horarios = () => {
 
       {/* Overlay de Carga durante Generación */}
       {isGenerating && (
+        <ModalPortal>
         <div className="no-print fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
           <div className="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 flex flex-col items-center max-w-sm text-center">
             <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mb-4 animate-spin">
@@ -548,6 +550,7 @@ const Horarios = () => {
             )}
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CABECERA */}

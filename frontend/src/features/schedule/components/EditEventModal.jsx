@@ -5,6 +5,7 @@
 
 import { X, Clock, Trash2 } from 'lucide-react';
 import { bloqueDentroVentana } from '../utils/schedule';
+import ModalPortal from '../../../components/ui/ModalPortal';
 
 const DIAS_NOMBRES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -40,8 +41,9 @@ const EditEventModal = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+    <ModalPortal>
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
 
         {/* Cabecera del modal */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -177,6 +179,7 @@ const EditEventModal = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

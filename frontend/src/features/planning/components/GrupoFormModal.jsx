@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X, AlertTriangle } from 'lucide-react';
+import ModalPortal from '../../../components/ui/ModalPortal';
 
 import BloquesService from '../../../api/bloques';
 import ConfiguracionesService from '../../../api/configuraciones';
@@ -92,7 +93,8 @@ const GrupoFormModal = ({
   }, [editing]);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <ModalPortal>
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
 
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -222,6 +224,7 @@ const GrupoFormModal = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

@@ -12,6 +12,7 @@ import { esErrorDeServidor } from '../utils/errors';
 import SedesService from '../api/sedes';
 import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
+import ModalPortal from '../components/ui/ModalPortal';
 
 // --- CONFIGURACIÓN ---
 const DIAS_NOMBRES = {
@@ -677,6 +678,7 @@ const BloquesHorarios = () => {
 
       {/* MODAL REGISTRAR / EDITAR */}
       {isModalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
 
@@ -792,10 +794,12 @@ const BloquesHorarios = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE ACTIVAR / DESACTIVAR / ELIMINAR */}
       {confirmAction && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
 
@@ -873,10 +877,12 @@ const BloquesHorarios = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE GENERAR GRILLA ESTÁNDAR */}
       {showGenerarModal && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
 
@@ -966,6 +972,7 @@ const BloquesHorarios = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>
