@@ -8,6 +8,7 @@ import {
   Loader2, AlertCircle, Calendar, ShieldCheck, Sparkles, Filter 
 } from 'lucide-react';
 import HabilitacionesService from '../../api/habilitaciones';
+import ModalPortal from '../ui/ModalPortal';
 import SubjectsService from '../../api/subjects';
 
 // Esquema de validación para añadir habilitación
@@ -536,6 +537,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
 
       {/* MODAL DEFENSIVO DE CONFIRMACIÓN DE ELIMINACIÓN DE HABILITACIÓN */}
       {deleteModalState.isOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 text-center space-y-4">
@@ -643,6 +645,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

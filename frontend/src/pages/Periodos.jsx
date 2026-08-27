@@ -10,6 +10,7 @@ import {
 import PeriodosService from '../api/periodos';
 import { useAuth } from '../context/AuthContext';
 import { esErrorDeServidor } from '../utils/errors';
+import ModalPortal from '../components/ui/ModalPortal';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const periodoSchema = z.object({
@@ -508,6 +509,7 @@ const Periodos = () => {
 
       {/* MODAL REGISTRAR / EDITAR */}
       {isModalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
 
@@ -622,10 +624,12 @@ const Periodos = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE CERRAR / REACTIVAR */}
       {confirmAction && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
 
@@ -681,6 +685,7 @@ const Periodos = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>

@@ -13,6 +13,7 @@ import SedesService from '../api/sedes';
 import AulasService from '../api/aulas';
 import useCanWrite from '../hooks/useCanWrite';
 import { esErrorDeServidor } from '../utils/errors';
+import ModalPortal from '../components/ui/ModalPortal';
 
 // --- ESQUEMAS DE VALIDACIÓN ZOD ---
 const sedeSchema = z.object({
@@ -760,6 +761,7 @@ const Aulas = () => {
 
       {/* MODAL CREAR / EDITAR SEDES */}
       {isSedeModalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
             
@@ -843,10 +845,12 @@ const Aulas = () => {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* MODAL CREAR / EDITAR AULAS */}
       {isAulaModalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
             
@@ -947,10 +951,12 @@ const Aulas = () => {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE ELIMINAR SEDES */}
       {deleteConfirmSede && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
             
@@ -984,10 +990,12 @@ const Aulas = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* CONFIRMACIÓN DE ELIMINAR AULAS */}
       {deleteConfirmAula && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 space-y-4">
             
@@ -1021,6 +1029,7 @@ const Aulas = () => {
 
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>
