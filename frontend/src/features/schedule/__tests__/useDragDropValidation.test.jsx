@@ -176,12 +176,12 @@ describe('useDragDropValidation', () => {
         start: lunes(8, 0),
         end: lunes(9, 0),
         resourceId: 'aula_1',
-        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
+        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10, leccion_id: 1 },
       });
     });
 
     await act(async () => {
-      await result.current.handleSaveChangesModal({ preventDefault: vi.fn() });
+      await result.current.handleSaveChangesModal(1, 1, 10);
     });
 
     expect(setup.setDemoHorarios).toHaveBeenCalled();
@@ -340,19 +340,13 @@ describe('useDragDropValidation — ventana por división (E17)', () => {
         id: '1',
         start: lunes(8, 0),
         end: lunes(9, 0),
-        extendedProps: { aula_id: 1, bloque_id: 10, division: 'MATUTINO', docente: '', grupo: '', aula: '', sede: '' },
+        extendedProps: { aula_id: 1, bloque_id: 10, division: 'MATUTINO', docente: '', grupo: '', aula: '', sede: '', leccion_id: 1 },
       });
-    });
-
-    // El usuario cambia los selects del modal (estado actualizado antes de guardar)
-    await act(async () => {
-      result.current.setEditAulaId('1');
-      result.current.setEditBloqueId('11'); // bloque nocturno 18:00
     });
 
     const { handleSaveChangesModal } = result.current;
     await act(async () => {
-      await handleSaveChangesModal({ preventDefault: () => {} });
+      await handleSaveChangesModal(1, '1', '11');
     });
 
     expect(setup.setDemoHorarios).not.toHaveBeenCalled();

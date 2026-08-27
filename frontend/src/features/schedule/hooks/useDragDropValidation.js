@@ -157,7 +157,8 @@ export const useDragDropValidation = ({
       return false;
     }
 
-    const divisionEvento = resolverDivisionEvento(horario.extendedProps, grupos);
+    const evProps = horario.extendedProps ?? horario;
+    const divisionEvento = resolverDivisionEvento(evProps, grupos);
     const ventana = resolveVentanaTurno(divisionEvento, configuraciones);
     for (const destino of bloqueDestinos) {
       if (ventana && !bloqueDentroVentana(destino, ventana)) {
@@ -320,11 +321,10 @@ export const useDragDropValidation = ({
       return;
     }
 
-    const aplicado = await aplicarMovimiento({
-      horarioId: selectedEvent.id,
-      nuevoBloqueId: targetBlock.id,
-      nuevaAulaId: roomId,
-      divisionEvento: selectedEvent.division || null,
+    const aplicado = await guardarAsignacionManual({
+      horario: selectedEvent,
+      aulaId: roomId,
+      bloqueDestinos: [targetBlock],   // un solo bloque: reducir de x2 a x1
     });
 
     if (aplicado) {
