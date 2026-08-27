@@ -32,7 +32,8 @@
    zebra por banda, filas "Descanso" en huecos, DnD HTML5.
    ============================================================ */
 .grilla-scroll {
-  height: 680px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -62,7 +63,12 @@ table.grilla-bloques {
 }
 
 .horarios-page {
-  --alto-banda: 64px; /* estándar cómodo en pantalla */
+  --alto-banda: 64px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  min-height: 0;
 }
 
 .grilla-bloques td {
@@ -421,6 +427,7 @@ table.grilla-bloques {
 
   /* La grilla fluye completa (sin alto de pantalla ni scroller) */
   .print-area .grilla-scroll {
+    flex: 1;
     height: auto !important;
     overflow: visible !important;
   }
