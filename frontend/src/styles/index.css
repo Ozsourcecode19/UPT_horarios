@@ -359,19 +359,19 @@ table.grilla-bloques {
   }
 
   .print-area {
-    position: absolute;
+    position: relative;
     left: 0;
     top: 0;
     width: 100%;
+    min-height: 100vh;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    padding: 8mm !important; /* margen propio (la @page no tiene) */
-    /* Rasteriza bordes/fondos completos aunque "Background graphics" esté off */
+    padding: 8mm !important;
+    display: flex;
+    flex-direction: column;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    /* Banda de 11mm ⇒ ~17 filas por página: jornada real siempre en 1 hoja,
-       a tamaño natural (zoom 1). Reducir --print-zoom si algún día hiciera falta. */
     --alto-banda: 11mm;
     --print-zoom: 1;
     zoom: var(--print-zoom, 1);
@@ -380,13 +380,19 @@ table.grilla-bloques {
   /* Tabla de la grilla por bandas: bordes firmes, filas íntegras */
   .print-area .grilla-bloques th,
   .print-area .grilla-bloques td {
-    border: 1px solid #94a3b8 !important;
-    position: static !important; /* sin sticky en papel */
+    border: 1px solid #64748b !important;
+    position: static !important;
     background: transparent !important;
   }
 
+  .print-area .grilla-bloques th {
+    background: #f1f5f9 !important;
+  }
+
   .print-area .grilla-bloques {
-    border-collapse: collapse !important;
+    border-collapse: separate !important;
+    border-spacing: 0;
+    flex: 1;
   }
 
   .print-area .grilla-bloques tr,
