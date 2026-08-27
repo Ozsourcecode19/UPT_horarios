@@ -251,7 +251,10 @@ const Horarios = () => {
   const listadoHorariosRaw = demoMode ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId)) : horariosReal;
 
   // --- FILTRADO DE EVENTOS EN MEMORIA ---
-  const listadoHorarios = filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos });
+  const listadoHorarios = useMemo(
+    () => filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos }),
+    [listadoHorariosRaw, filterType, filterValue, docentes, grupos]
+  );
 
   // --- EXPORTACIÓN (E12): descripción legible del filtro activo + descarga iCal ---
   const descripcionFiltro = useMemo(() => {
@@ -765,7 +768,7 @@ const Horarios = () => {
           onSave={(aulaId, bloqueId, abarca) => {
             setEditAulaId(aulaId);
             setEditBloqueId(bloqueId);
-            handleSaveChangesModal(abarca);
+            handleSaveChangesModal(abarca, aulaId, bloqueId);
           }}
           onDelete={handleDeleteSchedule}
           onClose={() => setIsEditModalOpen(false)}

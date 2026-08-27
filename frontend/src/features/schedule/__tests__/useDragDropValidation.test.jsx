@@ -141,22 +141,20 @@ describe('useDragDropValidation', () => {
 
     act(() => {
       result.current.handleEventClick({
-        event: {
-          id: '5',
-          title: 'Matematica',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          resourceId: 'aula_1',
-          extendedProps: {
-            materia: 'Matematica',
-            materia_codigo: 'MAT-101',
-            docente: 'Perez, Juan',
-            grupo: 'Seccion A',
-            aula: 'Aula 101',
-            sede: 'Principal',
-            aula_id: 1,
-            bloque_id: 10,
-          },
+        id: '5',
+        title: 'Matematica',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        resourceId: 'aula_1',
+        extendedProps: {
+          materia: 'Matematica',
+          materia_codigo: 'MAT-101',
+          docente: 'Perez, Juan',
+          grupo: 'Seccion A',
+          aula: 'Aula 101',
+          sede: 'Principal',
+          aula_id: 1,
+          bloque_id: 10,
         },
       });
     });
@@ -173,14 +171,12 @@ describe('useDragDropValidation', () => {
 
     act(() => {
       result.current.handleEventClick({
-        event: {
-          id: '1',
-          title: 'Matematica',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          resourceId: 'aula_1',
-          extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
-        },
+        id: '1',
+        title: 'Matematica',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        resourceId: 'aula_1',
+        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
       });
     });
 
@@ -199,14 +195,12 @@ describe('useDragDropValidation', () => {
 
     act(() => {
       result.current.handleEventClick({
-        event: {
-          id: '1',
-          title: 'Matematica',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          resourceId: 'aula_1',
-          extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
-        },
+        id: '1',
+        title: 'Matematica',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        resourceId: 'aula_1',
+        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
       });
       result.current.setEditBloqueId('999');
     });
@@ -225,14 +219,12 @@ describe('useDragDropValidation', () => {
 
     act(() => {
       result.current.handleEventClick({
-        event: {
-          id: '1',
-          title: 'Matematica',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          resourceId: 'aula_1',
-          extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
-        },
+        id: '1',
+        title: 'Matematica',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        resourceId: 'aula_1',
+        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
       });
     });
 
@@ -252,14 +244,12 @@ describe('useDragDropValidation', () => {
 
     act(() => {
       result.current.handleEventClick({
-        event: {
-          id: '1',
-          title: 'Matematica',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          resourceId: 'aula_1',
-          extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
-        },
+        id: '1',
+        title: 'Matematica',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        resourceId: 'aula_1',
+        extendedProps: { materia: 'Matematica', materia_codigo: 'MAT-101', docente: 'Perez, Juan', grupo: 'Seccion A', aula: 'Aula 101', sede: 'Principal', aula_id: 1, bloque_id: 10 },
       });
     });
 
@@ -347,12 +337,10 @@ describe('useDragDropValidation — ventana por división (E17)', () => {
     // Simular evento seleccionado con división MATUTINO
     await act(async () => {
       await result.current.handleEventClick({
-        event: {
-          id: '1',
-          start: lunes(8, 0),
-          end: lunes(9, 0),
-          extendedProps: { aula_id: 1, bloque_id: 10, division: 'MATUTINO', docente: '', grupo: '', aula: '', sede: '' },
-        },
+        id: '1',
+        start: lunes(8, 0),
+        end: lunes(9, 0),
+        extendedProps: { aula_id: 1, bloque_id: 10, division: 'MATUTINO', docente: '', grupo: '', aula: '', sede: '' },
       });
     });
 

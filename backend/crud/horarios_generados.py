@@ -329,10 +329,11 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
                     "docente": f"{docente_apellido}, {docente_nombre}",
                     "docente_id": docente_id,
                     "materia": materia_nombre,
-                    "materia_codigo": materia_codigo, # Usar el valor obtenido del join
-                    "backgroundColor": materia_color_hex, # Usar el color obtenido del join
+                    "materia_codigo": materia_codigo,
+                    "backgroundColor": materia_color_hex,
                     "aula": aula_nombre,
                     "aula_id": horario_gen.aula_id,
+                    "bloque_id": horario_gen.bloque_id,
                     "sede": sede_nombre,
                 }
             )
