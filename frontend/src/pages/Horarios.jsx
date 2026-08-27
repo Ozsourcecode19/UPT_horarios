@@ -355,6 +355,7 @@ const Horarios = () => {
     demoHorarios,
     setDemoHorarios,
     listadoHorarios,
+    todosLosHorarios: listadoHorariosRaw,
     aulas,
     bloques,
     configuraciones, // ventanas por turno: restringe movimientos fuera de la división del grupo
@@ -363,7 +364,7 @@ const Horarios = () => {
     selectedPeriodoId,
     puedeEscribir,
     showToast,
-    onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
+    onInvalidate: () => queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] }),
   });
 
   // Ventana del turno del evento en edición (filtra el select de bloques del modal)
@@ -709,6 +710,7 @@ const Horarios = () => {
 
         <GridSemanalBloques
           eventos={listadoHorarios}
+          todosLosEventos={listadoHorariosRaw}
           bandas={bandas}
           bloques={bloques}
           isLoading={isHorariosLoading}

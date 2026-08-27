@@ -22,6 +22,7 @@ const minutosAHora = (min) => `${Math.floor(min / 60)}:${String(min % 60).padSta
 
 const GridSemanalBloques = ({
   eventos = [],
+  todosLosEventos = [], // eventos sin filtrar (para detectar conflictos cross-view)
   bandas = [],       // [{iniMin, finMin, etiqueta}] de construirBandasEje
   bloques = [],
   isLoading = false,
@@ -65,6 +66,56 @@ const GridSemanalBloques = ({
     });
     return map;
   }, [eventos, minutoDe]);
+
+  // Mapa de celdas ocupadas por docente_id, grupo_id, aula_id (para detectar conflictos al hover)
+  const ocupadasPorEntidad = useMemo(() => {
+    const porDocente = new Map(); // docente_id -> Set<clave>
+    const porGrupo = new Map();   // grupo_id -> Set<clave>
+    const porAula = new Map();    // aula_id -> Set<clave>
+    (todosLosEventos.length ? todosLosEventos : eventos).forEach(ev => {
+      const bid = ev.extendedProps?.bloque_id;
+      const b = bid != null ? bloques.find(x => Number(x.id) === Number(bid)) : null;
+      if (!b || b.activo === false) return;
+      const clave = `${b.dia_semana}|${horaAMinutos(b.hora_inicio)}`;
+      const did = ev.extendedProps?.docente_id;
+      const gid = ev.extendedProps?.grupo_id;
+      const aid = ev.extendedProps?.aula_id;
+      if (did != null) {
+        if (!porDocente.has(Number(did))) porDocente.set(Number(did), new Set());
+        porDocente.get(Number(did)).add(clave);
+      }
+      if (gid != null) {
+        if (!porGrupo.has(Number(gid))) porGrupo.set(Number(gid), new Set());
+        porGrupo.get(Number(gid)).add(clave);
+      }
+      if (aid != null) {
+        if (!porAula.has(Number(aid))) porAula.set(Number(aid), new Set());
+        porAula.get(Number(aid)).add(clave);
+      }
+    });
+    return { porDocente, porGrupo, porAula };
+  }, [eventos, todosLosEventos, bloques]);
+
+  // Conflicto detectado en la celda hover durante un drag
+  const conflictoHover = useMemo(() => {
+    if (!drag || !celdaHover) return null;
+    const evArrastrado = eventos.find(e => String(e.id) === String(drag.id));
+    if (!evArrastrado) return null;
+    const ep = evArrastrado.extendedProps || {};
+    const did = ep.docente_id != null ? Number(ep.docente_id) : null;
+    const gid = ep.grupo_id != null ? Number(ep.grupo_id) : null;
+    const aid = ep.aula_id != null ? Number(ep.aula_id) : null;
+    if (did != null && ocupadasPorEntidad.porDocente.get(did)?.has(celdaHover)) {
+      return { tipo: 'docente', etiqueta: 'Docente ocupado' };
+    }
+    if (gid != null && ocupadasPorEntidad.porGrupo.get(gid)?.has(celdaHover)) {
+      return { tipo: 'grupo', etiqueta: 'Grupo ocupado' };
+    }
+    if (aid != null && ocupadasPorEntidad.porAula.get(aid)?.has(celdaHover)) {
+      return { tipo: 'aula', etiqueta: 'Aula ocupada' };
+    }
+    return null;
+  }, [drag, celdaHover, eventos, ocupadasPorEntidad]);
 
   // Agrupación de eventos por celda "dia|iniMin"
   const celdas = useMemo(() => {
@@ -154,10 +205,32 @@ const GridSemanalBloques = ({
                   const key = `${dia}|${fila.banda.iniMin}`;
                   const evs = celdas.get(key) || [];
                   const esHover = celdaHover === key;
+                  const conflicto = esHover && conflictoHover;
+
+                  // Punto indicador: celdas con conflicto mientras se arrastra (incluso sin hover)
+                  let puntoConflicto = null;
+                  if (drag) {
+                    const evArrastrado = eventos.find(e => String(e.id) === String(drag.id));
+                    if (evArrastrado) {
+                      const ep = evArrastrado.extendedProps || {};
+                      const did = ep.docente_id != null ? Number(ep.docente_id) : null;
+                      const gid = ep.grupo_id != null ? Number(ep.grupo_id) : null;
+                      const aid = ep.aula_id != null ? Number(ep.aula_id) : null;
+                      if (did != null && ocupadasPorEntidad.porDocente.get(did)?.has(key)) {
+                        puntoConflicto = 'docente';
+                      } else if (gid != null && ocupadasPorEntidad.porGrupo.get(gid)?.has(key)) {
+                        puntoConflicto = 'grupo';
+                      } else if (aid != null && ocupadasPorEntidad.porAula.get(aid)?.has(key)) {
+                        puntoConflicto = 'aula';
+                      }
+                    }
+                  }
+
+                  const claseConflicto = conflicto ? `celda-conflicto-${conflicto.tipo}` : '';
                   return (
                     <td
                       key={dia}
-                      className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''}`}
+                      className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto}`}
                       onDragOver={(e) => {
                         if (!drag) return;
                         e.preventDefault();
@@ -167,6 +240,9 @@ const GridSemanalBloques = ({
                       onDragLeave={() => setCeldaHover(h => (h === key ? null : h))}
                       onDrop={(e) => handleDropEnDia(e, dia, fila.banda)}
                     >
+                      {puntoConflicto && (
+                        <span className={`conflicto-punto conflicto-punto-${puntoConflicto}`} />
+                      )}
                       {evs.map(ev => {
                         const info = infoSpanPorId.get(ev.id);
                         const esContinuacion = !!info?.esContinuacion;
@@ -222,6 +298,11 @@ const GridSemanalBloques = ({
                           </div>
                         );
                       })}
+                      {conflicto && (
+                        <span className={`conflicto-badge conflicto-${conflicto.tipo}`}>
+                          {conflicto.etiqueta}
+                        </span>
+                      )}
                     </td>
                   );
                 })}

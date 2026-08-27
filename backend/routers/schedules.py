@@ -204,3 +204,72 @@ def read_schedules(periodo_id: Optional[int] = None, skip: int = 0, limit: int =
     # La función CRUD debe estar preparada para manejar periodo_id=None
     horarios = crud.get_horarios_generados(db, periodo_id=periodo_id, skip=skip, limit=limit)
     return horarios
+
+# --- DIAGNÓSTICO TEMPORAL: filas huérfanas y triggers null ---
+from sqlalchemy import text
+from pydantic import BaseModel
+
+class OrphanedRow(BaseModel):
+    id: int
+    leccion_id: Optional[int]
+    aula_id: Optional[int]
+    bloque_id: int
+    periodo_id: int
+    broken_ref: str
+    docente_id: Optional[int]
+    docente_apellido: Optional[str]
+
+class DiagnosticResult(BaseModel):
+    orphaned_count: int
+    null_triggers_count: int
+    orphaned_rows: List[OrphanedRow]
+    null_trigger_rows: List[dict]
+
+@router.get("/diagnostico/orphaned", response_model=DiagnosticResult,
+            summary="Diagnóstico: filas ACTIVO con referencias rotas (temporal)")
+def diagnostico_orphaned(db: Session = Depends(get_db)):
+    """
+    Busca horario_generado ACTIVO cuyas FK apuntan a entidades inexistentes
+    (Leccion, Aula, Docente, Materia, Grupo, Sede). Estas filas son invisibles
+    en la grilla (fullcalendar INNER JOIN las descarta) pero la validación
+    (menos JOINs) las encuentra → conflictos falsos.
+    Temporal: sin auth para diagnóstico rápido.
+    """
+    q_orphaned = text("""
+        SELECT hg.id, hg.leccion_id, hg.aula_id, hg.bloque_id, hg.periodo_id,
+               CASE WHEN l.id IS NULL THEN 'LECCION_MISSING'
+                    WHEN a.id IS NULL THEN 'AULA_MISSING'
+                    WHEN d.id IS NULL THEN 'DOCENTE_MISSING'
+                    WHEN m.id IS NULL THEN 'MATERIA_MISSING'
+                    WHEN g.id IS NULL THEN 'GRUPO_MISSING'
+                    WHEN s.id IS NULL THEN 'SEDE_MISSING'
+                    ELSE 'OK' END as broken_ref,
+               l.docente_id, d.apellido as docente_apellido
+        FROM horario_generado hg
+        LEFT JOIN lecciones l ON hg.leccion_id = l.id
+        LEFT JOIN docentes d ON l.docente_id = d.id
+        LEFT JOIN materias m ON l.materia_id = m.id
+        LEFT JOIN grupos g ON l.grupo_id = g.id
+        LEFT JOIN aulas a ON hg.aula_id = a.id
+        LEFT JOIN sedes s ON a.sede_id = s.id
+        WHERE hg.estado = 'ACTIVO'
+          AND (l.id IS NULL OR a.id IS NULL OR d.id IS NULL
+               OR m.id IS NULL OR g.id IS NULL OR s.id IS NULL)
+    """)
+    orphaned = db.execute(q_orphaned).mappings().all()
+
+    q_null_triggers = text("""
+        SELECT hg.id, hg.leccion_id, hg.aula_id, hg.bloque_id,
+               hg.dia_semana, hg.hora_inicio, hg.hora_fin
+        FROM horario_generado hg
+        WHERE hg.estado = 'ACTIVO'
+          AND (hg.dia_semana IS NULL OR hg.hora_inicio IS NULL OR hg.hora_fin IS NULL)
+    """)
+    null_triggers = db.execute(q_null_triggers).mappings().all()
+
+    return DiagnosticResult(
+        orphaned_count=len(orphaned),
+        null_triggers_count=len(null_triggers),
+        orphaned_rows=[OrphanedRow(**dict(r)) for r in orphaned],
+        null_trigger_rows=[dict(r) for r in null_triggers],
+    )
