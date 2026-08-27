@@ -378,7 +378,7 @@ table.grilla-bloques {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     --alto-banda: 11mm;
-    --print-zoom: 1;
+    --print-zoom: 1.46;
     zoom: var(--print-zoom, 1);
   }
 
