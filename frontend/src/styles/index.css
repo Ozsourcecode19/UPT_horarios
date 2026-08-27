@@ -489,6 +489,15 @@ table.grilla-bloques {
   color: #e2e8f0;
 }
 
+.dark .evento-card .ev-materia { color: #f1f5f9; }
+.dark .evento-card .ev-docente { color: #94a3b8; }
+.dark .evento-card .ev-grupo   { color: #94a3b8; }
+.dark .evento-card .ev-aula    { color: #94a3b8; }
+.dark .evento-card .ev-x2      { color: #93c5fd; }
+.dark .evento-card .ev-del:hover { background-color: rgba(220 38 38 / .2); }
+
+.dark select option { background-color: #1e293b; color: #e2e8f0; }
+
 /* ---------- La impresión (E12) SIEMPRE sale clara ---------- */
 @media print {
   html.dark body { background-color: #fff !important; }
