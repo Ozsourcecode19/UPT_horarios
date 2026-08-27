@@ -365,11 +365,10 @@ table.grilla-bloques {
   }
 
   .print-area {
-    position: relative;
+    position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    min-height: 100vh;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
@@ -398,7 +397,6 @@ table.grilla-bloques {
   .print-area .grilla-bloques {
     border-collapse: separate !important;
     border-spacing: 0;
-    flex: 1;
   }
 
   .print-area .grilla-bloques tr,
@@ -427,7 +425,6 @@ table.grilla-bloques {
 
   /* La grilla fluye completa (sin alto de pantalla ni scroller) */
   .print-area .grilla-scroll {
-    flex: 1;
     height: auto !important;
     overflow: visible !important;
   }
