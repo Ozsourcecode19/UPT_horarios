@@ -15,6 +15,7 @@ export const useDragDropValidation = ({
   demoHorarios,
   setDemoHorarios,
   listadoHorarios = [], // filas ACTIVO visibles (para detectar el par de un span en modo real)
+  todosLosHorarios = [], // filas ACTIVO sin filtrar (para buscar evento conflictivo cross-view)
   aulas,
   bloques,
   configuraciones = [], // ventanas por turno (configuracion) para restringir movimientos por división
@@ -213,7 +214,46 @@ export const useDragDropValidation = ({
       return true;
     } catch (err) {
       const d = err?.response?.data?.detail;
-      showToast(typeof d === 'string' ? d : (d?.mensaje || 'No se pudo asignar la clase'), 'error');
+      let mensaje = typeof d === 'string' ? d : (d?.mensaje || 'No se pudo asignar la clase');
+      const errorCode = typeof d === 'object' ? d?.error_code : null;
+
+      if (errorCode === 'CONFLICT_TEACHER' || mensaje?.includes('Docente ya tiene')) {
+        const ep = horario.extendedProps ?? horario;
+        const did = Number(ep.docente_id);
+        const conflictivo = todosLosHorarios.find(ev =>
+          Number(ev.extendedProps?.docente_id) === did
+          && bloqueDestinos.some(b => Number(ev.extendedProps?.bloque_id) === Number(b.id))
+          && Number(ev.id) !== Number(horario.id)
+        );
+        if (conflictivo) {
+          const ce = conflictivo.extendedProps;
+          mensaje = `Conflicto: El docente ${ce.docente || ''} ya tiene ${ce.materia || ''} (${ce.grupo || ''}) en este bloque.`;
+        }
+      } else if (errorCode === 'CONFLICT_GROUP' || mensaje?.includes('Grupo ya tiene')) {
+        const ep = horario.extendedProps ?? horario;
+        const gid = Number(ep.grupo_id);
+        const conflictivo = todosLosHorarios.find(ev =>
+          Number(ev.extendedProps?.grupo_id) === gid
+          && bloqueDestinos.some(b => Number(ev.extendedProps?.bloque_id) === Number(b.id))
+          && Number(ev.id) !== Number(horario.id)
+        );
+        if (conflictivo) {
+          const ce = conflictivo.extendedProps;
+          mensaje = `Conflicto: El grupo ${ce.grupo || ''} ya tiene ${ce.materia || ''} (${ce.docente || ''}) en este bloque.`;
+        }
+      } else if (errorCode === 'CONFLICT_ROOM' || mensaje?.includes('Aula ya')) {
+        const conflictivo = todosLosHorarios.find(ev =>
+          Number(ev.extendedProps?.aula_id) === Number(aulaId)
+          && bloqueDestinos.some(b => Number(ev.extendedProps?.bloque_id) === Number(b.id))
+          && Number(ev.id) !== Number(horario.id)
+        );
+        if (conflictivo) {
+          const ce = conflictivo.extendedProps;
+          mensaje = `Conflicto: El aula ${ce.aula || ''} ya tiene ${ce.materia || ''} (${ce.docente || ''}) en este bloque.`;
+        }
+      }
+
+      showToast(mensaje, 'error');
       return false;
     }
   };

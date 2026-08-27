@@ -100,6 +100,7 @@ table.grilla-bloques {
 .grilla-bloques td.celda-dia {
   padding: 0.5rem;
   transition: background-color 0.15s ease;
+  position: relative;
 }
 
 .grilla-bloques td.celda-droppable {
@@ -110,6 +111,75 @@ table.grilla-bloques {
   background-color: #eff6ff !important;
   outline: 2px dashed #60a5fa;
   outline-offset: -3px;
+}
+
+.grilla-bloques td.celda-conflicto-docente {
+  background-color: #fef2f2 !important;
+  outline: 2px dashed #f87171;
+  outline-offset: -3px;
+}
+
+.grilla-bloques td.celda-conflicto-grupo {
+  background-color: #fff7ed !important;
+  outline: 2px dashed #fb923c;
+  outline-offset: -3px;
+}
+
+.grilla-bloques td.celda-conflicto-aula {
+  background-color: #fefce8 !important;
+  outline: 2px dashed #facc15;
+  outline-offset: -3px;
+}
+
+.conflicto-badge {
+  display: block;
+  margin-top: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  user-select: none;
+}
+
+.conflicto-docente {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.conflicto-grupo {
+  background-color: #ffedd5;
+  color: #9a3412;
+}
+
+.conflicto-aula {
+  background-color: #fef9c3;
+  color: #854d0e;
+}
+
+.conflicto-punto {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  pointer-events: none;
+}
+
+.conflicto-punto-docente {
+  background-color: #ef4444;
+}
+
+.conflicto-punto-grupo {
+  background-color: #f97316;
+}
+
+.conflicto-punto-aula {
+  background-color: #eab308;
 }
 
 .fila-descanso td {
