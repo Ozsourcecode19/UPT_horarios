@@ -46,11 +46,21 @@ frontend/src/
 ├── components/
 │   ├── layout/
 │   │   └── MainLayout.jsx      ✅ Sidebar por secciones/rol + Header + breadcrumb + Outlet
+│   ├── ui/
+│   │   ├── Pagination.jsx      ✅ Componente reutilizable de paginación
+│   │   └── ModalPortal.jsx     ✅ Portal para modales (createPortal a document.body)
 │   ├── docentes/
 │   │   ├── DocenteDisponibilidad.jsx  ✅ Grilla semanal de disponibilidad
 │   │   ├── DocenteHabilitaciones.jsx  ✅ Habilitaciones por docente-materia
 │   │   └── DocenteTabs.jsx            ✅ Pestañas compartidas (Plantilla/Disponibilidad/Habilitaciones)
-│   └── (sin ui/ ni shared/)    ⚠️ Pendiente de organizar
+│
+├── hooks/
+│   ├── useDebounce.js          ✅ Debounce de 300ms para búsqueda
+│   ├── usePaginatedQuery.js    ✅ Wrapper de useQuery con paginación server-side
+│   ├── useCanWrite.js          ✅ Verifica permisos de escritura (ADMIN/JEFE-PNF)
+│   ├── useScheduleGeneration.js    ✅ Generación de horarios (real + demo + polling)
+│   ├── useDragDropValidation.js    ✅ Drag & drop + validación + handlers
+│   └── useGenerationPolling.js     ✅ Polling cycle (setInterval/clearInterval)
 │
 ├── features/
 │   ├── schedule/               ✅ Módulo horarios (E14+E16): utils/ hooks/ components/ __tests__/ demoData.js + index.js (barrel)
@@ -162,12 +172,11 @@ frontend/src/
 - Validación con `react-hook-form` + `zod` en todos los formularios
 - **Modo Demo automático:** Si el backend está caído, cada página activa un fallback local en `localStorage` con datos mock que persisten entre recargas
 - Notificaciones Toast (éxito, error, info, advertencia) con auto-cierre a los 4 segundos
-- Búsqueda/filtrado en tiempo real por nombre
+- **Paginación server-side** con búsqueda: page size fijo de 20, debounce 300ms, componente `Pagination` reutilizable. Todos los endpoints CRUD retornan `PaginatedResponse { items, total, page, page_size }`.
 - Estadísticas resumen en tarjetas (conteos, promedios)
 - **Docentes:** La eliminación ahora funciona correctamente (bug corregido en esta sesión: se agregó `cascade="all, delete-orphan"` a la relación `lecciones` en el modelo SQLAlchemy)
 
 **Posibles mejoras:**
-- Paginación del servidor (actualmente se cargan 100 registros máximo con `skip/limit`)
 - Ordenamiento de columnas en tablas
 - Exportación a CSV/Excel
 
@@ -479,7 +488,7 @@ Esta sección documenta patrones, convenciones y gotchas específicos del proyec
 **Modo Demo / Fallback:**  
 Todos los componentes de página siguen este patrón: si el `useQuery` falla (`isError`), se activa `demoMode` (estado local), se cargan datos de `MOCK_*` hardcodeados y se persiste en `localStorage`. El banner de "Modo Demo Activado" muestra un botón para reconectar. Este patrón **debe mantenerse** en cualquier componente nuevo.
 
-**Estructura de Queries:**  
+**Estructura de Queries (no paginadas):**  
 ```javascript
 const { data: entityData = [], isLoading, isError } = useQuery({
   queryKey: ['entity-name'],
@@ -490,6 +499,19 @@ const { data: entityData = [], isLoading, isError } = useQuery({
   retry: 0  // Siempre 0 para activar demo mode rápido
 });
 ```
+
+**Estructura de Queries (paginadas, server-side):**  
+```javascript
+const { items, total, totalPages, page, setPage, isLoading } = usePaginatedQuery(
+  ['entity-name'],
+  (skip, limit, search) => EntityService.getEntities(skip, limit, search),
+  { searchTerm: debouncedSearch, resetOn: [selectedSedeId] }
+);
+```
+
+- `usePaginatedQuery` gestiona `page`/`skip` internamente y extrae `.items` del `PaginatedResponse`.
+- `resetOn` reinicia la página al cambiar dependencias (ej. sede seleccionada).
+- **Regla crítica:** la extracción de `.items` SIEMPRE debe hacerse dentro del `queryFn`, no después. Si `data` queda como objeto PaginatedResponse durante loading, `.filter()/.map()/.find()` crashean → blank page.
 
 **Invalidación de caché post-mutación:**  
 ```javascript
@@ -890,3 +912,49 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 5. **Verificación:** ✅ Completada (2026-08-24). La primera regeneración real destapó dos defectos de backend corregidos (ver Bugfix 2026-08-24 en `PLAN_DE_DESARROLLO.md`): doble parseo JSONB (`json.loads` sobre dict) que crasheaba la generación, y lookup de ventana por turno con mismatch de mayúsculas que impedía aplicar las ventanas. Tras el fix: regeneración v2 con 4 horarios ACTIVO, sin advertencias, clases MATUTINO dentro de su ventana 07:00–12:00. Suite backend 49 tests ✅.
 
 6. **Fix post-uso (mismo día):** Reemplazar lanzaba **500** por violar el UNIQUE completo `(sede,día,hora_inicio)` al reinsertar sobre filas recién desactivadas (sqlite no reproduce ese índice del SQL oficial). Solución: **upsert por inicio** — la serie objetivo reactiva/ajusta filas existentes (activas o inactivas) y solo inserta las faltantes; los activos fuera de serie se desactivan (con historial en horario_generado se conservan como excepción inactiva). Además el recorte final ahora usa el **mayor valor válido del CHECK** que quepa (30/45/60/90/120) y descarta sobrantes <30'. Contador nuevo `actualizados` en respuesta y toast. Tests +3 (upsert inactiva, en-serie actualizado vs fuera desactivado, recorte válido) → pytest **68 passed**.
+
+### Contexto de la Sesión Actual (2026-08-31) — Paginación server-side + Fix páginas en blanco
+
+1. **Backend — Paginación:**
+   - Schema `PaginatedResponse[T]` genérico en `schemas/pagination.py`, exportado en `schemas/__init__.py`.
+   - 12 CRUD functions modificadas: `get_*` ahora aceptan `search: Optional[str]`, aplican `ilike`, retornan `(items, total)`. Default `limit=20`.
+   - 12 Routers modificados: `response_model=PaginatedResponse[Entity]`, parámetro `search` en GET list.
+   - `bloques_horarios.py`: parámetro adicional `sede_id` para filtro server-side de sede.
+
+2. **Frontend — Componentes nuevos:**
+   - `components/ui/Pagination.jsx`: componente reutilizable con patrón de páginas (1 … [5] … 12).
+   - `hooks/useDebounce.js`: debounce de 300ms para búsqueda.
+   - `hooks/usePaginatedQuery.js`: wrapper de `useQuery` con `page`/`skip`, extracción `.items`, `resetOn` para dependencias, `placeholderData: keepPreviousData` (React Query v5).
+
+3. **Frontend — Services API (10 archivos):**
+   - Todos los services de listado aceptan `(skip=0, limit=20, search=null)`.
+   - `bloques.js`: parámetro adicional `sedeId`.
+
+4. **Frontend — Páginas CRUD paginadas:**
+   - Carreras, Periodos, Docentes, Materias, Trayectos, Aulas+Sedes, BloquesHorarios usan `usePaginatedQuery` + `Pagination` + `useDebounce`.
+   - Demo mode: paginación local sobre datos de `localStorage`.
+
+5. **Fix crítico — Páginas en blanco:**
+   - **Causa raíz:**queries que retornaban PaginatedResponse sin extraer `.items` dentro del `queryFn`. Durante loading, `data = {}` (default), y `{}.items || {} || []` = `{}` (objeto). Cualquier `.filter()/.map()/.find()` sobre `{}` → TypeError → React desmonta todo el árbol → blank page.
+   - **Archivos corregidos:** `DocenteDisponibilidad.jsx`, `GrupoFormModal.jsx`, `Trayectos.jsx`, `Lecciones.jsx`, `Horarios.jsx`, `Dashboard.jsx`, `BloquesHorarios.jsx`, `Settings.jsx`.
+   - **Patrón correcto:** extraer `.items` SIEMPRE dentro del `queryFn`:
+     ```javascript
+     queryFn: async () => {
+       const res = await Service.get(0, 1000);
+       return res.items || res || [];
+     }
+     ```
+   - `Array.isArray()` guards en queries de dependencias que no tienen try/catch.
+
+6. **Fix — BloquesHorarios sede filter:**
+   - Antes: filtro client-side sobre datos paginados (la tabla quedaba vacía al cambiar de sede).
+   - Ahora: filtro server-side via parámetro `sede_id` en el endpoint GET.
+   - `usePaginatedQuery` pasa `sedeId` y incluye `selectedSedeId` en `queryKey` + `resetOn`.
+
+7. **Fix — React Query v5:**
+   - `keepPreviousData: true` → `placeholderData: keepPreviousData` (import de `@tanstack/react-query`).
+
+8. **Fix — selectedPeriodoId type mismatch:**
+   - `e.target.value` siempre es string. Agregado `Number()` en el `onChange` del selector de periodo en `Horarios.jsx`.
+
+9. **Verificación:** ✅ Frontend build OK (7.4s), 164 tests passed, backend 69 tests passed.
