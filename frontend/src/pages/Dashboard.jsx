@@ -89,28 +89,31 @@ const Dashboard = () => {
   // --- QUERIES REALES (patrón Modo Demo: retry 0 + fallback) ---
   const { data: docentesReal = [], isPending: isDocentesPending, isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
-    queryFn: async () => await DocentsService.getDocents(),
+    queryFn: async () => { const res = await DocentsService.getDocents(0, 1000); return res.items || res || []; },
     enabled: !demoMode,
     retry: 0,
   });
 
   const { data: materiasReal = [], isPending: isMateriasPending, isError: isMateriasError, error: materiasError, refetch: refetchMaterias } = useQuery({
     queryKey: ['subjects'],
-    queryFn: async () => await SubjectsService.getSubjects(),
+    queryFn: async () => { const res = await SubjectsService.getSubjects(0, 1000); return res.items || res || []; },
     enabled: !demoMode,
     retry: 0,
   });
 
   const { data: aulasReal = [], isPending: isAulasPending, isError: isAulasError, error: aulasError, refetch: refetchAulas } = useQuery({
     queryKey: ['aulas'],
-    queryFn: async () => await AulasService.getAulas(),
+    queryFn: async () => {
+      const res = await AulasService.getAulas(0, 1000);
+      return res.items || res || [];
+    },
     enabled: !demoMode,
     retry: 0,
   });
 
   const { data: periodosReal = [], isPending: isPeriodosPending, isError: isPeriodosError, error: periodosError, refetch: refetchPeriodos } = useQuery({
     queryKey: ['periodos'],
-    queryFn: async () => await PeriodosService.getPeriodos(),
+    queryFn: async () => { const res = await PeriodosService.getPeriodos(0, 1000); return res.items || res || []; },
     enabled: !demoMode,
     retry: 0,
   });

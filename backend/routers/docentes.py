@@ -1,9 +1,10 @@
 # backend/routers/docentes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud 
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -27,13 +28,13 @@ def read_docente(docente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Docente no encontrado")
     return db_docente
 
-@router.get("/", response_model=List[schemas.Docente], dependencies=[Depends(get_current_active_user)])
-def read_docentes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Docente], dependencies=[Depends(get_current_active_user)])
+def read_docentes(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de docentes.
+    Obtiene una lista de docentes con paginación.
     """
-    docentes = crud.get_docentes(db, skip=skip, limit=limit)
-    return docentes
+    items, total = crud.get_docentes(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{docente_id}", response_model=schemas.Docente, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_docente(docente_id: int, docente_update: schemas.DocenteUpdate, db: Session = Depends(get_db)):

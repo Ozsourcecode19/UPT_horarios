@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import SubjectsService from '../api/subjects';
 import useCanWrite from '../hooks/useCanWrite';
-import { esErrorDeServidor } from '../utils/errors';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import ModalPortal from '../components/ui/ModalPortal';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
@@ -59,6 +61,7 @@ const Materias = () => {
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMateria, setEditingMateria] = useState(null);
   const [deleteConfirmMateria, setDeleteConfirmMateria] = useState(null);
@@ -82,32 +85,39 @@ const Materias = () => {
     localStorage.setItem('demo_materias', JSON.stringify(demoMaterias));
   }, [demoMaterias]);
 
-  // --- QUERY DE MATERIAS (API) ---
+  // --- QUERY DE MATERIAS (API) CON PAGINACIÓN ---
   const { 
-    data: materiasReal = [], 
+    items: materiasReal = [], 
+    total: totalMateriasReal, 
+    totalPages,
+    page,
+    setPage,
     isLoading: isMateriasLoading, 
     isError: isMateriasError,
-    error: materiasError,
-    refetch: refetchMaterias
-  } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: async () => {
-      return await SubjectsService.getSubjects();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['subjects'],
+    (skip, limit, search) => SubjectsService.getSubjects(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearch }
+  );
 
-  // Activar modo demo automáticamente si el backend da error
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isMateriasError && esErrorDeServidor(materiasError) && !demoMode) {
+    if (isMateriasError && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
   }, [isMateriasError]);
 
-  const listadoMaterias = demoMode ? demoMaterias : materiasReal;
+  // Demo mode: filtrar localmente
+  const demoFiltered = demoMode ? demoMaterias.filter(m => {
+    const s = `${m.nombre} ${m.codigo} ${m.color_hex}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoMaterias = demoMode ? demoPageItems : materiasReal;
+  const totalMaterias = demoMode ? demoFiltered.length : (totalMateriasReal ?? 0);
 
   // --- FORMULARIO CONFIGURACIÓN ---
   const { 
@@ -222,17 +232,26 @@ const Materias = () => {
     }
   };
 
-  // --- FILTRO DE BÚSQUEDA ---
-  const filteredMaterias = listadoMaterias.filter(m => {
-    const searchString = `${m.nombre} ${m.codigo} ${m.color_hex}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
+  // --- FILTRO DE BÚSQUEDA (ya no se usa filtrado en memoria, la búsqueda es server-side) ---
+  const filteredMaterias = listadoMaterias;
+
+  // Stats completas (se necesitan del total, no solo de la página actual)
+  const { data: allMateriasStats = [] } = useQuery({
+    queryKey: ['subjects-stats'],
+    queryFn: async () => {
+      const result = await SubjectsService.getSubjects(0, 1000);
+      return result.items || result;
+    },
+    enabled: !demoMode,
+    retry: 0,
   });
+  const statsSource = demoMode ? demoMaterias : allMateriasStats;
 
   // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
-  const totalMaterias = listadoMaterias.length;
-  const activasCount = listadoMaterias.filter(m => m.activa).length;
-  const totalHoras = listadoMaterias.reduce((acc, curr) => acc + curr.carga_horaria_estandar, 0);
-  const promedioHoras = totalMaterias > 0 ? (totalHoras / totalMaterias).toFixed(1) : 0;
+  const totalMateriasStat = statsSource.length;
+  const activasCount = statsSource.filter(m => m.activa).length;
+  const totalHoras = statsSource.reduce((acc, curr) => acc + curr.carga_horaria_estandar, 0);
+  const promedioHoras = totalMateriasStat > 0 ? (totalHoras / totalMateriasStat).toFixed(1) : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -256,7 +275,6 @@ const Materias = () => {
           <button 
             onClick={() => {
               setDemoMode(false);
-              refetchMaterias();
               showToast("Intentando conectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -310,7 +328,7 @@ const Materias = () => {
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Materias Registradas</p>
-            <h4 className="text-3xl font-extrabold text-slate-800">{totalMaterias}</h4>
+            <h4 className="text-3xl font-extrabold text-slate-800">{totalMateriasStat}</h4>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
             <BookOpen className="w-6 h-6" />
@@ -365,7 +383,7 @@ const Materias = () => {
             />
           </div>
           <div className="text-xs font-medium text-slate-400">
-            Mostrando {filteredMaterias.length} de {totalMaterias} materias
+            Mostrando {listadoMaterias.length} de {totalMaterias} materias
           </div>
         </div>
 
@@ -471,9 +489,19 @@ const Materias = () => {
             </table>
           )}
         </div>
-      </div>
 
-      {/* MODAL REGISTRAR / EDITAR */}
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
+      </div>
       {isModalOpen && (
         <ModalPortal>
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">

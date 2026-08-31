@@ -16,11 +16,16 @@ def get_trayecto_academico(db: Session, trayecto_id: int) -> Optional[models.Tra
     """
     return db.query(models.TrayectoAcademico).filter(models.TrayectoAcademico.id == trayecto_id).first()
 
-def get_trayectos_academicos(db: Session, skip: int = 0, limit: int = 100) -> List[models.TrayectoAcademico]:
+def get_trayectos_academicos(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de trayectos académicos con paginación.
+    Obtiene una lista de trayectos académicos con paginación y búsqueda.
     """
-    return db.query(models.TrayectoAcademico).offset(skip).limit(limit).all()
+    q = db.query(models.TrayectoAcademico)
+    if search:
+        q = q.filter(models.TrayectoAcademico.nombre.ilike(f"%{search}%"))
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_trayecto_academico(db: Session, trayecto_academico: TrayectoAcademicoCreate):
     """

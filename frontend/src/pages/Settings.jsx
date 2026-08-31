@@ -206,7 +206,10 @@ const Settings = () => {
     refetch: refetchConfigs
   } = useQuery({
     queryKey: ['configuraciones'],
-    queryFn: async () => await ConfiguracionesService.getConfiguraciones(),
+    queryFn: async () => {
+      const res = await ConfiguracionesService.getConfiguraciones(0, 1000);
+      return res.items || res || [];
+    },
     enabled: !demoMode,
     retry: 0,
   });

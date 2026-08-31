@@ -5,13 +5,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Clock, Plus, Edit2, CheckCircle, XCircle, AlertCircle, AlertTriangle, X,
-  Database, RefreshCw, Sparkles, Lock, CalendarDays, Power, Trash2, Building2
+  Database, RefreshCw, Sparkles, Lock, CalendarDays, Power, Trash2, Building2, Search
 } from 'lucide-react';
 import BloquesService from '../api/bloques';
-import { esErrorDeServidor } from '../utils/errors';
 import SedesService from '../api/sedes';
 import ConfiguracionesService from '../api/configuraciones';
 import { useAuth } from '../context/AuthContext';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import ModalPortal from '../components/ui/ModalPortal';
 
 // --- CONFIGURACIÓN ---
@@ -127,6 +129,8 @@ const BloquesHorarios = () => {
   const isWritable = user?.role === 'ADMIN' || user?.role === 'JEFE-PNF';
 
   // --- ESTADOS LOCALES ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedSedeId, setSelectedSedeId] = useState('');
   const [onlyActivos, setOnlyActivos] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,40 +160,72 @@ const BloquesHorarios = () => {
     localStorage.setItem('demo_bloques_horarios', JSON.stringify(demoBloques));
   }, [demoBloques]);
 
-  // --- QUERIES (API) ---
-  const { data: bloquesReal = [], isLoading: isBloquesLoading, isError: isBloquesError, error: bloquesError, refetch: refetchBloques } = useQuery({
-    queryKey: ['bloques'],
-    queryFn: async () => await BloquesService.getBloques(),
-    enabled: !demoMode,
-    retry: 0,
-  });
+  // --- QUERIES (API) CON PAGINACIÓN ---
+  const {
+    items: bloquesReal = [],
+    total: totalBloquesReal,
+    totalPages,
+    page,
+    setPage,
+    isLoading: isBloquesLoading,
+    isError: isBloquesError,
+  } = usePaginatedQuery(
+    ['bloques', selectedSedeId],
+    (skip, limit, search) => BloquesService.getBloques(skip, limit, search, selectedSedeId ? Number(selectedSedeId) : null),
+    { searchTerm: demoMode ? '' : debouncedSearch, resetOn: [selectedSedeId] }
+  );
 
   const { data: sedesReal = [], isError: isSedesError } = useQuery({
     queryKey: ['sedes'],
-    queryFn: async () => await SedesService.getSedes(),
+    queryFn: async () => { const res = await SedesService.getSedes(0, 1000); return res.items || res || []; },
     enabled: !demoMode,
     retry: 0,
   });
 
   const { data: configuraciones = [] } = useQuery({
     queryKey: ['configuraciones'],
-    queryFn: async () => await ConfiguracionesService.getConfiguraciones(),
+    queryFn: async () => {
+      const res = await ConfiguracionesService.getConfiguraciones(0, 1000);
+      return res.items || res || [];
+    },
     enabled: !demoMode,
     retry: 0,
   });
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isBloquesError && esErrorDeServidor(bloquesError) && !demoMode) {
+    if (isBloquesError && !demoMode) {
       setDemoMode(true);
       showToast('Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.', 'warning');
     }
   }, [isBloquesError]);
 
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
-  const bloques = demoMode ? demoBloques : bloquesReal;
 
   const sedeActual = sedes.find(s => s.id === Number(selectedSedeId));
+
+  // Demo mode: filtrar localmente
+  const demoFiltered = demoMode ? demoBloques.filter(b => {
+    const s = `${DIAS_NOMBRES[b.dia_semana] || ''} ${b.hora_inicio}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoBloques = demoMode ? demoPageItems : bloquesReal;
+  const totalBloques = demoMode ? demoFiltered.length : (totalBloquesReal ?? 0);
+
+  // Stats: query separada para métricas (necesita todos los bloques, no solo la página actual)
+  const { data: allBloquesStats = [] } = useQuery({
+    queryKey: ['bloques-stats'],
+    queryFn: async () => {
+      const result = await BloquesService.getBloques(0, 1000);
+      return result.items || result;
+    },
+    enabled: !demoMode,
+    retry: 0,
+  });
+  const statsSource = demoMode ? demoBloques : allBloquesStats;
 
   // Duración por defecto para el generador: la clave duracion_bloque_default de Configuración
   const duracionDefault = useMemo(() => {
@@ -387,17 +423,16 @@ const BloquesHorarios = () => {
     }
   };
 
-  // --- FILTROS ---
-  const filteredBloques = bloques
-    .filter(b => !selectedSedeId || b.sede_id === Number(selectedSedeId))
+  // --- FILTROS CLIENT-SIDE (sede ya se filtra server-side, solo activos en cliente) ---
+  const filteredBloques = listadoBloques
     .filter(b => !onlyActivos || b.activo)
     .sort((a, b) => a.dia_semana - b.dia_semana || a.hora_inicio.localeCompare(b.hora_inicio));
 
-  // --- MÉTRICAS ---
-  const bloquesSede = bloques.filter(b => !selectedSedeId || b.sede_id === Number(selectedSedeId));
+  // --- MÉTRICAS (basadas en todos los bloques, no solo la página actual) ---
+  const bloquesSede = statsSource.filter(b => !selectedSedeId || b.sede_id === Number(selectedSedeId));
   const activosCount = bloquesSede.filter(b => b.activo).length;
   const inactivosCount = bloquesSede.length - activosCount;
-  const sedesConBloques = sedes.filter(s => bloques.some(b => b.sede_id === s.id)).length;
+  const sedesConBloques = sedes.filter(s => statsSource.some(b => b.sede_id === s.id)).length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -419,7 +454,7 @@ const BloquesHorarios = () => {
             </div>
           </div>
           <button
-            onClick={() => { setDemoMode(false); refetchBloques(); showToast('Intentando conectar con API real...', 'info'); }}
+            onClick={() => { setDemoMode(false); showToast('Intentando conectar con API real...', 'info'); }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -538,8 +573,18 @@ const BloquesHorarios = () => {
 
         {/* Barra de Filtros */}
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:max-w-lg">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:max-w-2xl">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por día u hora..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+              />
+            </div>
+            <div className="relative flex-1 sm:max-w-[200px]">
               <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <select
                 value={selectedSedeId}
@@ -674,6 +719,18 @@ const BloquesHorarios = () => {
             </table>
           )}
         </div>
+
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR / EDITAR */}

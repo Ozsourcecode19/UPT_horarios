@@ -1,9 +1,10 @@
 # backend/routers/bloques_horarios.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -47,13 +48,13 @@ def read_bloque_horario(bloque_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bloque Horario no encontrado")
     return db_bloque
 
-@router.get("/", response_model=List[schemas.BloqueHorario], dependencies=[Depends(get_current_active_user)])
-def read_bloques_horarios(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.BloqueHorario], dependencies=[Depends(get_current_active_user)])
+def read_bloques_horarios(skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de bloques horarios.
+    Obtiene una lista de bloques horarios con paginación, búsqueda y filtro por sede.
     """
-    bloques = crud.get_bloques_horarios(db, skip=skip, limit=limit)
-    return bloques
+    items, total = crud.get_bloques_horarios(db, skip=skip, limit=limit, search=search, sede_id=sede_id)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{bloque_id}", response_model=schemas.BloqueHorario, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_bloque_horario(bloque_id: int, bloque_update: schemas.BloqueHorarioUpdate, db: Session = Depends(get_db)):

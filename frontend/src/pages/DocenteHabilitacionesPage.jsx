@@ -34,7 +34,8 @@ const DocenteHabilitacionesPage = () => {
     queryKey: ['docents'],
     queryFn: async () => {
       try {
-        return await DocentsService.getDocents();
+        const res = await DocentsService.getDocents(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando docentes del backend, usando MOCK_DOCENTES");
         return MOCK_DOCENTES;

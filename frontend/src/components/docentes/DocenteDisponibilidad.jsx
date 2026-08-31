@@ -87,7 +87,8 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     queryKey: ['bloques'],
     queryFn: async () => {
       try {
-        return await BloquesService.getBloques();
+        const result = await BloquesService.getBloques(0, 1000);
+        return result.items || result;
       } catch (err) {
         console.warn("Error cargando bloques, usando fallback.");
         return [];
@@ -104,7 +105,8 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     queryKey: ['configuraciones'],
     queryFn: async () => {
       try {
-        return await ConfiguracionesService.getConfiguraciones();
+        const res = await ConfiguracionesService.getConfiguraciones();
+        return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando configuración, usando días laborables por defecto.");
         return [];

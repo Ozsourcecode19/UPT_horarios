@@ -15,11 +15,19 @@ def get_carrera(db: Session, carrera_id: int) -> Optional[models.Carrera]:
     """
     return db.query(models.Carrera).filter(models.Carrera.id == carrera_id).first()
 
-def get_carreras(db: Session, skip: int = 0, limit: int = 100) -> List[models.Carrera]:
+def get_carreras(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de carreras con paginación.
+    Obtiene una lista de carreras con paginación y búsqueda.
     """
-    return db.query(models.Carrera).offset(skip).limit(limit).all()
+    q = db.query(models.Carrera)
+    if search:
+        q = q.filter(
+            models.Carrera.nombre.ilike(f"%{search}%") |
+            models.Carrera.codigo.ilike(f"%{search}%")
+        )
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_carrera(db: Session, carrera: CarreraCreate) -> Carrera:
     """

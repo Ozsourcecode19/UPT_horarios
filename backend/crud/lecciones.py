@@ -20,11 +20,14 @@ def get_leccion(db: Session, leccion_id: int) -> Optional[models.Leccion]:
     """
     return db.query(models.Leccion).filter(models.Leccion.id == leccion_id).first()
 
-def get_lecciones(db: Session, skip: int = 0, limit: int = 100) -> List[models.Leccion]:
+def get_lecciones(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
     Obtiene una lista de lecciones con paginación.
     """
-    return db.query(models.Leccion).offset(skip).limit(limit).all()
+    q = db.query(models.Leccion)
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_leccion(db: Session, leccion: LeccionCreate):
     """

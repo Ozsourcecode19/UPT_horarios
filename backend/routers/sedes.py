@@ -1,9 +1,10 @@
 # backend/routers/sedes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db # Importar get_db desde el archivo correcto
 from core.security import get_current_active_user, require_role
 router = APIRouter(prefix="/sedes", tags=["Sedes"])
@@ -26,13 +27,13 @@ def read_sede(sede_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sede no encontrada")
     return db_sede
 
-@router.get("/", response_model=List[schemas.Sede], dependencies=[Depends(get_current_active_user)])
-def read_sedes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Sede], dependencies=[Depends(get_current_active_user)])
+def read_sedes(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de sedes.
+    Obtiene una lista de sedes con paginación.
     """
-    sedes = crud.get_sedes(db, skip=skip, limit=limit)
-    return sedes
+    items, total = crud.get_sedes(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{sede_id}", response_model=schemas.Sede, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_sede(sede_id: int, sede_update: schemas.SedeUpdate, db: Session = Depends(get_db)):

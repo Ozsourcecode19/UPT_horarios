@@ -1,11 +1,12 @@
 # backend/routers/usuarios.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from core.security import get_password_hash, get_current_active_user, require_role
 import models
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 """
 Importacion relativa "from .. import crud, schemas" causa problemas 
@@ -53,18 +54,19 @@ def read_usuario(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
     return db_usuario
 
-@router.get("/", response_model=List[schemas.Usuario])
+@router.get("/", response_model=PaginatedResponse[schemas.Usuario])
 def read_usuarios(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 20, 
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_active_user)
 ):
     """
-    Obtiene una lista de usuarios.
+    Obtiene una lista de usuarios con paginación.
     """
-    usuarios = crud.get_usuarios(db, skip=skip, limit=limit)
-    return usuarios
+    items, total = crud.get_usuarios(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{usuario_id}", response_model=schemas.Usuario)
 def update_usuario(

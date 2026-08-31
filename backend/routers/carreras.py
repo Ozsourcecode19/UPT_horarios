@@ -1,9 +1,10 @@
 # backend/routers/carreras.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -27,13 +28,13 @@ def read_carrera(carrera_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carrera no encontrada")
     return db_carrera
 
-@router.get("/", response_model=List[schemas.Carrera], dependencies=[Depends(get_current_active_user)])
-def read_carreras(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Carrera], dependencies=[Depends(get_current_active_user)])
+def read_carreras(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de carreras.
+    Obtiene una lista de carreras con paginación.
     """
-    carreras = crud.get_carreras(db, skip=skip, limit=limit)
-    return carreras
+    items, total = crud.get_carreras(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{carrera_id}", response_model=schemas.Carrera, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_carrera(carrera_id: int, carrera_update: schemas.CarreraUpdate, db: Session = Depends(get_db)):

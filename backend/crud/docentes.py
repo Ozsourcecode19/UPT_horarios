@@ -17,11 +17,19 @@ def get_docente(db: Session, docente_id: int) -> Optional[models.Docente]:
     """
     return db.query(models.Docente).filter(models.Docente.id == docente_id).first()
 
-def get_docentes(db: Session, skip: int = 0, limit: int = 100) -> List[models.Docente]:
+def get_docentes(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de docentes con paginación.
+    Obtiene una lista de docentes con paginación y búsqueda.
     """
-    return db.query(models.Docente).offset(skip).limit(limit).all()
+    q = db.query(models.Docente)
+    if search:
+        q = q.filter(
+            models.Docente.nombre.ilike(f"%{search}%") |
+            models.Docente.apellido.ilike(f"%{search}%")
+        )
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def get_horarios_de_docente(db: Session, docente_id: int) -> List[models.HorarioGenerado]:
     """

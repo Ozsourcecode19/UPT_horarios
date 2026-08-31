@@ -43,7 +43,8 @@ const GrupoFormModal = ({
     queryKey: ['bloques'],
     queryFn: async () => {
       try {
-        return await BloquesService.getBloques();
+        const result = await BloquesService.getBloques(0, 1000);
+        return result.items || result;
       } catch (err) {
         return [];
       }
@@ -54,7 +55,8 @@ const GrupoFormModal = ({
     queryKey: ['configuraciones'],
     queryFn: async () => {
       try {
-        return await ConfiguracionesService.getConfiguraciones();
+        const res = await ConfiguracionesService.getConfiguraciones();
+        return res.items || res || [];
       } catch (err) {
         return [];
       }

@@ -209,11 +209,21 @@ def get_bloque_horario(db: Session, bloque_id: int) -> Optional[models.BloqueHor
     """
     return db.query(models.BloqueHorario).filter(models.BloqueHorario.id == bloque_id).first()
 
-def get_bloques_horarios(db: Session, skip: int = 0, limit: int = 100) -> List[models.BloqueHorario]:
+def get_bloques_horarios(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None):
     """
-    Obtiene una lista de bloques horarios con paginación.
+    Obtiene una lista de bloques horarios con paginación, búsqueda y filtro por sede.
     """
-    return db.query(models.BloqueHorario).offset(skip).limit(limit).all()
+    q = db.query(models.BloqueHorario)
+    if search:
+        q = q.filter(
+            models.BloqueHorario.hora_inicio.ilike(f"%{search}%") |
+            models.BloqueHorario.dia_semana.ilike(f"%{search}%")
+        )
+    if sede_id is not None:
+        q = q.filter(models.BloqueHorario.sede_id == sede_id)
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_bloque_horario(db: Session, bloque_horario: BloqueHorarioCreate):
     """

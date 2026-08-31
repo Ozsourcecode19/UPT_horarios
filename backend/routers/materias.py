@@ -1,9 +1,10 @@
 # backend/routers/materias.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -27,13 +28,13 @@ def read_materia(materia_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
     return db_materia
 
-@router.get("/", response_model=List[schemas.Materia], dependencies=[Depends(get_current_active_user)])
-def read_materias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Materia], dependencies=[Depends(get_current_active_user)])
+def read_materias(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de materias.
+    Obtiene una lista de materias con paginación.
     """
-    materias = crud.get_materias(db, skip=skip, limit=limit)
-    return materias
+    items, total = crud.get_materias(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{materia_id}", response_model=schemas.Materia, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_materia(materia_id: int, materia_update: schemas.MateriaUpdate, db: Session = Depends(get_db)):

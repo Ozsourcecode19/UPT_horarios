@@ -10,11 +10,16 @@ def get_sede(db: Session, sede_id: int) -> Optional[models.Sede]:
     """
     return db.query(models.Sede).filter(models.Sede.id == sede_id).first()
 
-def get_sedes(db: Session, skip: int = 0, limit: int = 100) -> List[models.Sede]:
+def get_sedes(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de sedes con paginación.
+    Obtiene una lista de sedes con paginación y búsqueda.
     """
-    return db.query(models.Sede).offset(skip).limit(limit).all()
+    q = db.query(models.Sede)
+    if search:
+        q = q.filter(models.Sede.nombre.ilike(f"%{search}%"))
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_sede(db: Session, sede: schemas.SedeCreate) -> models.Sede:
     """

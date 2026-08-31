@@ -81,7 +81,8 @@ const Horarios = () => {
     queryKey: ['periodos'],
     queryFn: async () => {
       try {
-        return await PeriodosService.getPeriodos();
+        const res = await PeriodosService.getPeriodos(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         console.warn("Error consultando periodos en backend. Usando MOCK_PERIODOS.");
         return MOCK_PERIODOS;
@@ -105,7 +106,8 @@ const Horarios = () => {
     queryKey: ['aulas'],
     queryFn: async () => {
       try {
-        return await AulasService.getAulas();
+        const res = await AulasService.getAulas(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         return MOCK_AULAS;
       }
@@ -119,7 +121,8 @@ const Horarios = () => {
     queryKey: ['docentes'],
     queryFn: async () => {
       try {
-        return await DocentsService.getDocents();
+        const res = await DocentsService.getDocents(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         return MOCK_DOCENTES;
       }
@@ -133,7 +136,8 @@ const Horarios = () => {
     queryKey: ['grupos'],
     queryFn: async () => {
       try {
-        return await GruposService.getGrupos();
+        const res = await GruposService.getGrupos(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         return MOCK_GRUPOS;
       }
@@ -147,7 +151,8 @@ const Horarios = () => {
     queryKey: ['bloques'],
     queryFn: async () => {
       try {
-        return await BloquesService.getBloques();
+        const result = await BloquesService.getBloques(0, 1000);
+        return result.items || result;
       } catch (err) {
         return MOCK_BLOQUES;
       }
@@ -158,11 +163,12 @@ const Horarios = () => {
 
   // 5b. Configuración del sistema (ventanas por turno + jornada general).
   // La grilla se adapta a estas claves (mismas que consume el solver).
-  const { data: configuracionesReal = [] } = useQuery({
+  const { data: configuraciones = [] } = useQuery({
     queryKey: ['configuraciones'],
     queryFn: async () => {
       try {
-        return await ConfiguracionesService.getConfiguraciones();
+        const res = await ConfiguracionesService.getConfiguraciones(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         return [];
       }
@@ -170,7 +176,6 @@ const Horarios = () => {
     enabled: !demoMode,
     retry: 0
   });
-  const configuraciones = demoMode ? [] : configuracionesReal;
 
   // 6. Horarios Generados (Eventos)
   const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, error: horariosError, refetch: refetchHorarios } = useQuery({
@@ -600,7 +605,7 @@ const Horarios = () => {
           <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
           <select 
             value={selectedPeriodoId || ''} 
-            onChange={(e) => setSelectedPeriodoId(e.target.value)}
+            onChange={(e) => setSelectedPeriodoId(Number(e.target.value))}
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
           >
             {periodos.map(p => (

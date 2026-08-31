@@ -1,9 +1,10 @@
 # backend/routers/grupos.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud 
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -27,13 +28,13 @@ def read_grupo(grupo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
     return db_grupo
 
-@router.get("/", response_model=List[schemas.Grupo], dependencies=[Depends(get_current_active_user)])
-def read_grupos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Grupo], dependencies=[Depends(get_current_active_user)])
+def read_grupos(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de grupos.
+    Obtiene una lista de grupos con paginación.
     """
-    grupos = crud.get_grupos(db, skip=skip, limit=limit)
-    return grupos
+    items, total = crud.get_grupos(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{grupo_id}", response_model=schemas.Grupo, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_grupo(grupo_id: int, grupo_update: schemas.GrupoUpdate, db: Session = Depends(get_db)):

@@ -40,12 +40,8 @@ const DocenteDisponibilidadPage = () => {
   const { data: sedesReal = [], isError: isSedesError } = useQuery({
     queryKey: ['sedes'],
     queryFn: async () => {
-      try {
-        return await SedesService.getSedes();
-      } catch (err) {
-        console.warn("Error cargando sedes del backend, usando MOCK_SEDES");
-        return MOCK_SEDES;
-      }
+      const res = await SedesService.getSedes(0, 1000);
+      return res.items || res || [];
     },
     retry: 0,
   });
@@ -54,12 +50,8 @@ const DocenteDisponibilidadPage = () => {
   const { data: docentesReal = [], isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => {
-      try {
-        return await DocentsService.getDocents();
-      } catch (err) {
-        console.warn("Error cargando docentes del backend, usando MOCK_DOCENTES");
-        return MOCK_DOCENTES;
-      }
+      const res = await DocentsService.getDocents(0, 1000);
+      return res.items || res || [];
     },
     enabled: !demoMode,
     retry: 0,

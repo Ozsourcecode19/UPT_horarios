@@ -78,98 +78,131 @@ const Lecciones = () => {
 
   // 1. Grupos
   const {
-    data: gruposReal = [],
+    data: gruposResponse = {},
     isLoading: isGruposLoading,
     isError: isGruposError,
     error: gruposError,
     refetch: refetchGrupos
   } = useQuery({
     queryKey: ['grupos'],
-    queryFn: async () => await GruposService.getGrupos(),
+    queryFn: async () => {
+      try {
+        return await GruposService.getGrupos(0, 1000);
+      } catch (err) {
+        return { items: [] };
+      }
+    },
     enabled: !demoMode,
     retry: 0,
   });
+  const gruposReal = Array.isArray(gruposResponse.items)
+    ? gruposResponse.items
+    : Array.isArray(gruposResponse) ? gruposResponse : [];
 
   // 2. Lecciones
   const {
-    data: leccionesReal = [],
+    data: leccionesResponse = {},
     isLoading: isLeccionesLoading,
     isError: isLeccionesError,
     error: leccionesError,
     refetch: refetchLecciones
   } = useQuery({
     queryKey: ['lecciones'],
-    queryFn: async () => await LeccionesService.getLecciones(),
+    queryFn: async () => {
+      try {
+        return await LeccionesService.getLecciones(0, 1000);
+      } catch (err) {
+        return { items: [] };
+      }
+    },
     enabled: !demoMode,
     retry: 0,
   });
+  const leccionesReal = Array.isArray(leccionesResponse.items)
+    ? leccionesResponse.items
+    : Array.isArray(leccionesResponse) ? leccionesResponse : [];
 
   // 3. Trayectos
-  const { data: trayectosReal = [], isError: isTrayectosError } = useQuery({
+  const { data: trayectosResponse = {}, isError: isTrayectosError } = useQuery({
     queryKey: ['trayectos'],
     queryFn: async () => {
       try {
-        return await TrayectosService.getTrayectos();
+        return await TrayectosService.getTrayectos(0, 1000);
       } catch (err) {
         console.warn("Error cargando trayectos, usando mock");
-        return MOCK_TRAYECTOS;
+        return { items: MOCK_TRAYECTOS };
       }
     },
     retry: 0,
   });
+  const trayectosReal = Array.isArray(trayectosResponse.items)
+    ? trayectosResponse.items
+    : Array.isArray(trayectosResponse) ? trayectosResponse : [];
 
   // 4. Periodos
-  const { data: periodosReal = [], isError: isPeriodosError } = useQuery({
+  const { data: periodosResponse = {}, isError: isPeriodosError } = useQuery({
     queryKey: ['periodos'],
     queryFn: async () => {
       try {
-        return await PeriodosService.getPeriodos();
+        return await PeriodosService.getPeriodos(0, 1000);
       } catch (err) {
         console.warn("Error cargando periodos, usando mock");
-        return MOCK_PERIODOS;
+        return { items: MOCK_PERIODOS };
       }
     },
     retry: 0,
   });
+  const periodosReal = Array.isArray(periodosResponse.items)
+    ? periodosResponse.items
+    : Array.isArray(periodosResponse) ? periodosResponse : [];
 
   // 5. Docentes (dependencia para lecciones)
-  const { data: docentesReal = [], isError: isDocentesError } = useQuery({
+  const { data: docentesResponse = {}, isError: isDocentesError } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => {
       try {
-        return await DocentsService.getDocents();
+        return await DocentsService.getDocents(0, 1000);
       } catch (err) {
-        return MOCK_DOCENTES;
+        return { items: MOCK_DOCENTES };
       }
     },
     retry: 0,
   });
+  const docentesReal = Array.isArray(docentesResponse.items)
+    ? docentesResponse.items
+    : Array.isArray(docentesResponse) ? docentesResponse : [];
 
   // 6. Sedes (dependencia para grupos y lección forzada)
-  const { data: sedesReal = [], isError: isSedesError } = useQuery({
+  const { data: sedesResponse = {}, isError: isSedesError } = useQuery({
     queryKey: ['sedes'],
     queryFn: async () => {
       try {
-        return await SedesService.getSedes();
+        return await SedesService.getSedes(0, 1000);
       } catch (err) {
-        return MOCK_SEDES;
+        return { items: MOCK_SEDES };
       }
     },
     retry: 0,
   });
+  const sedesReal = Array.isArray(sedesResponse.items)
+    ? sedesResponse.items
+    : Array.isArray(sedesResponse) ? sedesResponse : [];
 
   // 7. Materias (dependencia para lecciones)
-  const { data: materiasReal = [], isError: isMateriasError } = useQuery({
+  const { data: materiasResponse = {}, isError: isMateriasError } = useQuery({
     queryKey: ['subjects'],
     queryFn: async () => {
       try {
-        return await SubjectsService.getSubjects();
+        return await SubjectsService.getSubjects(0, 1000);
       } catch (err) {
-        return MOCK_MATERIAS;
+        return { items: MOCK_MATERIAS };
       }
     },
     retry: 0,
   });
+  const materiasReal = Array.isArray(materiasResponse.items)
+    ? materiasResponse.items
+    : Array.isArray(materiasResponse) ? materiasResponse : [];
 
   // Activación automática de modo demo SOLO ante fallos de infraestructura
   // (red caída o HTTP 5xx). Un 401/403 no debe simular datos locales.
