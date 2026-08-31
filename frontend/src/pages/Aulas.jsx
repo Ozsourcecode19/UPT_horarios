@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,9 @@ import {
 import SedesService from '../api/sedes';
 import AulasService from '../api/aulas';
 import useCanWrite from '../hooks/useCanWrite';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import { esErrorDeServidor } from '../utils/errors';
 import ModalPortal from '../components/ui/ModalPortal';
 
@@ -72,7 +75,10 @@ const Aulas = () => {
 
   // --- ESTADOS LOCALES ---
   const [activeTab, setActiveTab] = useState('aulas'); // 'aulas' o 'sedes'
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTermAulas, setSearchTermAulas] = useState('');
+  const debouncedSearchAulas = useDebounce(searchTermAulas, 300);
+  const [searchTermSedes, setSearchTermSedes] = useState('');
+  const debouncedSearchSedes = useDebounce(searchTermSedes, 300);
   
   // Modales
   const [isSedeModalOpen, setIsSedeModalOpen] = useState(false);
@@ -111,49 +117,67 @@ const Aulas = () => {
     localStorage.setItem('demo_aulas', JSON.stringify(demoAulas));
   }, [demoAulas]);
 
-  // --- QUERY DE SEDES ---
+  // --- QUERY DE SEDES (API) CON PAGINACIÓN ---
   const { 
-    data: sedesReal = [], 
+    items: sedesReal = [], 
+    total: totalSedesReal,
+    totalPages: totalPagesSedes,
+    page: sedesPage,
+    setPage: setSedesPage,
     isLoading: isSedesLoading, 
     isError: isSedesError,
-    error: sedesError,
-    refetch: refetchSedes
-  } = useQuery({
-    queryKey: ['sedes'],
-    queryFn: async () => {
-      return await SedesService.getSedes();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['sedes'],
+    (skip, limit, search) => SedesService.getSedes(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearchSedes }
+  );
 
-  // --- QUERY DE AULAS ---
+  // --- QUERY DE AULAS (API) CON PAGINACIÓN ---
   const {
-    data: aulasReal = [],
+    items: aulasReal = [],
+    total: totalAulasReal,
+    totalPages: totalPagesAulas,
+    page: aulasPage,
+    setPage: setAulasPage,
     isLoading: isAulasLoading,
     isError: isAulasError,
-    error: aulasError,
-    refetch: refetchAulas
-  } = useQuery({
-    queryKey: ['aulas'],
-    queryFn: async () => {
-      return await AulasService.getAulas();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['aulas'],
+    (skip, limit, search) => AulasService.getAulas(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearchAulas }
+  );
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    const falloServidor = esErrorDeServidor(sedesError) || esErrorDeServidor(aulasError);
-    if ((isSedesError || isAulasError) && falloServidor && !demoMode) {
+    if ((isSedesError || isAulasError) && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo de Infraestructura automáticamente.", "warning");
     }
-  }, [isSedesError, isAulasError, sedesError, aulasError]);
+  }, [isSedesError, isAulasError]);
 
   const listadoSedes = demoMode ? demoSedes : sedesReal;
   const listadoAulas = demoMode ? demoAulas : aulasReal;
+
+  // Demo mode: filtrar y paginar localmente
+  const demoFilteredSedes = demoMode ? demoSedes.filter(s => {
+    const str = `${s.nombre} ${s.codigo} ${s.direccion || ''}`.toLowerCase();
+    return str.includes(debouncedSearchSedes.toLowerCase());
+  }) : [];
+  const demoTotalPagesSedes = Math.max(1, Math.ceil(demoFilteredSedes.length / 20));
+  const demoPageItemsSedes = demoMode ? demoFilteredSedes.slice((sedesPage - 1) * 20, sedesPage * 20) : [];
+
+  const demoFilteredAulas = demoMode ? demoAulas.filter(a => {
+    const sedeNombre = demoSedes.find(s => s.id === a.sede_id)?.nombre || '';
+    const str = `${a.nombre} ${a.tipo} ${sedeNombre}`.toLowerCase();
+    return str.includes(debouncedSearchAulas.toLowerCase());
+  }) : [];
+  const demoTotalPagesAulas = Math.max(1, Math.ceil(demoFilteredAulas.length / 20));
+  const demoPageItemsAulas = demoMode ? demoFilteredAulas.slice((aulasPage - 1) * 20, aulasPage * 20) : [];
+
+  const displaySedes = demoMode ? demoPageItemsSedes : listadoSedes;
+  const displayAulas = demoMode ? demoPageItemsAulas : listadoAulas;
+  const totalSedesCount = demoMode ? demoFilteredSedes.length : (totalSedesReal ?? 0);
+  const totalAulasCount = demoMode ? demoFilteredAulas.length : (totalAulasReal ?? 0);
 
   // --- FORMULARIOS CONFIGURACIÓN ---
   const { 
@@ -370,23 +394,13 @@ const Aulas = () => {
     }
   };
 
-  // --- FILTROS DE BÚSQUEDA ---
-  const filteredSedes = listadoSedes.filter(s => {
-    const searchString = `${s.nombre} ${s.codigo} ${s.direccion || ''}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
-
-  const filteredAulas = listadoAulas.filter(a => {
-    const sedeNombre = listadoSedes.find(s => s.id === a.sede_id)?.nombre || '';
-    const searchString = `${a.nombre} ${a.tipo} ${sedeNombre}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
+  // --- FILTROS DE BÚSQUEDA (ya no se usa filtrado en memoria, la búsqueda es server-side) ---
+  const filteredSedes = displaySedes;
+  const filteredAulas = displayAulas;
 
   // --- ESTADÍSTICAS ---
-  const totalAulasCount = listadoAulas.length;
   const aulasActivasCount = listadoAulas.filter(a => a.activa).length;
   const totalCapacidad = listadoAulas.reduce((acc, curr) => acc + (curr.capacidad || 0), 0);
-  const totalSedesCount = listadoSedes.length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -410,8 +424,8 @@ const Aulas = () => {
           <button 
             onClick={() => {
               setDemoMode(false);
-              refetchSedes();
-              refetchAulas();
+              queryClient.invalidateQueries({ queryKey: ['sedes'] });
+              queryClient.invalidateQueries({ queryKey: ['aulas'] });
               showToast("Intentando reconectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -519,7 +533,7 @@ const Aulas = () => {
       {/* PESTAÑAS (TABS) DE FILTRADO DE CONTENIDO */}
       <div className="flex gap-2 border-b border-slate-200 pb-px">
         <button
-          onClick={() => { setActiveTab('aulas'); setSearchTerm(''); }}
+          onClick={() => { setActiveTab('aulas'); setSearchTermAulas(''); }}
           className={`px-6 py-3 font-semibold text-sm transition-all duration-300 border-b-2 -mb-px ${
             activeTab === 'aulas'
               ? 'border-blue-600 text-blue-600'
@@ -529,7 +543,7 @@ const Aulas = () => {
           Aulas e Infraestructura
         </button>
         <button
-          onClick={() => { setActiveTab('sedes'); setSearchTerm(''); }}
+          onClick={() => { setActiveTab('sedes'); setSearchTermSedes(''); }}
           className={`px-6 py-3 font-semibold text-sm transition-all duration-300 border-b-2 -mb-px ${
             activeTab === 'sedes'
               ? 'border-blue-600 text-blue-600'
@@ -550,8 +564,8 @@ const Aulas = () => {
             <input 
               type="text" 
               placeholder={activeTab === 'aulas' ? "Buscar aula o tipo..." : "Buscar sede por nombre..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={activeTab === 'aulas' ? searchTermAulas : searchTermSedes}
+              onChange={(e) => activeTab === 'aulas' ? setSearchTermAulas(e.target.value) : setSearchTermSedes(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
@@ -665,6 +679,18 @@ const Aulas = () => {
           </div>
         )}
 
+        {/* Paginación Aulas */}
+        {activeTab === 'aulas' && !demoMode && totalPagesAulas > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={aulasPage} totalPages={totalPagesAulas} onPageChange={setAulasPage} />
+          </div>
+        )}
+        {activeTab === 'aulas' && demoMode && demoTotalPagesAulas > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={aulasPage} totalPages={demoTotalPagesAulas} onPageChange={setAulasPage} />
+          </div>
+        )}
+
         {/* CONTENIDO TAB 2: SEDES */}
         {activeTab === 'sedes' && (
           <div className="overflow-x-auto">
@@ -754,6 +780,18 @@ const Aulas = () => {
                 </tbody>
               </table>
             )}
+          </div>
+        )}
+
+        {/* Paginación Sedes */}
+        {activeTab === 'sedes' && !demoMode && totalPagesSedes > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={sedesPage} totalPages={totalPagesSedes} onPageChange={setSedesPage} />
+          </div>
+        )}
+        {activeTab === 'sedes' && demoMode && demoTotalPagesSedes > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={sedesPage} totalPages={demoTotalPagesSedes} onPageChange={setSedesPage} />
           </div>
         )}
 

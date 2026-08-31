@@ -1,9 +1,10 @@
 # backend/routers/configuraciones.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 router = APIRouter(prefix="/configuraciones", tags=["Configuración"])
@@ -26,13 +27,13 @@ def read_configuracion(clave: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Configuración no encontrada")
     return db_configuracion
 
-@router.get("/", response_model=List[schemas.Configuracion], dependencies=[Depends(get_current_active_user)])
-def read_configuraciones(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Configuracion], dependencies=[Depends(get_current_active_user)])
+def read_configuraciones(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de entradas de configuración.
+    Obtiene una lista de entradas de configuración con paginación.
     """
-    configuraciones = crud.get_configuraciones(db, skip=skip, limit=limit)
-    return configuraciones
+    items, total = crud.get_configuraciones(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{clave}", response_model=schemas.Configuracion, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_configuracion(clave: str, configuracion_update: schemas.ConfiguracionUpdate, db: Session = Depends(get_db)):

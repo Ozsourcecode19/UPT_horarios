@@ -2,10 +2,10 @@
 import apiClient from './client';
 
 const GruposService = {
-  getGrupos: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/grupos/', {
-      params: { skip, limit }
-    });
+  getGrupos: async (skip = 0, limit = 20, search = null) => {
+    const params = { skip, limit };
+    if (search) params.search = search;
+    const response = await apiClient.get('/grupos/', { params });
     return response.data;
   },
 

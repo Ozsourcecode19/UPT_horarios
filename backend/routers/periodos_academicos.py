@@ -1,9 +1,10 @@
 # backend/routers/periodos_academicos.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 router = APIRouter(prefix="/periodos-academicos", tags=["Periodos Académicos"])
@@ -26,13 +27,13 @@ def read_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo Académico no encontrado")
     return db_periodo
 
-@router.get("/", response_model=List[schemas.PeriodoAcademico], dependencies=[Depends(get_current_active_user)])
-def read_periodos_academicos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.PeriodoAcademico], dependencies=[Depends(get_current_active_user)])
+def read_periodos_academicos(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de periodos académicos.
+    Obtiene una lista de periodos académicos con paginación.
     """
-    periodos = crud.get_periodos_academicos(db, skip=skip, limit=limit)
-    return periodos
+    items, total = crud.get_periodos_academicos(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{periodo_id}", response_model=schemas.PeriodoAcademico, dependencies=[Depends(require_role(["ADMIN"]))])
 def update_periodo_academico(periodo_id: int, periodo_update: schemas.PeriodoAcademicoUpdate, db: Session = Depends(get_db)):

@@ -84,7 +84,8 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
     queryKey: ['materias'],
     queryFn: async () => {
       try {
-        return await SubjectsService.getSubjects();
+        const res = await SubjectsService.getSubjects(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando materias, usando mock.");
         return MOCK_MATERIAS;

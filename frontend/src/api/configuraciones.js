@@ -3,10 +3,10 @@ import apiClient from './client';
 
 const ConfiguracionesService = {
   // Obtiene la lista de entradas de configuración del sistema
-  getConfiguraciones: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/configuraciones/', {
-      params: { skip, limit }
-    });
+  getConfiguraciones: async (skip = 0, limit = 20, search = null) => {
+    const params = { skip, limit };
+    if (search) params.search = search;
+    const response = await apiClient.get('/configuraciones/', { params });
     return response.data;
   },
 

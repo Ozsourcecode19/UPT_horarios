@@ -14,11 +14,16 @@ def get_usuario(db: Session, usuario_id: int) -> Optional[models.Usuario]:
     """
     return db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
 
-def get_usuarios(db: Session, skip: int = 0, limit: int = 100) -> List[models.Usuario]:
+def get_usuarios(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de usuarios con paginación.
+    Obtiene una lista de usuarios con paginación y búsqueda.
     """
-    return db.query(models.Usuario).offset(skip).limit(limit).all()
+    q = db.query(models.Usuario)
+    if search:
+        q = q.filter(models.Usuario.username.ilike(f"%{search}%"))
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_usuario(db: Session, usuario: schemas.UsuarioCreate) -> models.Usuario: # <-- Anotación de retorno CORRECTA
     """

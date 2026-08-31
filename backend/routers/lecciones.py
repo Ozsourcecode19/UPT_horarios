@@ -1,9 +1,10 @@
 # backend/routers/lecciones.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import crud
 import schemas
+from schemas.pagination import PaginatedResponse
 from config.database import get_db
 from core.security import get_current_active_user, require_role
 
@@ -27,13 +28,13 @@ def read_leccion(leccion_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
     return db_leccion
 
-@router.get("/", response_model=List[schemas.Leccion], dependencies=[Depends(get_current_active_user)])
-def read_lecciones(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[schemas.Leccion], dependencies=[Depends(get_current_active_user)])
+def read_lecciones(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de lecciones.
+    Obtiene una lista de lecciones con paginación.
     """
-    lecciones = crud.get_lecciones(db, skip=skip, limit=limit)
-    return lecciones
+    items, total = crud.get_lecciones(db, skip=skip, limit=limit, search=search)
+    return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{leccion_id}", response_model=schemas.Leccion, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def update_leccion(leccion_id: int, leccion_update: schemas.LeccionUpdate, db: Session = Depends(get_db)):

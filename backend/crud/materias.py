@@ -10,11 +10,19 @@ def get_materia(db: Session, materia_id: int) -> Optional[models.Materia]:
     """
     return db.query(models.Materia).filter(models.Materia.id == materia_id).first()
 
-def get_materias(db: Session, skip: int = 0, limit: int = 100) -> List[models.Materia]:
+def get_materias(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de materias con paginación.
+    Obtiene una lista de materias con paginación y búsqueda.
     """
-    return db.query(models.Materia).offset(skip).limit(limit).all()
+    q = db.query(models.Materia)
+    if search:
+        q = q.filter(
+            models.Materia.nombre.ilike(f"%{search}%") |
+            models.Materia.codigo.ilike(f"%{search}%")
+        )
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_materia(db: Session, materia: schemas.MateriaCreate) -> models.Materia:
     """

@@ -15,11 +15,16 @@ def get_aula(db: Session, aula_id: int) -> Optional[models.Aula]:
     """
     return db.query(models.Aula).filter(models.Aula.id == aula_id).first()
 
-def get_aulas(db: Session, skip: int = 0, limit: int = 100) -> List[models.Aula]:
+def get_aulas(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de aulas con paginación.
+    Obtiene una lista de aulas con paginación y búsqueda.
     """
-    return db.query(models.Aula).offset(skip).limit(limit).all()
+    q = db.query(models.Aula)
+    if search:
+        q = q.filter(models.Aula.nombre.ilike(f"%{search}%"))
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_aula(db: Session, aula: AulaCreate):
     """

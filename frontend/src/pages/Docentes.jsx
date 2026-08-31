@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,9 @@ import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
 import DocenteTabs from '../components/docentes/DocenteTabs';
 import useCanWrite from '../hooks/useCanWrite';
-import { esErrorDeServidor } from '../utils/errors';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import ModalPortal from '../components/ui/ModalPortal';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
@@ -57,6 +59,7 @@ const Docentes = () => {
   
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocente, setEditingDocente] = useState(null);
   const [deleteConfirmDocente, setDeleteConfirmDocente] = useState(null);
@@ -85,7 +88,8 @@ const Docentes = () => {
     queryKey: ['sedes'],
     queryFn: async () => {
       try {
-        return await SedesService.getSedes();
+        const res = await SedesService.getSedes(0, 1000);
+        return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando sedes del backend, usando MOCK_SEDES");
         return MOCK_SEDES;
@@ -96,33 +100,68 @@ const Docentes = () => {
 
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
 
-  // --- QUERY DE DOCENTES (API) ---
-  const { 
-    data: docentesReal = [], 
-    isLoading: isDocentesLoading, 
+  // --- QUERY DE DOCENTES (API) CON PAGINACIÓN ---
+  const {
+    items: docentesReal = [],
+    total: totalDocentesReal,
+    totalPages,
+    page,
+    setPage,
+    isLoading: isDocentesLoading,
     isError: isDocentesError,
-    error: docentesError,
-    refetch: refetchDocentes
-  } = useQuery({
-    queryKey: ['docents'],
+  } = usePaginatedQuery(
+    ['docents'],
+    (skip, limit, search) => DocentsService.getDocents(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearch }
+  );
+
+  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
+  useEffect(() => {
+    if (isDocentesError && !demoMode) {
+      setDemoMode(true);
+      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+    }
+  }, [isDocentesError]);
+
+  // Demo mode: filtrar localmente
+  const demoFiltered = demoMode ? demoDocentes.filter(d => {
+    const s = `${d.nombre} ${d.apellido} ${d.email || ''}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoDocentes = demoMode ? demoPageItems : docentesReal;
+  const filteredDocentes = listadoDocentes;
+
+  // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
+  const totalDocentes = demoMode ? demoFiltered.length : (totalDocentesReal ?? 0);
+
+  // Stats completas (se necesitan del total, no solo de la página actual)
+  const { data: allDocentesStats = [] } = useQuery({
+    queryKey: ['docents-stats'],
     queryFn: async () => {
-      return await DocentsService.getDocents();
+      const result = await DocentsService.getDocents(0, 1000);
+      return result.items || result;
     },
     enabled: !demoMode,
     retry: 0,
   });
+  const statsSource = demoMode ? demoDocentes : allDocentesStats;
+  const activosCount = statsSource.filter(d => d.activo).length;
+  const promedioCarga = statsSource.length > 0 
+    ? Math.round(statsSource.reduce((acc, curr) => acc + curr.carga_maxima, 0) / statsSource.length) 
+    : 0;
 
-  // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
-  useEffect(() => {
-    if (isDocentesError && esErrorDeServidor(docentesError) && !demoMode) {
-      setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+  // Encontrar la sede más común
+  const countSedes = statsSource.reduce((acc, curr) => {
+    if (curr.sede_principal_id) {
+      acc[curr.sede_principal_id] = (acc[curr.sede_principal_id] || 0) + 1;
     }
-  }, [isDocentesError, docentesError]);
-
-  const listadoDocentes = demoMode ? demoDocentes : docentesReal;
-
-  // --- FORMULARIO CONFIGURACIÓN ---
+    return acc;
+  }, {});
+  const topSedeId = Object.keys(countSedes).reduce((a, b) => countSedes[a] > countSedes[b] ? a : b, null);
+  const topSedeNombre = sedes.find(s => s.id === Number(topSedeId))?.nombre.split(' (')[0] || "Ninguna";
   const { 
     register, 
     handleSubmit, 
@@ -213,6 +252,7 @@ const Docentes = () => {
           showToast("Docente registrado exitosamente");
         }
         queryClient.invalidateQueries({ queryKey: ['docents'] });
+        queryClient.invalidateQueries({ queryKey: ['docents-stats'] });
         setIsModalOpen(false);
       } catch (err) {
         console.error(err);
@@ -239,6 +279,7 @@ const Docentes = () => {
       try {
         await DocentsService.deleteDocent(deleteConfirmDocente.id);
         queryClient.invalidateQueries({ queryKey: ['docents'] });
+        queryClient.invalidateQueries({ queryKey: ['docents-stats'] });
         showToast("Docente eliminado exitosamente", "info");
         setDeleteConfirmDocente(null);
       } catch (err) {
@@ -247,29 +288,6 @@ const Docentes = () => {
       }
     }
   };
-
-  // --- FILTRO DE BÚSQUEDA ---
-  const filteredDocentes = listadoDocentes.filter(d => {
-    const searchString = `${d.nombre} ${d.apellido} ${d.email || ''}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
-
-  // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
-  const totalDocentes = listadoDocentes.length;
-  const activosCount = listadoDocentes.filter(d => d.activo).length;
-  const promedioCarga = totalDocentes > 0 
-    ? Math.round(listadoDocentes.reduce((acc, curr) => acc + curr.carga_maxima, 0) / totalDocentes) 
-    : 0;
-
-  // Encontrar la sede más común
-  const countSedes = listadoDocentes.reduce((acc, curr) => {
-    if (curr.sede_principal_id) {
-      acc[curr.sede_principal_id] = (acc[curr.sede_principal_id] || 0) + 1;
-    }
-    return acc;
-  }, {});
-  const topSedeId = Object.keys(countSedes).reduce((a, b) => countSedes[a] > countSedes[b] ? a : b, null);
-  const topSedeNombre = sedes.find(s => s.id === Number(topSedeId))?.nombre.split(' (')[0] || "Ninguna";
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -293,7 +311,7 @@ const Docentes = () => {
           <button 
             onClick={() => {
               setDemoMode(false);
-              refetchDocentes();
+              queryClient.invalidateQueries({ queryKey: ['docents'] });
               showToast("Intentando conectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -549,6 +567,18 @@ const Docentes = () => {
             </table>
           )}
         </div>
+
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR / EDITAR */}

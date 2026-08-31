@@ -11,6 +11,9 @@ import {
 import CarrerasService from '../api/carreras';
 import TrayectosService from '../api/trayectos';
 import useCanWrite from '../hooks/useCanWrite';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import ModalPortal from '../components/ui/ModalPortal';
 import { esErrorDeServidor } from '../utils/errors';
 
@@ -62,6 +65,7 @@ const Carreras = () => {
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCarrera, setEditingCarrera] = useState(null);
   const [deleteConfirmCarrera, setDeleteConfirmCarrera] = useState(null);
@@ -85,41 +89,56 @@ const Carreras = () => {
     localStorage.setItem('demo_carreras', JSON.stringify(demoCarreras));
   }, [demoCarreras]);
 
-  // --- QUERY DE CARRERAS (API) ---
-  const { 
-    data: carrerasReal = [], 
-    isLoading: isCarrerasLoading, 
+  // --- QUERY DE CARRERAS (API) CON PAGINACIÓN ---
+  const {
+    items: carrerasReal = [],
+    total: totalCarrerasReal,
+    totalPages,
+    page,
+    setPage,
+    isLoading: isCarrerasLoading,
     isError: isCarrerasError,
-    error: carrerasError,
-    refetch: refetchCarreras
-  } = useQuery({
-    queryKey: ['carreras'],
-    queryFn: async () => {
-      return await CarrerasService.getCarreras();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['carreras'],
+    (skip, limit, search) => CarrerasService.getCarreras(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearch }
+  );
 
   // --- QUERY DE TRAYECTOS (Para validar borrado de carreras vinculadas) ---
-  const { data: trayectosReal = [] } = useQuery({
+  const { data: trayectosResponse = {} } = useQuery({
     queryKey: ['trayectos'],
     queryFn: async () => {
-      return await TrayectosService.getTrayectos();
+      try {
+        return await TrayectosService.getTrayectos(0, 1000);
+      } catch (err) {
+        return { items: [] };
+      }
     },
     enabled: !demoMode,
     retry: 0,
   });
+  const trayectosReal = Array.isArray(trayectosResponse.items)
+    ? trayectosResponse.items
+    : Array.isArray(trayectosResponse) ? trayectosResponse : [];
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isCarrerasError && esErrorDeServidor(carrerasError) && !demoMode) {
+    if (isCarrerasError && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
   }, [isCarrerasError]);
 
-  const listadoCarreras = demoMode ? demoCarreras : carrerasReal;
+  // Demo mode: filtrar localmente
+  const demoFiltered = demoMode ? demoCarreras.filter(c => {
+    const s = `${c.nombre} ${c.codigo} ${c.tipo_distribucion}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoCarreras = demoMode ? demoPageItems : carrerasReal;
+  const totalCarreras = demoMode ? demoFiltered.length : (totalCarrerasReal ?? 0);
   const listadoTrayectos = demoMode ? MOCK_TRAYECTOS : trayectosReal;
 
   // --- FORMULARIO CONFIGURACIÓN ---
@@ -191,6 +210,7 @@ const Carreras = () => {
           showToast("Carrera registrada exitosamente");
         }
         queryClient.invalidateQueries({ queryKey: ['carreras'] });
+        queryClient.invalidateQueries({ queryKey: ['carreras-stats'] });
         queryClient.invalidateQueries({ queryKey: ['trayectos'] });
         setIsModalOpen(false);
       } catch (err) {
@@ -235,17 +255,25 @@ const Carreras = () => {
     }
   };
 
-  // --- FILTRO DE BÚSQUEDA ---
-  const filteredCarreras = listadoCarreras.filter(c => {
-    const searchString = `${c.nombre} ${c.codigo} ${c.tipo_distribucion}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
+  // --- FILTRO DE BÚSQUEDA (ya no se usa filtrado en memoria, la búsqueda es server-side) ---
+  const filteredCarreras = listadoCarreras;
 
   // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
-  const totalCarreras = listadoCarreras.length;
-  const totalTrayectosVinculados = listadoTrayectos.filter(t => listadoCarreras.some(c => c.id === t.carrera_id)).length;
-  const tiposDistribucion = new Set(listadoCarreras.map(c => c.tipo_distribucion)).size;
-  const semestralesCount = listadoCarreras.filter(c => c.tipo_distribucion === 'SEMESTRAL').length;
+  const totalTrayectosVinculados = listadoTrayectos.filter(t => carrerasReal.some(c => c.id === t.carrera_id)).length;
+
+  // Stats completas (se necesitan del total, no solo de la página actual)
+  const { data: allCarrerasStats = [] } = useQuery({
+    queryKey: ['carreras-stats'],
+    queryFn: async () => {
+      const result = await CarrerasService.getCarreras(0, 1000);
+      return result.items || result;
+    },
+    enabled: !demoMode,
+    retry: 0,
+  });
+  const statsSource = demoMode ? demoCarreras : allCarrerasStats;
+  const tiposDistribucion = new Set(statsSource.map(c => c.tipo_distribucion)).size;
+  const semestralesCount = statsSource.filter(c => c.tipo_distribucion === 'SEMESTRAL').length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -269,7 +297,6 @@ const Carreras = () => {
           <button 
             onClick={() => {
               setDemoMode(false);
-              refetchCarreras();
               showToast("Intentando conectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -377,7 +404,7 @@ const Carreras = () => {
             />
           </div>
           <div className="text-xs font-medium text-slate-400">
-            Mostrando {filteredCarreras.length} de {totalCarreras} carreras
+            Mostrando {listadoCarreras.length} de {totalCarreras} carreras
           </div>
         </div>
 
@@ -475,6 +502,18 @@ const Carreras = () => {
             </table>
           )}
         </div>
+
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR / EDITAR */}

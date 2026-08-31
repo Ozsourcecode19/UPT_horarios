@@ -12,7 +12,9 @@ import TrayectosService from '../api/trayectos';
 import CarrerasService from '../api/carreras';
 import GruposService from '../api/grupos';
 import useCanWrite from '../hooks/useCanWrite';
-import { esErrorDeServidor } from '../utils/errors';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 import ModalPortal from '../components/ui/ModalPortal';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
@@ -57,6 +59,7 @@ const Trayectos = () => {
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrayecto, setEditingTrayecto] = useState(null);
   const [deleteConfirmTrayecto, setDeleteConfirmTrayecto] = useState(null);
@@ -80,37 +83,44 @@ const Trayectos = () => {
     localStorage.setItem('demo_trayectos', JSON.stringify(demoTrayectos));
   }, [demoTrayectos]);
 
-  // --- QUERY DE TRAYECTOS (API) ---
-  const { 
-    data: trayectosReal = [], 
-    isLoading: isTrayectosLoading, 
+  // --- QUERY DE TRAYECTOS (API) CON PAGINACIÓN ---
+  const {
+    items: trayectosReal = [],
+    total: totalTrayectosReal,
+    totalPages,
+    page,
+    setPage,
+    isLoading: isTrayectosLoading,
     isError: isTrayectosError,
-    error: trayectosError,
-    refetch: refetchTrayectos
-  } = useQuery({
-    queryKey: ['trayectos'],
-    queryFn: async () => {
-      return await TrayectosService.getTrayectos();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['trayectos'],
+    (skip, limit, search) => TrayectosService.getTrayectos(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearch }
+  );
 
   // --- QUERY DE CARRERAS (Dependencia del dropdown) ---
-  const { data: carrerasReal = [] } = useQuery({
+  const { data: carrerasResponse = {} } = useQuery({
     queryKey: ['carreras'],
     queryFn: async () => {
-      return await CarrerasService.getCarreras();
+      try {
+        return await CarrerasService.getCarreras(0, 1000);
+      } catch (err) {
+        return { items: [] };
+      }
     },
     enabled: !demoMode,
     retry: 0,
   });
+  const carrerasReal = Array.isArray(carrerasResponse.items)
+    ? carrerasResponse.items
+    : Array.isArray(carrerasResponse) ? carrerasResponse : [];
 
   // --- QUERY DE GRUPOS (Para validar borrado de trayectos vinculados) ---
   const { data: gruposReal = [] } = useQuery({
     queryKey: ['grupos'],
     queryFn: async () => {
-      return await GruposService.getGrupos();
+      const res = await GruposService.getGrupos(0, 1000);
+      return res.items || res || [];
     },
     enabled: !demoMode,
     retry: 0,
@@ -118,13 +128,12 @@ const Trayectos = () => {
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isTrayectosError && esErrorDeServidor(trayectosError) && !demoMode) {
+    if (isTrayectosError && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
   }, [isTrayectosError]);
 
-  const listadoTrayectos = demoMode ? demoTrayectos : trayectosReal;
   const listadoCarreras = demoMode ? MOCK_CARRERAS : carrerasReal;
   const listadoGrupos = demoMode ? MOCK_GRUPOS : gruposReal;
 
@@ -132,6 +141,17 @@ const Trayectos = () => {
     const carrera = listadoCarreras.find(c => c.id === carreraId);
     return carrera ? carrera.nombre : `Carrera #${carreraId}`;
   };
+
+  // Demo mode: filtrar localmente y paginar
+  const demoFiltered = demoMode ? demoTrayectos.filter(t => {
+    const s = `${t.nombre} ${t.anio_academico} ${t.estado} ${getCarreraNombre(t.carrera_id)}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoTrayectos = demoMode ? demoPageItems : trayectosReal;
+  const totalTrayectos = demoMode ? demoFiltered.length : (totalTrayectosReal ?? 0);
 
   // --- FORMULARIO CONFIGURACIÓN ---
   const { 
@@ -166,7 +186,7 @@ const Trayectos = () => {
         carrera_id: listadoCarreras.length > 0 ? listadoCarreras[0].id : '',
         nombre: '',
         anio_academico: new Date().getFullYear(),
-        orden_secuencial: (listadoTrayectos.filter(t => t.carrera_id === (listadoCarreras[0]?.id || null)).length + 1),
+        orden_secuencial: (allTrayectosSource.filter(t => t.carrera_id === (listadoCarreras[0]?.id || null)).length + 1),
         estado: 'ACTIVO',
       });
     }
@@ -252,17 +272,14 @@ const Trayectos = () => {
     }
   };
 
-  // --- FILTRO DE BÚSQUEDA ---
-  const filteredTrayectos = listadoTrayectos.filter(t => {
-    const searchString = `${t.nombre} ${t.anio_academico} ${t.estado} ${getCarreraNombre(t.carrera_id)}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
+  // --- FILTRO DE BÚSQUEDA (ya no se usa filtrado en memoria, la búsqueda es server-side) ---
+  const filteredTrayectos = listadoTrayectos;
 
-  // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
-  const totalTrayectos = listadoTrayectos.length;
-  const activosCount = listadoTrayectos.filter(t => t.estado === 'ACTIVO').length;
-  const carrerasConTrayectos = new Set(listadoTrayectos.map(t => t.carrera_id)).size;
-  const totalGruposVinculados = listadoGrupos.filter(g => listadoTrayectos.some(t => t.id === g.trayecto_id)).length;
+  // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS (sobre todos los registros, no solo la página actual) ---
+  const allTrayectosSource = demoMode ? demoTrayectos : trayectosReal;
+  const activosCount = allTrayectosSource.filter(t => t.estado === 'ACTIVO').length;
+  const carrerasConTrayectos = new Set(allTrayectosSource.map(t => t.carrera_id)).size;
+  const totalGruposVinculados = listadoGrupos.filter(g => allTrayectosSource.some(t => t.id === g.trayecto_id)).length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -286,7 +303,6 @@ const Trayectos = () => {
           <button 
             onClick={() => {
               setDemoMode(false);
-              refetchTrayectos();
               showToast("Intentando conectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -394,7 +410,7 @@ const Trayectos = () => {
             />
           </div>
           <div className="text-xs font-medium text-slate-400">
-            Mostrando {filteredTrayectos.length} de {totalTrayectos} trayectos
+            Mostrando {listadoTrayectos.length} de {totalTrayectos} trayectos
           </div>
         </div>
 
@@ -513,6 +529,18 @@ const Trayectos = () => {
             </table>
           )}
         </div>
+
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR / EDITAR */}

@@ -2,8 +2,11 @@
 import apiClient from './client';
 
 const BloquesService = {
-  getBloques: async () => {
-    const response = await apiClient.get('/bloques-horarios/', { params: { limit: 1000 } });
+  getBloques: async (skip = 0, limit = 20, search = null, sedeId = null) => {
+    const params = { skip, limit };
+    if (search) params.search = search;
+    if (sedeId) params.sede_id = sedeId;
+    const response = await apiClient.get('/bloques-horarios/', { params });
     return response.data;
   },
 

@@ -10,11 +10,16 @@ def get_periodo_academico(db: Session, periodo_id: int) -> Optional[models.Perio
     """
     return db.query(models.PeriodoAcademico).filter(models.PeriodoAcademico.id == periodo_id).first()
 
-def get_periodos_academicos(db: Session, skip: int = 0, limit: int = 100) -> List[models.PeriodoAcademico]:
+def get_periodos_academicos(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
     """
-    Obtiene una lista de periodos académicos con paginación.
+    Obtiene una lista de periodos académicos con paginación y búsqueda.
     """
-    return db.query(models.PeriodoAcademico).offset(skip).limit(limit).all()
+    q = db.query(models.PeriodoAcademico)
+    if search:
+        q = q.filter(models.PeriodoAcademico.nombre.ilike(f"%{search}%"))
+    total = q.count()
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 def create_periodo_academico(db: Session, periodo: schemas.PeriodoAcademicoCreate) -> models.PeriodoAcademico:
     """

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,8 +9,10 @@ import {
 } from 'lucide-react';
 import PeriodosService from '../api/periodos';
 import { useAuth } from '../context/AuthContext';
-import { esErrorDeServidor } from '../utils/errors';
 import ModalPortal from '../components/ui/ModalPortal';
+import useDebounce from '../hooks/useDebounce';
+import usePaginatedQuery from '../hooks/usePaginatedQuery';
+import Pagination from '../components/ui/Pagination';
 
 // --- ESQUEMA DE VALIDACIÓN ZOD ---
 const periodoSchema = z.object({
@@ -77,6 +79,7 @@ const Periodos = () => {
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPeriodo, setEditingPeriodo] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { periodo, accion: 'cerrar' | 'reactivar' }
@@ -100,31 +103,39 @@ const Periodos = () => {
     localStorage.setItem('demo_periodos', JSON.stringify(demoPeriodos));
   }, [demoPeriodos]);
 
-  // --- QUERY DE PERIODOS (API) ---
+  // --- QUERY DE PERIODOS (API) CON PAGINACIÓN ---
   const {
-    data: periodosReal = [],
+    items: periodosReal = [],
+    total: totalPeriodosReal,
+    totalPages,
+    page,
+    setPage,
     isLoading: isPeriodosLoading,
     isError: isPeriodosError,
-    error: periodosError,
-    refetch: refetchPeriodos
-  } = useQuery({
-    queryKey: ['periodos'],
-    queryFn: async () => {
-      return await PeriodosService.getPeriodos();
-    },
-    enabled: !demoMode,
-    retry: 0,
-  });
+  } = usePaginatedQuery(
+    ['periodos'],
+    (skip, limit, search) => PeriodosService.getPeriodos(skip, limit, search),
+    { searchTerm: demoMode ? '' : debouncedSearch }
+  );
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
   useEffect(() => {
-    if (isPeriodosError && esErrorDeServidor(periodosError) && !demoMode) {
+    if (isPeriodosError && !demoMode) {
       setDemoMode(true);
       showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
     }
-  }, [isPeriodosError, periodosError]);
+  }, [isPeriodosError]);
 
-  const listadoPeriodos = demoMode ? demoPeriodos : periodosReal;
+  // Demo mode: filtrar localmente
+  const demoFiltered = demoMode ? demoPeriodos.filter(p => {
+    const s = `${p.nombre} ${p.tipo_corte} ${p.anio_academico} ${p.estado}`.toLowerCase();
+    return s.includes(debouncedSearch.toLowerCase());
+  }) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+
+  const listadoPeriodos = demoMode ? demoPageItems : periodosReal;
+  const totalPeriodos = demoMode ? demoFiltered.length : (totalPeriodosReal ?? 0);
 
   // --- FORMULARIO CONFIGURACIÓN ---
   const {
@@ -239,14 +250,7 @@ const Periodos = () => {
     }
   };
 
-  // --- FILTRO DE BÚSQUEDA ---
-  const filteredPeriodos = listadoPeriodos.filter(p => {
-    const searchString = `${p.nombre} ${p.tipo_corte} ${p.anio_academico} ${p.estado}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
-
   // --- CÁLCULO DE MÉTRICAS ESTADÍSTICAS ---
-  const totalPeriodos = listadoPeriodos.length;
   const activosCount = listadoPeriodos.filter(p => p.estado === 'ACTIVO').length;
   const planificacionCount = listadoPeriodos.filter(p => p.estado === 'PLANIFICACION').length;
   const cerradosCount = listadoPeriodos.filter(p => p.estado === 'CERRADO').length;
@@ -273,7 +277,7 @@ const Periodos = () => {
           <button
             onClick={() => {
               setDemoMode(false);
-              refetchPeriodos();
+              queryClient.invalidateQueries({ queryKey: ['periodos'] });
               showToast("Intentando conectar con API real...", "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
@@ -383,7 +387,7 @@ const Periodos = () => {
             />
           </div>
           <div className="text-xs font-medium text-slate-400">
-            Mostrando {filteredPeriodos.length} de {totalPeriodos} periodos
+            Mostrando {listadoPeriodos.length} de {totalPeriodos} periodos
           </div>
         </div>
 
@@ -403,7 +407,7 @@ const Periodos = () => {
                 </div>
               ))}
             </div>
-          ) : filteredPeriodos.length === 0 ? (
+          ) : listadoPeriodos.length === 0 ? (
             <div className="p-12 text-center flex flex-col items-center">
               <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
                 <CalendarRange className="w-8 h-8" />
@@ -425,7 +429,7 @@ const Periodos = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredPeriodos.map((periodo) => {
+                {listadoPeriodos.map((periodo) => {
                   const tipoCorte = TIPO_CORTE_STYLES[periodo.tipo_corte] || TIPO_CORTE_STYLES.SEMESTRAL;
                   const estado = ESTADO_STYLES[periodo.estado] || ESTADO_STYLES.PLANIFICACION;
                   const estaCerrado = periodo.estado === 'CERRADO';
@@ -505,6 +509,18 @@ const Periodos = () => {
             </table>
           )}
         </div>
+
+        {/* Paginación */}
+        {!demoMode && totalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        )}
+        {demoMode && demoTotalPages > 1 && (
+          <div className="px-6 border-t border-slate-100">
+            <Pagination currentPage={page} totalPages={demoTotalPages} onPageChange={setPage} />
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR / EDITAR */}

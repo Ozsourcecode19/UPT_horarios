@@ -2,10 +2,10 @@
 import apiClient from './client';
 
 const AulasService = {
-  getAulas: async (skip = 0, limit = 100) => {
-    const response = await apiClient.get('/aulas/', {
-      params: { skip, limit }
-    });
+  getAulas: async (skip = 0, limit = 20, search = null) => {
+    const params = { skip, limit };
+    if (search) params.search = search;
+    const response = await apiClient.get('/aulas/', { params });
     return response.data;
   },
 
