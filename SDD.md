@@ -374,6 +374,25 @@ sequenceDiagram
 
 ### 5.3 Catálogo de endpoints (prefijo global `/api`)
 
+**Paginación:** Todos los endpoints GET de listado (CRUD) retornan un `PaginatedResponse` y aceptan parámetros de paginación y búsqueda:
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `skip` | int | 0 | Offset (número de registros a saltar) |
+| `limit` | int | 20 | Registros por página |
+| `search` | string | null | Búsqueda `ILIKE` sobre campos relevantes |
+| `sede_id` | int | null | Filtro por sede (solo `bloques-horarios`) |
+
+**Respuesta paginada (`PaginatedResponse[T]`):**
+```json
+{
+  "items": [...],
+  "total": 120,
+  "page": 1,
+  "page_size": 20
+}
+```
+
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | POST | `/token` | Público | Autenticación, devuelve JWT. |
@@ -509,8 +528,7 @@ frontend/
 
 ### 6.3 Patrón de datos (TanStack Query + Modo Demo)
 
-Toda página sigue el patrón:
-
+**Queries simples (array directo):**
 ```javascript
 const { data = [], isLoading, isError } = useQuery({
   queryKey: ['entity'],
@@ -518,6 +536,20 @@ const { data = [], isLoading, isError } = useQuery({
   retry: 0, // fallback rápido a demo mode
 });
 ```
+
+**Queries paginadas (server-side):**
+```javascript
+const { items, total, totalPages, page, setPage } = usePaginatedQuery(
+  ['entity'],
+  (skip, limit, search) => EntityService.getEntity(skip, limit, search),
+  { searchTerm: debouncedSearch }
+);
+```
+
+- `usePaginatedQuery` maneja internamente `page`/`skip` y extrae `.items` del `PaginatedResponse`.
+- El hook incluye `resetOn` para reiniciar la página al cambiar parámetros (ej. `selectedSedeId`).
+- Los endpoints CRUD retornan `PaginatedResponse { items, total, page, page_size }`.
+- **Regla crítica:** la extracción de `.items` SIEMPRE debe hacerse dentro del `queryFn` (no después), para evitar que `data` sea un objeto durante loading y crashee el render con `.filter()/.map()/.find()`.
 
 - Si el `useQuery` falla → se activa `demoMode` con datos `MOCK_*` persistidos en `localStorage` y banner "Modo Demo" con botón de reconexión.
 - Toda mutación invalida la caché: `queryClient.invalidateQueries({ queryKey: [...] })`.
@@ -661,8 +693,9 @@ npm run dev    # http://localhost:3000
 2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
 3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
 4. **Vista de recursos** en FullCalendar. **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna (un `<FullCalendar>` por aula, scroll horizontal) sin plugin Premium (`@fullcalendar/resource-timegrid` es comercial). `timeGridWeek` sigue siendo la vista por defecto.
-5. **Dashboard dinámico** con datos reales y gráficas.
-6. **Módulo de configuración** conectado a `/api/configuraciones/`.
+5. **Paginación server-side** en todos los endpoints CRUD. **✅ Implementado:** schema `PaginatedResponse[T]`, búsqueda `ILIKE`, filtro `sede_id` en bloques, hook `usePaginatedQuery` en frontend.
+6. **Dashboard dinámico** con datos reales y gráficas.
+7. **Módulo de configuración** conectado a `/api/configuraciones/`.
 
 ### 10.3 Riesgos técnicos
 
