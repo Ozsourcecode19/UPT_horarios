@@ -13,6 +13,11 @@ const base64UrlDecode = (input) => {
   return new TextDecoder('utf-8').decode(bytes);
 };
 
+/**
+ * Decodifica el payload de un JWT sin depender de librerías externas.
+ * @param {string | null} token
+ * @returns {{ sub: string, rol: string, exp: number } | null}
+ */
 export const decodeJwt = (token) => {
   if (!token) return null;
   try {
@@ -25,9 +30,13 @@ export const decodeJwt = (token) => {
   }
 };
 
-// Indica si el token está vencido comparando el claim `exp` con la hora actual.
-// Usa un margen de seguridad para evitar usar tokens a punto de expirar.
-// Devuelve true si falta el token o no se puede decodificar (no confiable).
+/**
+ * Indica si el token está vencido comparando el claim `exp` con la hora actual.
+ * Usa un margen de seguridad para evitar usar tokens a punto de expirar.
+ * @param {string | null} token
+ * @param {number} margenSegundos - Margen de seguridad en segundos (default 30)
+ * @returns {boolean} true si falta el token o está vencido
+ */
 export const isTokenExpired = (token, margenSegundos = 30) => {
   if (!token) return true;
   const payload = decodeJwt(token);
