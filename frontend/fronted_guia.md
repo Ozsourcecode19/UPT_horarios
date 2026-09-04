@@ -1,7 +1,7 @@
 # Guía del Proyecto Frontend — Sistema de Horarios UPT Bolívar
-**Versión:** 2.0 — Estado Real del Proyecto  
-**Fecha de actualización:** 2026-08-20  
-**Stack:** React 18 · Vite · TanStack Query · FullCalendar · Axios · FastAPI (backend)
+**Versión:** 2.1 — Estado Real del Proyecto  
+**Fecha de actualización:** 2026-09-04  
+**Stack:** React 18 · Vite · TanStack Query · Axios · FastAPI (backend) · Grilla Nativa (sin FullCalendar)
 
 ---
 
@@ -26,7 +26,7 @@ frontend/src/
 │   ├── client.js               ✅ Axios + interceptor JWT + redirect 401
 │   ├── auth.service.js         ✅ Login, logout, token
 │   ├── docents.js              ✅ CRUD completo
-│   ├── schedule.js             ✅ Generación, FullCalendar, validate-move, CRUD
+│   ├── schedule.js             ✅ Generación, grilla nativa, validate-move, CRUD
 │   ├── periodos.js             ✅ CRUD completo
 │   ├── aulas.js                ✅ CRUD completo
 │   ├── grupos.js               ✅ CRUD completo
@@ -37,8 +37,7 @@ frontend/src/
 │   ├── disponibilidades.js     ✅ CRUD disponibilidad docente
 │   ├── habilitaciones.js       ✅ CRUD habilitaciones docente-materia
 │   ├── trayectos.js            ✅ CRUD trayectos académicos
-│   ├── configuraciones.js      ✅ GET/PUT configuración del sistema (E7)
-│   └── endpoints.js            ⚠️ Archivo vacío (no utilizado aún)
+│   └── configuraciones.js      ✅ GET/PUT configuración del sistema (E7)
 │
 ├── config/
 │   └── navigation.js            ✅ Fuente única de navegación (secciones, roles, hijos)
@@ -63,8 +62,10 @@ frontend/src/
 │   └── useGenerationPolling.js     ✅ Polling cycle (setInterval/clearInterval)
 │
 ├── features/
-│   ├── schedule/               ✅ Módulo horarios (E14+E16): utils/ hooks/ components/ __tests__/ demoData.js + index.js (barrel)
-│   └── planning/               ✅ Módulo planificación Grupos+Lecciones (E16): utils/ hooks/ components/ schemas.js __tests__/ demoData.js + index.js (barrel)
+│   ├── schedule/               ✅ Módulo horarios (E14+E16+E18+E20): utils/ hooks/ components/ __tests__/ demoData.js + index.js (barrel)
+│   ├── planning/               ✅ Módulo planificación Grupos+Lecciones (E16): utils/ hooks/ components/ schemas.js __tests__/ demoData.js + index.js (barrel)
+│   ├── bloques/                ✅ Módulo Bloques Horarios (E21): utils/ hooks/ components/ schemas.js __tests__/ demoData.js + index.js (barrel)
+│   └── aulas/                  ✅ Módulo Aulas+Sedes (E22): utils/ hooks/ components/ schemas.js __tests__/ demoData.js + index.js (barrel)
 │
 ├── pages/
 │   ├── Login.jsx               ✅ Implementado + JWT
@@ -73,13 +74,13 @@ frontend/src/
 │   ├── DocenteDisponibilidadPage.jsx    ✅ Sub-ruta /docentes/disponibilidad (Modo Demo)
 │   ├── DocenteHabilitacionesPage.jsx    ✅ Sub-ruta /docentes/habilitaciones (Modo Demo)
 │   ├── Materias.jsx            ✅ CRUD completo con selector de color
-│   ├── Aulas.jsx               ✅ CRUD completo
+│   ├── Aulas.jsx               ✅ Gestión aulas+sedes (235 líneas, features/aulas/)
 │   ├── Carreras.jsx            ✅ CRUD completo (carreras/PNF, ADMIN + JEFE-PNF)
 │   ├── Trayectos.jsx           ✅ CRUD completo (trayectos académicos, solo ADMIN)
 │   ├── Lecciones.jsx           ✅ CRUD completo (lección = docente+grupo+materia + división)
-│   ├── Horarios.jsx            ✅ FullCalendar + DnD + Filtros + Stepper de flujo + Modo Demo
+│   ├── Horarios.jsx            ✅ Grilla nativa por bandas + DnD HTML5 + Filtros + Modo Demo
 │   ├── Periodos.jsx            ✅ CRUD completo (crear/editar/cerrar/reactivar)
-│   ├── BloquesHorarios.jsx     ✅ Gestión de bloques horarios (CRUD por sede, Modo Demo, roles)
+│   ├── BloquesHorarios.jsx     ✅ Gestión de bloques horarios (192 líneas, features/bloques/)
 │   └── Settings.jsx            ✅ Configuración del optimizador (E7 + Turnos/divisiones)
 │
 ├── routes/
@@ -95,14 +96,14 @@ frontend/src/
 | Paquete | Versión | Uso |
 |---|---|---|
 | `@tanstack/react-query` | v5 | Fetching, caché y estados de carga/error |
-| `@fullcalendar/react` | v6 | Calendario principal de horarios |
-| `@fullcalendar/timegrid` | v6 | Vista semanal/diaria del calendario |
-| `@fullcalendar/interaction` | v6 | Drag & Drop de bloques horarios |
-| `@fullcalendar/core/locales/es` | v6 | Localización en español |
 | `axios` | latest | Cliente HTTP con interceptores JWT |
 | `react-hook-form` | v7 | Formularios con validación |
 | `@hookform/resolvers` + `zod` | latest | Validación de esquemas en formularios |
 | `lucide-react` | latest | Íconos SVG |
+| `vitest` + `@testing-library/react` | latest | Tests unitarios de componentes |
+| `react-router-dom` | v6 | Enrutamiento SPA |
+
+> **Nota:** FullCalendar fue eliminado en E18. La grilla de horarios usa tabla nativa por bandas de bloque con DnD HTML5.
 
 ---
 
@@ -551,12 +552,14 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 | Archivo | Complejidad | Razón |
 |---|---|---|
-| `frontend/src/pages/Horarios.jsx` | 🟡 Media (~649 líneas) | Estados + queries + handlers; UI extraída a `features/schedule/components/` (E16) |
+| `frontend/src/pages/Horarios.jsx` | 🟡 Media (~649 líneas) | Orquestador: estados, queries, handlers. UI extraída a `features/schedule/` (E16). Pendiente: extraer selector de periodo y handler de generación. |
 | `frontend/src/pages/Lecciones.jsx` | 🟡 Media (~559 líneas) | Queries + wiring; lógica/UI extraída a `features/planning/` (E16) |
+| `frontend/src/features/schedule/components/GridSemanalBloques.jsx` | 🟡 Media (~430 líneas) | Grilla nativa por bandas + DnD HTML5 (E18). Lógica pura extraída a `utils/schedule.js`. |
 | `backend/services/scheduler/or_tools_adapter.py` | 🔴 Alta | Lógica CP-SAT con muchas variables y restricciones |
 | `backend/crud/horarios_generados.py` | 🟡 Media (338 líneas) | Manejo exhaustivo de excepciones DB |
 | `frontend/src/pages/Docentes.jsx` | 🟡 Media (762 líneas) | 3 tabs + CRUD + Disponibilidad + Habilitaciones |
-| `backend/models/docente.py` | 🟢 Baja | Modelo SQLAlchemy con cascades corregidos |
+| `frontend/src/features/aulas/hooks/useSedesCrud.js` | 🟢 Baja (~150 líneas) | CRUD sedes con demo mode (E22) |
+| `frontend/src/features/aulas/hooks/useAulasCrud.js` | 🟢 Baja (~152 líneas) | CRUD aulas con demo mode (E22) |
 
 ### Contexto de la Última Sesión (2026-07-19)
 
@@ -957,4 +960,4 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 8. **Fix — selectedPeriodoId type mismatch:**
    - `e.target.value` siempre es string. Agregado `Number()` en el `onChange` del selector de periodo en `Horarios.jsx`.
 
-9. **Verificación:** ✅ Frontend build OK (7.4s), 164 tests passed, backend 69 tests passed.
+9. **Verificación:** ✅ Frontend build OK, 198 tests vitest passed, backend 69 tests pytest passed.
