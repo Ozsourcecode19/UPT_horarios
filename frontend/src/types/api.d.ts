@@ -37,6 +37,7 @@ export interface FullCalendarExtendedProps {
   aula_id: number | null
   bloque_id: number
   sede: string
+  periodo_id?: number | null
   [key: string]: unknown
 }
 
