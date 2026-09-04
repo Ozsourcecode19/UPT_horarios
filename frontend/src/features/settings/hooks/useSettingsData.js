@@ -1,0 +1,74 @@
+// src/features/settings/hooks/useSettingsData.js
+// Hook que encapsula las 4 queries de Settings + modo demo.
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import ConfiguracionesService from '../../../api/configuraciones';
+import UsuariosService from '../../../api/usuarios';
+import DatabaseService from '../../../api/database';
+import { esErrorDeServidor } from '../../../utils/errors';
+import { MOCK_CONFIGURACIONES } from '../demoData';
+
+export function useSettingsData() {
+  const queryClient = useQueryClient();
+  const [demoMode, setDemoMode] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const [demoConfigs, setDemoConfigs] = useState(() => {
+    const saved = localStorage.getItem('demo_configuraciones');
+    return saved ? JSON.parse(saved) : MOCK_CONFIGURACIONES;
+  });
+
+  useEffect(() => { localStorage.setItem('demo_configuraciones', JSON.stringify(demoConfigs)); }, [demoConfigs]);
+
+  const { data: configsReal = [], isLoading: isConfigsLoading, isError: isConfigsError, error: configsError, refetch: refetchConfigs } = useQuery({
+    queryKey: ['configuraciones'],
+    queryFn: async () => { const res = await ConfiguracionesService.getConfiguraciones(0, 1000); return res.items || res || []; },
+    enabled: !demoMode, retry: 0,
+  });
+
+  useEffect(() => {
+    if (isConfigsError && esErrorDeServidor(configsError) && !demoMode) {
+      setDemoMode(true);
+      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+    }
+  }, [isConfigsError]);
+
+  const { data: usuariosData = { items: [], total: 0 }, isLoading: isUsuariosLoading, refetch: refetchUsuarios } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: async () => await UsuariosService.getUsuarios(0, 100, null),
+    retry: 0,
+  });
+
+  const { data: dbHealth, isLoading: isDbHealthLoading, refetch: refetchDbHealth } = useQuery({
+    queryKey: ['database-health'],
+    queryFn: () => DatabaseService.getHealth(),
+    retry: 0,
+  });
+
+  const { data: notifConfigs = [], isLoading: isNotifLoading, refetch: refetchNotifConfigs } = useQuery({
+    queryKey: ['configuraciones-notif'],
+    queryFn: async () => {
+      const res = await ConfiguracionesService.getConfiguraciones(0, 100, null);
+      const items = res.items || res || [];
+      return items.filter(c => ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_use_tls', 'notificaciones_email_generacion', 'notificaciones_email_errores'].includes(c.clave));
+    },
+    retry: 0,
+  });
+
+  return {
+    demoMode, setDemoMode, toast, showToast,
+    configs: demoMode ? demoConfigs : configsReal,
+    setDemoConfigs,
+    isConfigsLoading,
+    usuarios: usuariosData.items || [],
+    isUsuariosLoading, refetchUsuarios,
+    dbHealth, isDbHealthLoading, refetchDbHealth,
+    notifConfigs, isNotifLoading, refetchNotifConfigs,
+    refetchConfigs, queryClient,
+  };
+}
