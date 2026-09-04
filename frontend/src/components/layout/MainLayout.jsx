@@ -1,9 +1,42 @@
-import { useState } from 'react';
+import { useState, Component } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, LogOut, Menu, X } from 'lucide-react';
+import { Calendar, LogOut, Menu, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { NAVIGATION, getRouteMeta, isRoleAllowed } from '../../config/navigation';
 import ThemeToggle from './ThemeToggle';
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 mb-4">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-2">Ha ocurrido un error</h3>
+          <p className="text-sm text-slate-500 mb-4 max-w-md">
+            Se produjo un error inesperado al renderizar esta página. Intenta recargar o navegar a otra sección.
+          </p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Recargar página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick }) => (
   <Link
@@ -178,7 +211,9 @@ const MainLayout = () => {
 
         {/* Page Content */}
         <div className="flex-1 overflow-auto p-6 lg:p-10">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

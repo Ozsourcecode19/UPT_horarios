@@ -13,7 +13,7 @@ from routers import (
     usuarios, sedes, carreras, periodos_academicos, trayectos_academicos,
     grupos, docentes, materias, aulas, disponibilidades_docentes,
     habilitaciones_docentes, configuraciones, bloques_horarios,
-    lecciones, horarios_generados, schedules, auth
+    lecciones, horarios_generados, schedules, auth, database
 )
 
 import models
@@ -47,6 +47,7 @@ app.include_router(lecciones.router, prefix="/api", tags=["Lecciones"])
 app.include_router(horarios_generados.router, prefix="/api", tags=["Horarios Generados"])
 app.include_router(schedules.router, prefix="/api", tags=["Operaciones de Horario"])
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
+app.include_router(database.router, prefix="/api", tags=["Base de Datos"])
 
 @app.get("/")
 def read_root():

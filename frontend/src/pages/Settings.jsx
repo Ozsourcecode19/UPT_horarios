@@ -6,9 +6,11 @@ import { z } from 'zod';
 import {
   Settings as SettingsIcon, Sliders, Shield, Database, Bell, AlertTriangle,
   RefreshCw, Sparkles, CheckCircle, AlertCircle, X, Lock, Save, Clock, CalendarDays,
-  Gauge, Timer, Layers
+  Gauge, Timer, Layers, Users, Plus, Edit2, Trash2, UserCheck, UserX
 } from 'lucide-react';
 import ConfiguracionesService from '../api/configuraciones';
+import UsuariosService from '../api/usuarios';
+import DatabaseService from '../api/database';
 import { useAuth } from '../context/AuthContext';
 import { esErrorDeServidor } from '../utils/errors';
 
@@ -108,6 +110,127 @@ const GRUPO_NOTAS = {
   ),
 };
 
+// --- FORMULARIO DE USUARIO (inline, para modal) ---
+const UserForm = ({ user, onSave, onCancel, onError, errorMsg }) => {
+  const [form, setForm] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    password: '',
+    rol: user?.rol || 'LECTOR',
+    activo: user?.activo ?? true,
+  });
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    onError('');
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.username || form.username.length < 3) {
+      onError('El nombre de usuario debe tener al menos 3 caracteres');
+      return;
+    }
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      onError('El email no tiene un formato válido');
+      return;
+    }
+    if (!user && !form.password) {
+      onError('La contraseña es requerida para nuevos usuarios');
+      return;
+    }
+    if (!user && form.password.length < 6) {
+      onError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (!['ADMIN', 'JEFE-PNF', 'DOCENTE', 'LECTOR'].includes(form.rol)) {
+      onError('Rol no válido');
+      return;
+    }
+    const payload = { ...form };
+    if (user && !payload.password) delete payload.password;
+    onSave(payload);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      {errorMsg && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-800/40 rounded-xl text-sm text-red-700 dark:text-red-400 font-medium">
+          {errorMsg}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Username *</label>
+          <input
+            type="text"
+            value={form.username}
+            onChange={(e) => handleChange('username', e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium placeholder-slate-400 dark:placeholder-slate-500"
+            placeholder="juan_perez"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium placeholder-slate-400 dark:placeholder-slate-500"
+            placeholder="juan@upt.edu.ve"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+            {user ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *'}
+          </label>
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => handleChange('password', e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium placeholder-slate-400 dark:placeholder-slate-500"
+            placeholder={user ? "••••••" : "Mínimo 6 caracteres"}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Rol *</label>
+          <select
+            value={form.rol}
+            onChange={(e) => handleChange('rol', e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
+          >
+            <option value="ADMIN">Administrador</option>
+            <option value="JEFE-PNF">Jefe PNF</option>
+            <option value="DOCENTE">Docente</option>
+            <option value="LECTOR">Lector</option>
+          </select>
+        </div>
+      </div>
+      {user && (
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={form.activo}
+            onChange={(e) => handleChange('activo', e.target.checked)}
+            className="w-4 h-4 accent-emerald-500 rounded"
+          />
+          Usuario activo
+        </label>
+      )}
+      <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+        <button type="button" onClick={onCancel} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-sm transition-colors">
+          Cancelar
+        </button>
+        <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">
+          {user ? 'Guardar Cambios' : 'Crear Usuario'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const DIAS_SEMANA = [
   { valor: 1, label: 'Lun' },
   { valor: 2, label: 'Mar' },
@@ -197,6 +320,36 @@ const Settings = () => {
     localStorage.setItem('demo_configuraciones', JSON.stringify(demoConfigs));
   }, [demoConfigs]);
 
+  // --- ESTADOS DE GESTIÓN DE USUARIOS (Seguridad) ---
+  const [userSearch, setUserSearch] = useState('');
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState(null);
+  const [userFormError, setUserFormError] = useState('');
+
+  // --- QUERY DE USUARIOS (API) ---
+  const {
+    data: usuariosData = { items: [], total: 0 },
+    isLoading: isUsuariosLoading,
+    refetch: refetchUsuarios,
+  } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: async () => {
+      const res = await UsuariosService.getUsuarios(0, 100, userSearch || null);
+      return res;
+    },
+    retry: 0,
+  });
+
+  const usuarios = usuariosData.items || [];
+
+  const ROLES_CONFIG = {
+    ADMIN: { label: 'Administrador', color: 'bg-red-50 text-red-700 border-red-200/60', icon: Shield },
+    'JEFE-PNF': { label: 'Jefe PNF', color: 'bg-purple-50 text-purple-700 border-purple-200/60', icon: Users },
+    DOCENTE: { label: 'Docente', color: 'bg-blue-50 text-blue-700 border-blue-200/60', icon: Users },
+    LECTOR: { label: 'Lector', color: 'bg-slate-100 text-slate-600 border-slate-200/60', icon: Users },
+  };
+
   // --- QUERY DE CONFIGURACIONES (API) ---
   const {
     data: configsReal = [],
@@ -225,6 +378,64 @@ const Settings = () => {
   const configs = demoMode ? demoConfigs : configsReal;
   const editables = configs.filter(c => c.editable);
   const readonlys = configs.filter(c => !c.editable);
+
+  // --- QUERIES PARA BASE DE DATOS ---
+  const {
+    data: dbHealth,
+    isLoading: isDbHealthLoading,
+    refetch: refetchDbHealth,
+  } = useQuery({
+    queryKey: ['database-health'],
+    queryFn: () => DatabaseService.getHealth(),
+    retry: 0,
+  });
+
+  // --- QUERIES PARA NOTIFICACIONES (claves SMTP en configuracion) ---
+  const {
+    data: notifConfigs = [],
+    isLoading: isNotifLoading,
+    refetch: refetchNotifConfigs,
+  } = useQuery({
+    queryKey: ['configuraciones-notif'],
+    queryFn: async () => {
+      const res = await ConfiguracionesService.getConfiguraciones(0, 100, null);
+      const items = res.items || res || [];
+      return items.filter(c =>
+        ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_use_tls', 'notificaciones_email_generacion', 'notificaciones_email_errores'].includes(c.clave)
+      );
+    },
+    retry: 0,
+  });
+
+  const [notifForm, setNotifForm] = useState({
+    smtp_server: '',
+    smtp_port: '587',
+    smtp_username: '',
+    smtp_password: '',
+    smtp_use_tls: true,
+    notificaciones_email_generacion: false,
+    notificaciones_email_errores: false,
+  });
+  const [notifSaving, setNotifSaving] = useState(false);
+
+  // Sincronizar notifForm cuando llegan los datos de la API
+  useEffect(() => {
+    if (notifConfigs.length > 0) {
+      const map = {};
+      for (const c of notifConfigs) {
+        map[c.clave] = c.valor;
+      }
+      setNotifForm(prev => ({
+        ...prev,
+        smtp_server: map.smtp_server ?? '',
+        smtp_port: String(map.smtp_port ?? '587'),
+        smtp_username: map.smtp_username ?? '',
+        smtp_use_tls: map.smtp_use_tls ?? true,
+        notificaciones_email_generacion: map.notificaciones_email_generacion ?? false,
+        notificaciones_email_errores: map.notificaciones_email_errores ?? false,
+      }));
+    }
+  }, [notifConfigs]);
 
   // Agrupa las claves editables por tema (GRUPOS), preservando el orden definido
   const groupedEditables = useMemo(() => {
@@ -312,7 +523,7 @@ const Settings = () => {
                     className={`h-10 rounded-xl text-xs font-bold border transition-all ${
                       active
                         ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
-                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-blue-300'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500'
                     } ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
                     {d.label}
@@ -331,7 +542,7 @@ const Settings = () => {
               type="time"
               disabled={!isAdmin}
               {...register(cfg.clave)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             />
             {error && <span className="text-xs text-red-500 font-medium mt-1 block">{error.message}</span>}
           </div>
@@ -346,11 +557,11 @@ const Settings = () => {
               max={w.max}
               disabled={!isAdmin}
               {...register(cfg.clave, { valueAsNumber: true })}
-              className="w-full accent-blue-600 bg-slate-100 h-2 rounded-lg disabled:opacity-60"
+              className="w-full accent-blue-600 bg-slate-100 dark:bg-slate-700 h-2 rounded-lg disabled:opacity-60"
             />
-            <div className="flex justify-between text-xs text-slate-400 mt-1">
+            <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-1">
               <span>{w.lowLabel}</span>
-              <span className="font-semibold text-blue-600">{value}</span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400">{value}</span>
               <span>{w.highLabel}</span>
             </div>
           </div>
@@ -362,7 +573,7 @@ const Settings = () => {
             <select
               disabled={!isAdmin}
               {...register(cfg.clave, { valueAsNumber: true })}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {(w.options || []).map(opt => (
                 <option key={opt} value={opt}>{opt} minutos</option>
@@ -378,7 +589,7 @@ const Settings = () => {
               type="number"
               disabled={!isAdmin}
               {...register(cfg.clave, { valueAsNumber: true })}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             />
             {error && <span className="text-xs text-red-500 font-medium mt-1 block">{error.message}</span>}
           </div>
@@ -401,7 +612,7 @@ const Settings = () => {
         return (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Hora Inicio</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Hora Inicio</label>
               <input
                 type="time"
                 disabled={!isAdmin}
@@ -410,11 +621,11 @@ const Settings = () => {
                   const newVal = { ...watch(cfg.clave), hora_inicio: e.target.value + ':00' };
                   setValue(cfg.clave, newVal, { shouldValidate: true, shouldDirty: true });
                 }}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Hora Fin</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Hora Fin</label>
               <input
                 type="time"
                 disabled={!isAdmin}
@@ -423,7 +634,7 @@ const Settings = () => {
                   const newVal = { ...watch(cfg.clave), hora_fin: e.target.value + ':00' };
                   setValue(cfg.clave, newVal, { shouldValidate: true, shouldDirty: true });
                 }}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -436,7 +647,7 @@ const Settings = () => {
               type="text"
               disabled={!isAdmin}
               {...register(cfg.clave)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             />
             {error && <span className="text-xs text-red-500 font-medium mt-1 block">{error.message}</span>}
           </div>
@@ -456,7 +667,7 @@ const Settings = () => {
 
   const tabs = [
     { id: 'algoritmo', label: 'Algoritmo', icon: Sliders, pending: false },
-    { id: 'seguridad', label: 'Seguridad (RBAC)', icon: Shield, pending: true },
+    { id: 'seguridad', label: 'Seguridad (RBAC)', icon: Shield, pending: false },
     { id: 'base-datos', label: 'Base de Datos', icon: Database, pending: true },
     { id: 'notificaciones', label: 'Notificaciones', icon: Bell, pending: true },
   ];
@@ -466,16 +677,16 @@ const Settings = () => {
 
       {/* Banner de Modo Demo */}
       {demoMode && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-4 flex items-center justify-between gap-4 text-amber-800 shadow-[0_4px_20px_rgba(245,158,11,0.05)]">
+        <div className="bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 dark:border-amber-500/10 rounded-3xl p-4 flex items-center justify-between gap-4 text-amber-800 dark:text-amber-300 shadow-[0_4px_20px_rgba(245,158,11,0.05)]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
               <p className="text-sm font-bold flex items-center gap-1.5">
-                Modo Demo Activado <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
+                Modo Demo Activado <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400 animate-spin" />
               </p>
-              <p className="text-xs text-amber-600/90">
+              <p className="text-xs text-amber-600/90 dark:text-amber-400/70">
                 Operando con la configuración de prueba en almacenamiento local.
               </p>
             </div>
@@ -545,14 +756,14 @@ const Settings = () => {
 
           {activeTab === 'algoritmo' && (
             <>
-              <h3 className="text-xl font-bold text-slate-800 border-b border-slate-100 pb-4 flex items-center gap-2">
-                <SettingsIcon className="w-5 h-5 text-blue-600" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-4 flex items-center gap-2">
+                <SettingsIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 Parámetros del Optimizador (OR-Tools)
               </h3>
 
               {!isAdmin && (
-                <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-sm text-slate-600">
-                  <Lock className="w-5 h-5 text-slate-400 shrink-0" />
+                <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-2xl text-sm text-slate-600 dark:text-slate-300">
+                  <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
                   <span>
                     Tu rol (<span className="font-semibold">{user?.role}</span>) solo tiene lectura de la configuración. Solo los usuarios <span className="font-semibold">ADMIN</span> pueden modificarla.
                   </span>
@@ -563,8 +774,8 @@ const Settings = () => {
                 <div className="space-y-4">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="space-y-2 animate-pulse">
-                      <div className="h-4 bg-slate-100 rounded w-1/3"></div>
-                      <div className="h-10 bg-slate-100 rounded-xl"></div>
+                      <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-1/3"></div>
+                      <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                     </div>
                   ))}
                 </div>
@@ -578,8 +789,8 @@ const Settings = () => {
                           <group.icon className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <p className="text-base font-bold text-slate-800">{group.label}</p>
-                          {group.descripcion && <p className="text-xs text-slate-400">{group.descripcion}</p>}
+                          <p className="text-base font-bold text-slate-800 dark:text-slate-100">{group.label}</p>
+                          {group.descripcion && <p className="text-xs text-slate-400 dark:text-slate-500">{group.descripcion}</p>}
                         </div>
                       </div>
 
@@ -588,16 +799,16 @@ const Settings = () => {
                         {group.items.map(cfg => {
                           const w = WIDGETS[cfg.clave] || { widget: 'text' };
                           return (
-                            <div key={cfg.clave} className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2.5">
+                            <div key={cfg.clave} className="p-5 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-2xl space-y-2.5">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-600 flex items-center justify-center shrink-0">
                                   {widgetIcon(w.widget)}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-slate-700 capitalize">
+                                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200 capitalize">
                                     {cfg.clave.split('_').join(' ')}
                                   </p>
-                                  {cfg.descripcion && <p className="text-xs text-slate-400">{cfg.descripcion}</p>}
+                                  {cfg.descripcion && <p className="text-xs text-slate-400 dark:text-slate-500">{cfg.descripcion}</p>}
                                 </div>
                               </div>
                               {renderField(cfg)}
@@ -608,9 +819,9 @@ const Settings = () => {
 
                       {/* Nota explicativa del grupo */}
                       {GRUPO_NOTAS[group.id] && (
-                        <div className="p-4 bg-amber-50/50 border border-amber-100/60 rounded-2xl flex gap-3">
-                          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800 leading-relaxed">{GRUPO_NOTAS[group.id]}</p>
+                        <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100/60 dark:border-amber-800/40 rounded-2xl flex gap-3">
+                          <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{GRUPO_NOTAS[group.id]}</p>
                         </div>
                       )}
                     </div>
@@ -618,16 +829,16 @@ const Settings = () => {
 
                   {/* Claves de solo lectura */}
                   {readonlys.length > 0 && (
-                    <div className="p-5 bg-blue-50/50 border border-blue-100/60 rounded-2xl">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-3 flex items-center gap-1.5">
+                    <div className="p-5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-800/40 rounded-2xl">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 mb-3 flex items-center gap-1.5">
                         <Layers className="w-4 h-4" />
                         Información del sistema (solo lectura)
                       </h4>
                       <div className="space-y-2">
                         {readonlys.map(cfg => (
                           <div key={cfg.clave} className="flex items-center justify-between gap-4 text-sm">
-                            <span className="font-semibold text-slate-600">{cfg.clave}</span>
-                            <span className="px-2.5 py-1 bg-white border border-blue-100 rounded-lg text-xs font-mono text-blue-700">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">{cfg.clave}</span>
+                            <span className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-800/40 rounded-lg text-xs font-mono text-blue-700 dark:text-blue-400">
                               {typeof cfg.valor === 'object' ? JSON.stringify(cfg.valor) : String(cfg.valor)}
                             </span>
                           </div>
@@ -637,12 +848,12 @@ const Settings = () => {
                   )}
 
                   {isAdmin && (
-                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
                       <button
                         type="button"
                         onClick={() => reset(defaultValues)}
                         disabled={!isDirty}
-                        className="px-5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Descartar cambios
                       </button>
@@ -661,21 +872,449 @@ const Settings = () => {
             </>
           )}
 
-          {activeTab !== 'algoritmo' && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
-                <X className="w-8 h-8" />
+          {/* === TAB: SEGURIDAD === */}
+          {activeTab === 'seguridad' && (
+            <>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                Gestión de Usuarios y Roles
+              </h3>
+
+              {!isAdmin && (
+                <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-2xl text-sm text-slate-600 dark:text-slate-300">
+                  <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <span>
+                    Tu rol (<span className="font-semibold">{user?.role}</span>) solo tiene lectura. Solo los usuarios <span className="font-semibold">ADMIN</span> pueden gestionar usuarios.
+                  </span>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => { setEditingUser(null); setUserFormError(''); setUserModalOpen(true); }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Añadir Usuario
+                  </button>
+                </div>
+              )}
+
+              {isUsuariosLoading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-14 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : usuarios.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto mb-3">
+                    <Users className="w-7 h-7" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No hay usuarios registrados</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700">
+                        <th className="py-3 px-4">Usuario</th>
+                        <th className="py-3 px-4">Email</th>
+                        <th className="py-3 px-4 text-center">Rol</th>
+                        <th className="py-3 px-4 text-center">Estado</th>
+                        <th className="py-3 px-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
+                      {usuarios.map((u) => {
+                        const rc = ROLES_CONFIG[u.rol] || ROLES_CONFIG.LECTOR;
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="py-3 px-4">
+                              <div>
+                                <span className="font-semibold text-slate-800 dark:text-slate-100 block">{u.username}</span>
+                                <span className="text-xs text-slate-400 dark:text-slate-500">ID: #{u.id}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{u.email}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${rc.color}`}>
+                                {u.rol}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              {u.activo ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-semibold">
+                                  <UserCheck className="w-3 h-3" /> Activo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-xs font-semibold">
+                                  <UserX className="w-3 h-3" /> Inactivo
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              {isAdmin && (
+                                <div className="flex justify-end gap-1">
+                                  <button
+                                    onClick={() => { setEditingUser(u); setUserFormError(''); setUserModalOpen(true); }}
+                                    className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-all"
+                                    title="Editar usuario"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteUserConfirm(u)}
+                                    className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all"
+                                    title="Eliminar usuario"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* === TAB: BASE DE DATOS === */}
+          {activeTab === 'base-datos' && (
+            <>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-4 flex items-center gap-2">
+                <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                Estado de la Base de Datos
+              </h3>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => refetchDbHealth()}
+                  disabled={isDbHealthLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-xs transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isDbHealthLoading ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </button>
               </div>
-              <h4 className="text-lg font-bold text-slate-700">Módulo pendiente</h4>
-              <p className="text-sm text-slate-400 mt-1 max-w-sm">
-                Esta sección se habilitará en una futura fase del plan de desarrollo.
-              </p>
-            </div>
+
+              {isDbHealthLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-28 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
+              ) : dbHealth ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-100/60 dark:border-blue-800/40 rounded-2xl p-5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-2">PostgreSQL</div>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug">{dbHealth.postgresql_version?.split(',')[0] || 'N/A'}</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-emerald-50 to-green-50/50 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-100/60 dark:border-emerald-800/40 rounded-2xl p-5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400 mb-2">Conexión</div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{dbHealth.connection_status}</p>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50/50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-100/60 dark:border-purple-800/40 rounded-2xl p-5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-purple-500 dark:text-purple-400 mb-2">Versión del Esquema</div>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{dbHealth.schema_version || 'No definida'}</p>
+                    </div>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mt-2">Registros por tabla</h4>
+
+                  {dbHealth.tables && dbHealth.tables.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700">
+                            <th className="py-3 px-4">Tabla</th>
+                            <th className="py-3 px-4 text-right">Registros</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
+                          {dbHealth.tables.map((t) => (
+                            <tr key={t.table_name} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors">
+                              <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-200">{t.table_name}</td>
+                              <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-300">{t.row_count.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">No hay datos de tablas disponibles.</div>
+                  )}
+                </>
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto mb-3">
+                    <Database className="w-7 h-7" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No se pudo conectar a la base de datos</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Verifica que el backend esté corriendo.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* === TAB: NOTIFICACIONES === */}
+          {activeTab === 'notificaciones' && (
+            <>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-700 pb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                Notificaciones por Email
+              </h3>
+
+              {!isAdmin && (
+                <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-2xl text-sm text-slate-600 dark:text-slate-300">
+                  <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <span>
+                    Tu rol (<span className="font-semibold">{user?.role}</span>) solo tiene lectura. Solo los usuarios <span className="font-semibold">ADMIN</span> pueden modificar estas configuraciones.
+                  </span>
+                </div>
+              )}
+
+              {isNotifLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Configuración SMTP */}
+                  <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-800/50 dark:to-blue-950/20 border border-slate-200/60 dark:border-slate-700 rounded-2xl p-6 space-y-4">
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full" />
+                      Configuración del Servidor SMTP
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Servidor SMTP</label>
+                        <input
+                          type="text"
+                          value={notifForm.smtp_server}
+                          onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_server: e.target.value }))}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500"
+                          placeholder="smtp.gmail.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Puerto</label>
+                        <input
+                          type="number"
+                          value={notifForm.smtp_port}
+                          onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_port: e.target.value }))}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500"
+                          placeholder="587"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Usuario / Email remitente</label>
+                        <input
+                          type="text"
+                          value={notifForm.smtp_username}
+                          onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_username: e.target.value }))}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500"
+                          placeholder="correo@upt.edu.ve"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Contraseña SMTP</label>
+                        <input
+                          type="password"
+                          value={notifForm.smtp_password}
+                          onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_password: e.target.value }))}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500"
+                          placeholder="••••••••"
+                        />
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Almacenado en texto plano. Usar solo en desarrollo.</p>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={notifForm.smtp_use_tls}
+                        onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_use_tls: e.target.checked }))}
+                        disabled={!isAdmin}
+                        className="w-4 h-4 accent-blue-500 rounded"
+                      />
+                      Usar conexión TLS (recomendado)
+                    </label>
+                  </div>
+
+                  {/* Preferencias de notificación */}
+                  <div className="bg-gradient-to-br from-slate-50 to-amber-50/30 dark:from-slate-800/50 dark:to-amber-950/20 border border-slate-200/60 dark:border-slate-700 rounded-2xl p-6 space-y-4">
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 bg-amber-500 dark:bg-amber-400 rounded-full" />
+                      Preferencias de Notificación
+                    </h4>
+
+                    <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl cursor-pointer select-none hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 block">Generación de horarios</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">Recibir email cuando finaliza la generación automática</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={notifForm.notificaciones_email_generacion}
+                        onChange={(e) => setNotifForm(prev => ({ ...prev, notificaciones_email_generacion: e.target.checked }))}
+                        disabled={!isAdmin}
+                        className="w-4 h-4 accent-amber-500 rounded"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl cursor-pointer select-none hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 block">Alertas de errores</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">Recibir email cuando ocurre un error en el sistema</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={notifForm.notificaciones_email_errores}
+                        onChange={(e) => setNotifForm(prev => ({ ...prev, notificaciones_email_errores: e.target.checked }))}
+                        disabled={!isAdmin}
+                        className="w-4 h-4 accent-amber-500 rounded"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Botón guardar */}
+                  {isAdmin && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={async () => {
+                          setNotifSaving(true);
+                          try {
+                            const fields = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_use_tls', 'notificaciones_email_generacion', 'notificaciones_email_errores'];
+                            for (const clave of fields) {
+                              let valor = notifForm[clave];
+                              if (clave === 'smtp_port') valor = parseInt(valor, 10) || 587;
+                              await ConfiguracionesService.updateConfiguracion(clave, { valor });
+                            }
+                            // La contraseña no se guarda en configuraciones por seguridad
+                            showToast("Configuración de notificaciones guardada exitosamente");
+                            refetchNotifConfigs();
+                          } catch (err) {
+                            showToast(err?.response?.data?.detail || "Error al guardar configuración", "error");
+                          } finally {
+                            setNotifSaving(false);
+                          }
+                        }}
+                        disabled={notifSaving}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {notifSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Guardar Configuración
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
         </div>
 
       </div>
+
+      {/* === MODAL: CREAR / EDITAR USUARIO === */}
+      {userModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {editingUser ? 'Editar Usuario' : 'Añadir Nuevo Usuario'}
+              </h3>
+              <button onClick={() => setUserModalOpen(false)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <UserForm
+              user={editingUser}
+              onError={setUserFormError}
+              errorMsg={userFormError}
+              onSave={async (data) => {
+                try {
+                  if (editingUser) {
+                    await UsuariosService.updateUsuario(editingUser.id, data);
+                    showToast("Usuario actualizado exitosamente");
+                  } else {
+                    await UsuariosService.createUsuario(data);
+                    showToast("Usuario creado exitosamente");
+                  }
+                  refetchUsuarios();
+                  setUserModalOpen(false);
+                } catch (err) {
+                  const detail = err?.response?.data?.detail || 'Error al guardar usuario';
+                  setUserFormError(typeof detail === 'string' ? detail : JSON.stringify(detail));
+                }
+              }}
+              onCancel={() => setUserModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* === MODAL: CONFIRMAR ELIMINAR USUARIO === */}
+      {deleteUserConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 p-6 animate-in zoom-in-95 duration-200 space-y-4">
+            <div className="w-12 h-12 bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 rounded-2xl flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">¿Eliminar este usuario?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                Estás a punto de eliminar al usuario{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-200">{deleteUserConfirm.username}</span> ({deleteUserConfirm.email}).
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700 pt-4">
+              <button
+                onClick={() => setDeleteUserConfirm(null)}
+                className="px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-xs transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await UsuariosService.deleteUsuario(deleteUserConfirm.id);
+                    showToast("Usuario eliminado exitosamente", "info");
+                    refetchUsuarios();
+                    setDeleteUserConfirm(null);
+                  } catch (err) {
+                    showToast(err?.response?.data?.detail || "Error al eliminar usuario", "error");
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-xs shadow-md shadow-red-500/10 transition-all hover:-translate-y-0.5"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
