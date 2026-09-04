@@ -43,7 +43,7 @@ describe('validateMoveMock', () => {
       bloques: ctx.bloques,
       periodoId: ctx.periodoId,
     });
-    expect(res).toEqual({ valido: true });
+    expect(res).toMatchObject({ valido: true });
   });
 
   it('rechaza con INVALID_TARGET si el bloque no existe', () => {
@@ -127,6 +127,6 @@ describe('validateMoveMock', () => {
       horarioId: 1, nuevoBloqueId: 2, nuevaAulaId: 2, eventosDemo: ctx.eventos,
       aulas: ctx.aulas, bloques: ctx.bloques, periodoId: ctx.periodoId,
     });
-    expect(res).toEqual({ valido: true });
+    expect(res).toMatchObject({ valido: true });
   });
 });

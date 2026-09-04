@@ -1,18 +1,23 @@
-// src/utils/dashboardStats.js
+// src/utils/dashboardStats.ts
 // Logica pura del panel analitico del Dashboard (E11), extraida para poder
 // testearla de forma aislada (vitest) igual que el resto de utils de horarios.
+
+import type { FullCalendarEvent, PreGenerationCheck, GenerationStatus } from '../types/api';
+import type { CargaDocente, DistribucionMateria, ResumenConflictos } from '../types/schedule';
 
 const HORA_MS = 3.6e6;
 const COLOR_FALLBACK = '#6366f1';
 
+type NivelObservacion = 'ok' | 'warn' | 'error' | 'sin-datos';
+
 /**
  * Convierte los eventos FullCalendar del periodo en carga horaria semanal por docente.
  * Suma la duración (end - start) de todas sus clases.
- * @param {import('../types/api').FullCalendarEvent[]} eventos
- * @returns {import('../types/schedule').CargaDocente[]} Ordenado de mayor a menor carga
+ * @param eventos
+ * @returns Ordenado de mayor a menor carga
  */
-export const cargaHorariaPorDocente = (eventos) => {
-  const acum = {};
+export const cargaHorariaPorDocente = (eventos: FullCalendarEvent[]): CargaDocente[] => {
+  const acum: Record<string, number> = {};
 
   (eventos || []).forEach(ev => {
     const start = new Date(ev?.start);
@@ -33,11 +38,11 @@ export const cargaHorariaPorDocente = (eventos) => {
 
 /**
  * Cuenta las clases por materia usando el color del evento.
- * @param {import('../types/api').FullCalendarEvent[]} eventos
- * @returns {import('../types/schedule').DistribucionMateria[]} Ordenado de mayor a menor
+ * @param eventos
+ * @returns Ordenado de mayor a menor
  */
-export const distribucionPorMateria = (eventos) => {
-  const acum = {};
+export const distribucionPorMateria = (eventos: FullCalendarEvent[]): DistribucionMateria[] => {
+  const acum: Record<string, DistribucionMateria> = {};
 
   (eventos || []).forEach(ev => {
     const materia = ev?.extendedProps?.materia || 'Materia no asignada';
@@ -52,22 +57,25 @@ export const distribucionPorMateria = (eventos) => {
 /**
  * Deriva la salud del periodo a partir del checklist previo a la generación
  * y del estado de la última generación.
- * @param {import('../types/api').PreGenerationCheck | null} preCheck
- * @param {import('../types/api').GenerationStatus | null} generationStatus
- * @returns {import('../types/schedule').ResumenConflictos}
+ * @param preCheck
+ * @param generationStatus
+ * @returns Resumen de conflictos
  */
-export const resumenConflictos = (preCheck, generationStatus) => {
-  const items = [];
-  let nivel = 'sin-datos';
+export const resumenConflictos = (
+  preCheck: PreGenerationCheck | null,
+  generationStatus: GenerationStatus | null
+): ResumenConflictos => {
+  const items: Array<{ clave: string; label: string; nivel: NivelObservacion; mensaje: string }> = [];
+  let nivel: NivelObservacion = 'sin-datos';
 
-  const add = (itemNivel, label, mensaje) => {
+  const add = (itemNivel: NivelObservacion, label: string, mensaje: string) => {
     items.push({ clave: `${label}:${items.length}`, label, nivel: itemNivel, mensaje });
-    const peso = { error: 3, warn: 2, ok: 1 }[itemNivel] || 0;
-    if (peso > ({ error: 3, warn: 2, ok: 1 }[nivel] || 0)) nivel = itemNivel;
+    const peso = ({ error: 3, warn: 2, ok: 1 } as const)[itemNivel] || 0;
+    if (peso > (({ error: 3, warn: 2, ok: 1 } as const)[nivel] || 0)) nivel = itemNivel;
   };
 
   if (preCheck) {
-    const causas = [];
+    const causas: string[] = [];
     if (preCheck.lecciones_activas === 0) causas.push('no hay lecciones activas');
     if (preCheck.aulas === 0) causas.push('no hay aulas activas');
     if (preCheck.bloques === 0) causas.push('no hay bloques activos');
