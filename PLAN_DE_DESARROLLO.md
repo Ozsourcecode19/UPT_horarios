@@ -70,7 +70,7 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 **Bugfix (guardar modal falla "No se pudo identificar la lección", 2026-08-27):** al intentar guardar un cambio de 2 bloques desde el modal, surgía el error "No se pudo identificar la lección de esta clase". Causa raíz: `_abrirEditor` aplana los campos de `extendedProps` al nivel superior de `selectedEvent` (objeto sin sub-objeto `extendedProps`), pero `guardarAsignacionManual` leía `horario.extendedProps?.leccion_id` — que es `undefined` en el objeto plano. El `leccion_id` existía como `horario.leccion_id` (nivel superior), no como `horario.extendedProps.leccion_id`. Fix: línea 169 de `useDragDropValidation.js` cambiada a `horario.leccion_id ?? horario.extendedProps?.leccion_id` (compatibilidad con ambos formatos). Fixes previos del mismo bugfix (parámetros explícitos en `handleSaveChangesModal`, fallback en `_abrirEditor`) se mantienen. Verificación: vitest **164 passed**, pytest **69 passed**, `pnpm build` OK.
 
-**Pendientes:** Fase E (Backlog estructurado en ejecuciones): E15 (Tipado TypeScript/JSDoc). Backend testeado (E9+validaciones, 54 tests ✅); frontend con suite completa (164 tests ✅). `docs/*.pdf` vacíos.
+**Pendientes:** Backend testeado (E9+validaciones, 69 tests ✅); frontend con suite completa (198 tests ✅). `docs/*.pdf` vacíos eliminados (2026-09-04).
 
 **Bugfix (cambiar x2 a x1 no se refleja en UI, 2026-08-27):** al reducir un horario de 2 bloques a 1 bloque desde el modal, el cambio no se reflejaba en la grilla. Causa: la rama `abarca === 1` en `handleSaveChangesModal` llamaba `aplicarMovimiento` (PUT a una sola fila), que solo movía el registro seleccionado **sin eliminar el hermano** creado al extender a 2 bloques. El backend seguía devolviendo 2 filas para la misma lección. Fix: la rama ahora pasa por `guardarAsignacionManual` con `[targetBlock]` (un solo elemento), que usa `POST /schedules/asignar-manual` (reemplazo atómico de todas las filas de la lección). Además, `guardarAsignacionManual` ahora normaliza `extendedProps` con `horario.extendedProps ?? horario` para leer `division` correctamente en objetos planos. Tests actualizados con `leccion_id` en extendedProps y nueva firma `(abarca, aulaId, bloqueId)`. Verificación: vitest **164 passed**, pytest **69 passed**, `pnpm build` OK.
 
@@ -83,6 +83,8 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
 - ✅ **E21 — Extracción de BloquesHorarios.jsx a features/bloques/ (2026-09-04):** `BloquesHorarios.jsx` (1039 → 192 líneas, reducción del 81.5%). Nueva feature `src/features/bloques/` con: `demoData.js` (MOCK_SEDES, MOCK_BLOQUES), `schemas.js` (bloqueSchema zod, DIAS_NOMBRES, DURACIONES_VALIDAS), `utils/bloques.js` (horaCompleta, calcularFin, generarSimulacionDemo), `hooks/useBloquesCrud.js` (CRUD dual real+demo, paginación, toast), 6 componentes UI (BloquesStatsCards, BloquesFilterBar, BloquesTable, BloqueFormModal, ConfirmActionModal, GenerarGrillaModal), barrel `index.js`, 14 tests en `__tests__/bloques.test.js`. Vitest **178 passed** (+14), `pnpm build` OK.
+
+- ✅ **E22 — Extracción de Aulas.jsx a features/aulas/ (2026-09-04):** `Aulas.jsx` (1077 → 235 líneas, reducción del 78%). Nueva feature `src/features/aulas/` con: `demoData.js` (MOCK_SEDES, MOCK_AULAS), `schemas.js` (sedeSchema, aulaSchema, AULAS_TYPES), `utils/aulas.js` (calcularEstadisticas), `hooks/useSedesCrud.js` + `hooks/useAulasCrud.js` (CRUD dual real+demo, paginación, toast), 9 componentes UI (Toast, AulasStatsCards, AulasTabs, AulasFilterBar, AulasTable, SedesTable, SedeFormModal, AulaFormModal, ConfirmDeleteModal), barrel `index.js`, 20 tests en `__tests__/aulas.test.js`. Vitest **198 passed** (+20), `pnpm build` OK.
 
 ---
 
@@ -224,11 +226,4 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
 - Cualquier cambio en `database/schema_horarios_v2.1.1.sql` debe conservar los triggers PL/pgSQL.
 - Los tests (E9/E10/E11) no deben requerir la BD real con triggers.
-� `features/schedule/` (al terminar la extracción de E10), exportación PDF/iCal, modo oscuro, migración TypeScript.
-
----
-
-## Riesgos a vigilar
-- El tracker en memoria de E1 (ya implementado) se pierde al reiniciar el proceso; aceptable (1 worker), mejorable a futuro con tabla de log.
-- Cualquier cambio en `database/schema_horarios_v2.1.1.sql` debe conservar los triggers PL/pgSQL.
-- Los tests (E9/E10) no deben requerir la BD real con triggers.
+- `features/schedule/` (al terminar la extracción de E10), exportación PDF/iCal, modo oscuro, migración TypeScript.

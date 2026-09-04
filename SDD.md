@@ -2,12 +2,13 @@
 
 **Versión del documento:** 1.0
 **Versión del sistema:** 2.1.1
-**Fecha:** 2026-08-01
+**Fecha:** 2026-09-04
 **Estado:** Aprobado para revisión
 
 | Fecha | Versión | Autor | Descripción |
 |---|---|---|---|
 | 2026-08-01 | 1.0 | Equipo de Desarrollo | Versión inicial del SDD basada en el estado actual del código |
+| 2026-09-04 | 1.1 | Equipo de Desarrollo | Actualización E12–E21: grilla nativa, dark mode, paginación, features, tests |
 
 **Referencias técnicas:**
 - *Informe Técnico MVP Horarios web upt-1.pdf* (Arquitectura Base)
@@ -33,7 +34,7 @@ La UPT Bolívar necesita generar horarios académicos semanales para sus Program
 1. Automatizar la generación de horarios mediante un solucionador de optimización (Google OR-Tools CP-SAT).
 2. Centralizar los datos maestros del proceso: docentes, materias, aulas, grupos, lecciones, periodos académicos, sedes, carreras y trayectos.
 3. Permitir la configuración de restricciones (disponibilidad y habilitaciones) antes de generar.
-4. Visualizar los horarios generados en una grilla semanal interactiva (FullCalendar) con edición manual vía drag & drop validado.
+4. Visualizar los horarios generados en una grilla semanal interactiva (tabla nativa por bandas de bloque con drag & drop HTML5) con edición manual validada.
 5. Controlar el acceso mediante autenticación JWT y roles.
 
 ### 1.3 Usuarios y roles
@@ -62,7 +63,7 @@ La UPT Bolívar necesita generar horarios académicos semanales para sus Program
 | RF-07 | Registro de disponibilidad horaria del docente (franjas DISPONIBLE / NO_DISPONIBLE / PREFERENCIA). | Fase 3 |
 | RF-08 | Registro de habilitaciones docente–materia con nivel (BASICO..ESPECIALISTA). | Fase 3 |
 | RF-09 | Defensa en 3 niveles al eliminar una habilitación asociada a lecciones (validación previa, bloqueo en periodo ACTIVO con sugerencia de `fecha_hasta`, inactivación de lecciones en PLANIFICACION). | Fase 3 |
-| RF-10 | Visualización semanal de horarios (Lunes–Viernes, 07:00–18:30) en FullCalendar. | Fase 4 |
+| RF-10 | Visualización semanal de horarios (Lunes–Viernes, 07:00–18:30) en grilla nativa por bandas de bloque. | Fase 4 |
 | RF-11 | Drag & drop de eventos con validación previa (`POST /api/schedules/validate-move`). | Fase 4 |
 | RF-12 | Filtros de horario por aula, docente o grupo. | Fase 4 |
 | RF-13 | Generación automática de horarios con OR-Tools CP-SAT (`POST /api/schedules/generate`, 202 Accepted). | Fase 5 |
@@ -104,7 +105,7 @@ flowchart TD
         R --> P2[Dashboard]
         R --> P3[Docentes + Disponibilidad + Habilitaciones]
         R --> P4[Materias / Aulas / Lecciones]
-        R --> P5[Horarios FullCalendar]
+        R --> P5[Horarios — Grilla Nativa]
         QK[TanStack Query] --> P3
         QK --> P4
         QK --> P5
@@ -131,8 +132,8 @@ flowchart TD
 |---|---|---|---|
 | Generación de horarios | Algoritmo greedy/heurístico propio | Google OR-Tools CP-SAT | Solver probado para problemas de asignación (timetabling), restricciones duras/blancas expresables declarativamente. |
 | Ejecución de la generación | Síncrona en el request | Asíncrona (`BackgroundTasks`) con 202 Accepted | La generación puede tardar 10–60 s; no debe bloquear la API. |
-| Vista de calendario | Tabla HTML propia | FullCalendar `timeGridWeek` | Componente maduro con drag & drop e interacciones listas. |
-| Vista de recursos (aulas en paralelo) | Plugin Premium `@fullcalendar/resource-timegrid` (licencia comercial) | Vista custom multi-instancia (una columna `<FullCalendar>` por aula) | Se evita la licencia Premium; reutiliza `eventContent`/`eventDrop`/`eventClick` existentes; limitación: drag & drop solo intra-columna (cambio de aula vía modal de edición). |
+| Vista de calendario | FullCalendar `timeGridWeek` | Tabla nativa por bandas de bloque (`GridSemanalBloques`) | FullCalendar eliminado en E18. La grilla nativa usa DnD HTML5 puro, resolución exacta de celda→bloque, spans de extensión x2, y冲突检测 en tiempo real. Sin dependencias de terceros para el calendario. |
+| Vista de recursos (aulas en paralelo) | Plugin Premium `@fullcalendar/resource-timegrid` (licencia comercial) | Grilla nativa por bandas de bloque (`GridSemanalBloques`) con DnD HTML5 | FullCalendar eliminado en E18. La grilla nativa usa DnD HTML5 puro, resolución exacta de celda→bloque, spans de extensión x2, y conflictos en tiempo real. Sin dependencias de terceros para el calendario. |
 | Validación de reglas | Solo en el solver | Solver + triggers PL/pgSQL | Defensa en profundidad: el solver genera soluciones válidas y la BD rechaza violaciones directas (p. ej., cambios manuales por SQL). |
 | Gestión de esquema | `Base.metadata.create_all` | Alembic + scripts SQL versionados | Control de versiones del esquema y actualizaciones incrementales. |
 
@@ -306,7 +307,7 @@ erDiagram
 |---|---|---|
 | `usuarios` | Autenticación y roles | Rol: ADMIN, JEFE-PNF, DOCENTE, LECTOR. |
 | `docentes` | Docentes del plantel | `carga_maxima` (1–60), relación 1:1 con usuario vía `usuario_id`. |
-| `materias` | Materias del PNF | `color_hex` usado por FullCalendar. |
+| `materias` | Materias del PNF | `color_hex` usado por la grilla nativa. |
 | `aulas` | Espacios físicos/virtuales | Tipos: AULA, LABORATORIO, AUDITORIO, TALLER, VIRTUAL. |
 | `bloques_horarios` | Franjas temporales por sede y día | `dia_semana` 1=Lunes..7=Domingo, duración 30/45/60/90/120 min. |
 | `grupos` | Secciones de estudiantes | Vinculados a trayecto, sede, periodo y división (turno). `division` (MATUTINO/VESPERTINO/NOCTURNO) restringe la ventana de bloques asignables. |
@@ -408,7 +409,7 @@ sequenceDiagram
 | GET | `/schedules/pre-generation-check?periodo_id=` | Autenticado | Checklist de prerequisitos para generar (E2). |
 | GET | `/schedules/versions?periodo_id=` | Autenticado | Lista versiones de horario del periodo (E4). |
 | POST | `/schedules/restore` | ADMIN/JEFE-PNF | Restaura versión de horario (ACTIVO actual→HISTORICO, objetivo→ACTIVO) (E4). |
-| GET | `/schedules/fullcalendar?periodo_id=` | Autenticado | Horarios en formato FullCalendar. |
+| GET | `/schedules/fullcalendar?periodo_id=` | Autenticado | Horarios en formato eventos (backend calcula start/end/día; frontend renderiza en grilla nativa). |
 | POST | `/schedules/validate-move` | ADMIN/JEFE-PNF | Valida movimiento drag & drop. |
 | PUT/DELETE/GET | `/schedules/{horario_id}` y `/schedules/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Gestión manual de horarios generados. |
 | CRUD | `/configuraciones/` | Escritura: ADMIN; Lectura: autenticados | Parámetros del sistema (solver). |
@@ -500,18 +501,25 @@ frontend/
 │   │   ├── schedule.js         # Generación, fullcalendar, validate-move, CRUD
 │   │   └── docents.js, subjects.js, aulas.js, grupos.js, lecciones.js,
 │   │       periodos.js, bloques.js, sedes.js, disponibilidades.js,
-│   │       habilitaciones.js, trayectos.js, endpoints.js (sin usar)
+│   │       habilitaciones.js, trayectos.js
 │   ├── components/
 │   │   ├── layout/MainLayout.jsx        # Sidebar + Header + Outlet
 │   │   └── docentes/DocenteDisponibilidad.jsx, DocenteHabilitaciones.jsx
+│   ├── features/                 # Arquitectura por dominios (E14+)
+│   │   ├── schedule/             # Horarios: hooks, utils, componentes
+│   │   ├── planning/             # Lecciones: hooks, utils, schemas
+│   │   ├── bloques/              # Bloques Horarios: hooks, utils, componentes
+│   │   └── aulas/                # Aulas+Sedes: hooks, utils, schemas, componentes (E22)
 │   ├── pages/                  # Login, Dashboard, Docentes, Materias, Aulas,
-│   │                           # Lecciones, Horarios, Settings, ScheduleManager
+│   │                           # Lecciones, Horarios, BloquesHorarios, Settings, Configuracion
 │   ├── routes/                 # AppRouter.jsx + ProtectedRoute.jsx
-│   ├── hooks/                  # useAuth.js, useSchedule.js
+│   ├── hooks/                  # useAuth.js, useSchedule.js, useGenerationPolling.js
 │   ├── context/AuthContext.jsx
-│   └── utils/dateFormatters.js
+│   ├── types/                  # schedule.d.ts (ambiente global, E15)
+│   └── utils/                  # dateFormatters.js, errors.js, jwt.js, + __tests__/
 ├── src/styles/index.css        # Tailwind
 ├── tailwind.config.js
+├── tsconfig.json               # strict:false, noEmit:true, moduleResolution:"bundler"
 └── vite.config.js
 ```
 
@@ -523,7 +531,7 @@ frontend/
 | `/dashboard` | Dashboard | Sí |
 | `/docentes` | Docentes (3 tabs: CRUD, Disponibilidad, Habilitaciones) | Sí |
 | `/materias`, `/aulas`, `/lecciones` | CRUDs | Sí |
-| `/horarios` | FullCalendar + generación | Sí |
+| `/horarios` | Grilla nativa por bandas de bloque + generación | Sí |
 | `/configuracion` | Settings (placeholder) | Sí |
 
 ### 6.3 Patrón de datos (TanStack Query + Modo Demo)
@@ -554,17 +562,21 @@ const { items, total, totalPages, page, setPage } = usePaginatedQuery(
 - Si el `useQuery` falla → se activa `demoMode` con datos `MOCK_*` persistidos en `localStorage` y banner "Modo Demo" con botón de reconexión.
 - Toda mutación invalida la caché: `queryClient.invalidateQueries({ queryKey: [...] })`.
 
-### 6.4 Módulo de Horarios (FullCalendar)
+### 6.4 Módulo de Horarios (Grilla Nativa)
 
-**Archivo:** `src/pages/Horarios.jsx` (≈1147 líneas).
+**Archivos clave:**
+- `src/pages/Horarios.jsx` (≈649 líneas): orquestador, estados, queries, handlers (E16)
+- `src/features/schedule/` (E14/E16/E18/E20): grilla, hooks, utils, demoData, componentes
 
-- Vista `timeGridWeek`, localización `es`, `weekends: false`, franja 07:00–18:30.
-- **Mapeo de datos:** el backend (`get_horarios_para_calendario`) transforma `HorarioGenerado` + joins en `FullCalendarEvent { id, title, start, end, resourceId, extendedProps }`. La fecha del evento se calcula como `lunes_base = fecha_inicio_periodo - weekday(fecha_inicio_periodo)` y se desplaza según `dia_semana`, evitando proyectar clases en fines de semana. Desde 2026-08-24 `extendedProps` incluye además las claves `grupo_id`, `docente_id`, `aula_id` y `division` (labels en el query; sin cambios de schema), que el frontend usa para filtrar por IDs reales y resolver la ventana horaria de la grilla según el turno del grupo.
-- **Drag & drop:** al soltar un evento se busca el bloque más cercano (≤45 min de diferencia), se llama a `validate-move` y, si hay conflicto, se hace `revert()` y se muestra el error.
-- **Filtros (2026-08-24):** vista por filtros con segmented control `[Grupos|Docentes|Aulas]`, grupos por defecto; sin opción "todos". La grilla es única y su ventana horaria dinámica: grupo → `ventana_{division}` de `configuracion` (fallback estándar del turno); docente/aula o grupo sin división → jornada general (`hora_inicio_jornada`–`hora_fin_jornada`). Helper puro: `resolveVentanaGrilla` (`frontend/src/features/schedule/utils/schedule.js`). La vista por columnas de aulas fue eliminada.
-- **Movimientos restringidos por división (2026-08-25):** `validate_move` rechaza con `FUERA_VENTANA_DIVISION` cualquier bloque objetivo que no quepa COMPLETO dentro de la ventana del turno del grupo (`ventana_{division}` de `configuracion`; misma regla del solver en `or_tools_adapter`). Sin división válida o sin config no restringe (jornada global). El frontend replica la regla en cliente antes de llamar a la API (`useDragDropValidation.aplicarMovimiento`, helpers `resolveVentanaTurno`/`bloqueDentroVentana`) y el modal de edición solo lista bloques dentro de la ventana.
+- **Grilla nativa por bandas de bloque** (`GridSemanalBloques`): tabla HTML, sin FullCalendar. Franjas de bloque como bandas horizontales, días como columnas, celdas coloreadas por sede (`bg-[sede.color_hex]`). Spans de extensión x2 para lecciones de 2 horas.
+- **Drag & Drop HTML5:** `dragstart`/`dragover`/`drop` nativos. Doble verificación: `resolveBloquePorPosicion` (cliente, 15 min) + `resolveBloqueExacto` (cliente, resolución exacta). Resolución exacta por día+sede. Feedback visual (borde punteado, spinner).
+- **Filtros (2026-08-24/25):** sin opción "todos" ni columnas por aulas; segmented `[Grupos|Docentes|Aulas]` con grupos por defecto. Semana plantilla: sin navegación ni vista día, cabeceras solo LUNES…VIERNES; eje de tiempo con rangos de bloque (`etiquetasRangoBloques`). La grilla adapta su ventana vía `resolveVentanaGrilla` (grupo → `ventana_{division}` de `configuracion`; docente/aula → jornada general).
+- **Movimientos restringidos por división (2026-08-25):** `validate_move` rechaza con `FUERA_VENTANA_DIVISION` cualquier bloque objetivo que no quepa COMPLETO dentro de la ventana del turno del grupo. El frontend replica la regla en cliente antes de llamar a la API (`useDragDropValidation.aplicarMovimiento`, helpers `resolveVentanaTurno`/`bloqueDentroVentana`).
+- **Mapeo de datos:** el backend (`get_horarios_para_calendario`) transforma `HorarioGenerado` + joins en `FullCalendarEvent { id, title, start, end, extendedProps }`. La fecha del evento se calcula como `lunes_base = fecha_inicio_periodo - weekday(fecha_inicio_periodo)` y se desplaza según `dia_semana`, evitando proyectar clases en fines de semana. `extendedProps` incluye `grupo_id`, `docente_id`, `aula_id` y `division` (labels en el query; sin cambios de schema).
+- **Edición rica de eventos (E20):** `EditEventModal` con spans 1-2 bloques (`resolvedSpans`), borrado rápido (`FastDeleteButton`), asignación manual (`AsignarManualButton`). El botón "Eliminar" en `VersionPanel` fue eliminado.
 - **Selector de periodo:** cambia los eventos y navega con `api.gotoDate(fecha_inicio)`.
-- **Generación:** botón "Generación Inteligente" → `POST /api/schedules/generate` → **polling reactivo** (hasta 10 intentos cada 3 s sobre `refetchHorarios()`) → actualización automática del calendario e invalidación de caché.
+- **Generación:** botón "Generación Inteligente" → `POST /api/schedules/generate` → **polling reactivo** (`useGenerationPolling` en `hooks/`) con `onStatus`/`onSettled` callbacks.
+- **Impresión:** `@page margin:0` + clases `no-print` que colapsan todo lo que no es la tabla.
 
 ```mermaid
 sequenceDiagram
@@ -577,15 +589,21 @@ sequenceDiagram
     H->>A: POST /api/schedules/generate?periodo_id
     A->>B: request
     B-->>A: 202 Accepted (tarea en background)
-    loop Polling (10 intentos x 3 s)
-        H->>Q: refetchHorarios()
-        Q->>A: GET /api/schedules/fullcalendar?periodo_id
+    loop Polling (useGenerationPolling)
+        H->>A: GET /api/schedules/generation-status?periodo_id
         A->>B: request
-        B-->>A: eventos
-        A-->>Q: data
-        Q-->>H: eventos > 0 ?
+        B-->>A: PENDING/DONE/FAILED
+        A-->>H: status
+        alt DONE
+            H->>Q: invalidateQueries(['horarios'])
+            Q->>A: GET /api/schedules/fullcalendar?periodo_id
+            A->>B: request
+            B-->>A: eventos
+            A-->>Q: data
+            Q-->>H: grilla actualizada
+        end
     end
-    H-->>U: Calendario actualizado + toast de éxito
+    H-->>U: Grilla nativa actualizada + toast de éxito
 ```
 
 ### 6.5 Gestión de disponibilidad y habilitaciones
@@ -617,9 +635,9 @@ sequenceDiagram
 
 ### 8.1 Estado actual
 
-- **Backend (E9):** suite `pytest`/`httpx` en `backend/tests/` con **46 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible), cálculo `lunes_base` y smoke de API. **Sin** BD Postgres ni triggers PL/pgSQL.
-- **Frontend (E10):** suite **vitest** con **54 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `findNearestBloque`, `filterEvents`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`) y los hooks `useGenerationPolling` (fake timers + servicio mock), `useScheduleGeneration` y `useDragDropValidation` (ciclos demo/real, toasts, rollback por `revert()`, estado del modal).
-- La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a FullCalendar).
+- **Backend (E9):** suite `pytest`/`httpx` en `backend/tests/` con **69 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible), cálculo `lunes_base`, smoke de API y validaciones de CRUD. **Sin** BD Postgres ni triggers PL/pgSQL.
+- **Frontend (E22):** suite **vitest** con **198 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `filterEvents`, `resolveVentanaGrilla`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`, `horaCompleta`, `calcularFin`, `generarSimulacionDemo`, `calcularEstadisticas`), hooks (`useGenerationPolling`, `useScheduleGeneration`, `useDragDropValidation`), y utilidades de planning/schedule/bloques/aulas. Tests en `src/utils/__tests__/`, `src/hooks/__tests__/`, `src/features/schedule/__tests__/`, `src/features/bloques/__tests__/` y `src/features/aulas/__tests__/`.
+- La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a la grilla nativa).
 
 ### 8.2 Estrategia recomendada
 
@@ -679,32 +697,36 @@ npm run dev    # http://localhost:3000
 
 | Prioridad | Problema | Estado |
 |---|---|---|
-| 🔴 Alta | Generación sin resultados visibles si el frontend quedó en Modo Demo o los triggers dejan campos `NULL`. | Resuelto (Fix idempotencia + Fix sede + Fix disponibilidad + polling reactivo). |
-| 🟡 Media | Dashboard con estadísticas estáticas (hardcodeadas) y botón "Generar Horario" sin `onClick`. | Pendiente. |
-| 🟡 Media | No hay página de gestión de periodos académicos en el frontend. | Pendiente. |
-| 🟡 Media | `Settings.jsx` es un placeholder vacío. | Pendiente. |
-| 🟢 Baja | `Horarios.jsx` de ~1147 líneas (refactorizar a `features/`). | Pendiente. |
-| 🟢 Baja | Proyecto en JS (sin TypeScript). | Pendiente. |
-| 🟢 Baja | Sin exportación PDF/iCal, sin modo oscuro. Vista de recursos: **✅ Implementada (E8, custom).** | Pendiente. |
+| ✅ | Todos los bugs conocidos anteriores están resueltos (E0–E21). | Resuelto |
+| 🟡 Media | `status_tracker.py` en memoria se pierde al reiniciar el proceso. | Pendiente (aceptable para 1 worker) |
+| 🟡 Media | `SDD.md` y `fronted_guia.md` pueden estar parcialmente desactualizados. | Revisar periódicamente |
 
 ### 10.2 Roadmap priorizado
 
 1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
-2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4):** endpoints `GET /schedules/versions` y `POST /schedules/restore`.
+2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4+E4b).**
 3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
-4. **Vista de recursos** en FullCalendar. **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna (un `<FullCalendar>` por aula, scroll horizontal) sin plugin Premium (`@fullcalendar/resource-timegrid` es comercial). `timeGridWeek` sigue siendo la vista por defecto.
-5. **Paginación server-side** en todos los endpoints CRUD. **✅ Implementado:** schema `PaginatedResponse[T]`, búsqueda `ILIKE`, filtro `sede_id` en bloques, hook `usePaginatedQuery` en frontend.
-6. **Dashboard dinámico** con datos reales y gráficas.
-7. **Módulo de configuración** conectado a `/api/configuraciones/`.
+4. **Vista de recursos** (aulas en paralelo). **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna. **Reemplazada (E18):** la grilla nativa por bandas de bloque reemplazó FullCalendar completamente.
+5. **Paginación server-side** en todos los endpoints CRUD. **✅ Implementado:** schema `PaginatedResponse[T]`, búsqueda `ILIKE`, hook `usePaginatedQuery`.
+6. **Dashboard dinámico** con datos reales y gráficas. **✅ Implementado (E6+E11):** stats reales + analytics de carga docente/distribución materias/conflictos.
+7. **Módulo de configuración** conectado a `/api/configuraciones/`. **✅ Implementado (E7).**
+8. **Exportación PDF/iCal.** **✅ Implementado (E12).**
+9. **Modo Oscuro.** **✅ Implementado (E13).**
+10. **Tipado TypeScript/JSDoc.** **✅ Implementado (E15):** .d.ts ambient types + JSDoc + 6 archivos .ts puros.
+11. **Extracción de features.** **✅ Implementado (E14+E16+E21):** `features/schedule/`, `features/planning/`, `features/bloques/`.
+12. **Grilla nativa sin FullCalendar.** **✅ Implementado (E18):** tabla por bandas con DnD HTML5.
+13. **Edición rica de eventos.** **✅ Implementado (E20):** spans 1-2 bloques, borrado rápido, asignación manual.
+14. **Extracción de Aulas.jsx.** **✅ Implementado (E22):** `features/aulas/` con hooks, utils, schemas, 9 componentes, barrel. Page reducida de 1077→235 líneas.
 
 ### 10.3 Riesgos técnicos
 
 | Riesgo | Mitigación |
 |---|---|
-| Tiempo de resolución del solver crece con el número de lecciones. | Ejecución asíncrona; futura vista de estado con polling/WebSocket. |
+| Tiempo de resolución del solver crece con el número de lecciones. | Ejecución asíncrona (E1): tracker en memoria + polling en frontend (E3). |
 | Dependencia de triggers PL/pgSQL para integridad. | Los campos calculados se documentan en el modelo; el CRUD omite registros incompletos con `continue`. |
-| Secretos y credenciales con valores por defecto. | Inyectar vía variables de entorno en producción. |
-| Monolito `Horarios.jsx` difícil de mantener. | Refactor progresivo a hooks y utilidades dedicadas. |
+| Secretos y credenciales con valores por defecto. | Inyectar vía variables de entorno en producción; `RuntimeError` si `ENTORNO=production` sin `SECRET_KEY`. |
+| `Horarios.jsx` (~649 líneas) sigue siendo el orquestador principal. | Lógica/UI extraída a `features/schedule/` (E14/E16/E20); pendiente: extraer selector de periodo y handler de generación. |
+| `status_tracker` en memoria se pierde al reiniciar el proceso. | Aceptable (1 worker); mejorable a futuro con tabla de log. |
 
 ---
 
