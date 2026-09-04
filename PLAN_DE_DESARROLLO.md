@@ -82,6 +82,8 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 
 **Bugfix (generación, 2026-08-09):** la generación fallaba con `FAILED` cuando una lección pertenecía a una sede sin aulas (p. ej. sede 4 "Espacio Virtual"). El solver solo exigía `aula.sede_id == bloque.sede_id`; al insertar, el trigger `fn_validar_sede_horario` rechazaba la asignación (`Inconsistencia de sede: Aula(1), Bloque(1), Lección(4)`) y además el archivado previo ocurría en un commit separado que dejaba el periodo sin versión ACTIVO. Corregido en `or_tools_adapter.py`: (1) el solver ahora respeta la sede tripartita `aula == bloque == lección` (`COALESCE(sede_forzada, grupo.sede)`); (2) archivado + inserción son una sola transacción (commit único), un fallo ya no pierde el horario ACTIVO anterior. Se añadió `lecciones_sin_candidatos` al pre-generation-check y los toasts de error/warning duran más en la UI. **Verificado E2E:** generación OPTIMAL y fila `ACTIVO` insertada sin rechazo del trigger.
 
+- ✅ **E21 — Extracción de BloquesHorarios.jsx a features/bloques/ (2026-09-04):** `BloquesHorarios.jsx` (1039 → 192 líneas, reducción del 81.5%). Nueva feature `src/features/bloques/` con: `demoData.js` (MOCK_SEDES, MOCK_BLOQUES), `schemas.js` (bloqueSchema zod, DIAS_NOMBRES, DURACIONES_VALIDAS), `utils/bloques.js` (horaCompleta, calcularFin, generarSimulacionDemo), `hooks/useBloquesCrud.js` (CRUD dual real+demo, paginación, toast), 6 componentes UI (BloquesStatsCards, BloquesFilterBar, BloquesTable, BloqueFormModal, ConfirmActionModal, GenerarGrillaModal), barrel `index.js`, 14 tests en `__tests__/bloques.test.js`. Vitest **178 passed** (+14), `pnpm build` OK.
+
 ---
 
 # Ejecuciones
