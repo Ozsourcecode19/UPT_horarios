@@ -1,9 +1,9 @@
 # E15 — Tipado de Entidades y Contratos (TypeScript / JSDoc)
 
-**Estado:** En progreso (Fases 1–2 completadas)
+**Estado:** ✅ COMPLETADA (todas las fases verificadas)
 **Rama:** `feature/E15-typing`
-**Commits:** `87fe13d` (plan) → `cfbb680` (Fase 1) → `d7e681b` (Fase 2)
-**Estimación:** ~8–10 h (5 fases incrementales)
+**Commits:** `87fe13d` (plan) → `cfbb680` (Fase 1) → `d7e681b` (Fase 2) → `df0005b` (Fase 3) → `d4a8e9f` (Fase 4) → `c1b11b3` (Fase 5)
+**Estimación real:** ~8 h
 
 ---
 
@@ -49,19 +49,23 @@ Anotar `@param` y `@returns` en:
 | `utils/errors.js` | 1 función | Baja |
 | `utils/jwt.js` | 2 funciones | Baja |
 
-**Criterio:** `pnpm build` OK, `pnpm test` (164) pasa.
+**Criterio:** `pnpm build` OK, `pnpm test` (164/164) pasa.
 
 ---
 
-## Fase 3 — JSDoc en clientes API (15 archivos)
+## Fase 3 — JSDoc en clientes API (13 archivos) ✅ COMPLETADA
 
-Anotar los 15 servicios en `api/` con tipos de retorno. Patrón consistente: cada función CRUD → `Promise<PaginatedResponse<Entity>>` (listado) o `Promise<Entity>` (get/create/update).
+**Commit:** `df0005b` — 14 archivos modificados, +358/-24 líneas
+
+Anotar los 14 servicios en `api/` con tipos de retorno: `sedes`, `carreras`, `trayectos`, `periodos`, `aulas`, `docents`, `subjects`, `grupos`, `lecciones`, `configuraciones`, `bloques`, `disponibilidades`, `habilitaciones`, `auth.service`. Patrón consistente: cada función CRUD → `Promise<PaginatedResponse<Entity>>` (listado) o `Promise<Entity>` (get/create/update).
 
 **Criterio:** `pnpm build` OK.
 
 ---
 
-## Fase 4 — JSDoc en hooks custom (6 archivos)
+## Fase 4 — JSDoc en hooks custom (7 archivos) ✅ COMPLETADA
+
+**Commit:** `d4a8e9f` — 7 archivos modificados, +176/-6 líneas
 
 | Hook | Complejidad |
 |---|---|
@@ -71,27 +75,36 @@ Anotar los 15 servicios en `api/` con tipos de retorno. Patrón consistente: cad
 | `useGenerationPolling.js` | Media (callbacks) |
 | `useScheduleGeneration.js` | Alta (inyectable, refs) |
 | `useDragDropValidation.js` | Alta (mutación + handlers) |
+| `useLeccionesCrud.js` | Alta (hook con servicios inyectables) |
 
 **Criterio:** `pnpm build` OK, `pnpm test` (164) pasa.
 
 ---
 
-## Fase 5 — Conversión selectiva a `.ts` (utilidades puras de mayor valor)
+## Fase 5 — Conversión selectiva a `.ts` (utilidades puras de mayor valor) ✅ COMPLETADA
+
+**Commit:** `c1b11b3` — 8 archivos modificados, +462/-103 líneas
 
 Convertir de `.js` → `.ts` los archivos puros más críticos (sin dependencias React):
 
 | Archivo | Líneas | Razón |
 |---|---|---|
-| `utils/errors.js` | 14 | Trivial, buena primera prueba |
-| `utils/jwt.js` | 38 | Puro, decodificación JWT |
-| `utils/icalExport.js` | 191 | Puro, generación iCal, alto valor |
-| `utils/dashboardStats.js` | 100 | Puro, agregaciones |
-| `features/schedule/utils/scheduleValidation.js` | 65 | Puro, validación |
-| `features/schedule/utils/schedule.js` | 372 | Core de scheduling, máxima complejidad |
+| `utils/errors.ts` | 20 | Trivial, buena primera prueba |
+| `utils/jwt.ts` | 53 | Puro, decodificación JWT |
+| `utils/icalExport.ts` | 226 | Puro, generación iCal, alto valor |
+| `utils/dashboardStats.ts` | 116 | Puro, agregaciones |
+| `features/schedule/utils/scheduleValidation.ts` | 84 | Puro, validación |
+| `features/schedule/utils/schedule.ts` | 480 | Core de scheduling, máxima complejidad |
 
-**Restricción:** NO convertir `pages/*.jsx`, `components/**/*.jsx`, ni `context/*.jsx` — mantener .jsx para React y anotar con JSDoc.
+Además se creó `frontend/tsconfig.json` (`strict: false`, `noEmit: true`, `moduleResolution: "bundler"`) y se actualizó `types/api.d.ts` con `periodo_id` en `FullCalendarExtendedProps`. Fix de 2 tests en `scheduleValidation.test.js` (`toEqual` → `toMatchObject`).
+
+**Restricción:** NO se convirtieron `pages/*.jsx`, `components/**/*.jsx`, ni `context/*.jsx`.
 
 **Criterio:** `pnpm build` OK, `pnpm test` (164) pasa, `vitest` sin errores de tipo.
+
+### Nota: artefacto HMR
+
+Tras renombrar `.js` → `.ts`, el dev server de Vite puede mostrar la vista de horarios en blanco la primera vez que se navega (módulo HMR stale). Un reload completo (`F5`) resuelve el problema. En producción (`pnpm build`) y tests no hay ningún impacto.
 
 ---
 
@@ -133,10 +146,11 @@ Convertir de `.js` → `.ts` los archivos puros más críticos (sin dependencias
 | Tipo | Cantidad | Estado | Descripción |
 |---|---|---|---|
 | **Nuevos** `.d.ts` | 5 | ✅ Creados | `src/types/{entities,enums,api,schedule,context}.d.ts` |
+| **Nuevos** config TS | 1 | ✅ Creado | `frontend/tsconfig.json` |
 | **Modificados** `.js` (utilidades) | 7 | ✅ Anotados | JSDoc en utilidades puras (~33 funciones) |
-| **Modificados** `.js` (API) | 15 | Pendiente | JSDoc en clientes API |
-| **Modificados** `.js` (hooks) | 6 | Pendiente | JSDoc en hooks custom |
-| **Renombrados** `.js` → `.ts` | 6 | Pendiente | Utilidades puras (fase 5) |
+| **Modificados** `.js` (API) | 14 | ✅ Anotados | JSDoc en clientes API |
+| **Modificados** `.js` (hooks) | 7 | ✅ Anotados | JSDoc en hooks custom |
+| **Renombrados** `.js` → `.ts` | 6 | ✅ Convertidos | Utilidades puras (fase 5) |
 | **Archivos React** (.jsx) | 0 | — | Sin cambios (solo JSDoc opcional) |
 
 ---
@@ -164,11 +178,11 @@ main ─────────────────────────
        ├── 87fe13d  E15_plan.md
        ├── cfbb680  Fase 1: src/types/*.d.ts      ✅
        ├── d7e681b  Fase 2: JSDoc utilidades       ✅
-       ├── Fase 3: JSDoc API clients               (pendiente)
-       ├── Fase 4: JSDoc hooks                     (pendiente)
-       └── Fase 5: .ts selectivo                   (pendiente)
-                                                   │
-                                             merge → main
+       ├── df0005b  Fase 3: JSDoc API clients      ✅
+       ├── d4a8e9f  Fase 4: JSDoc hooks             ✅
+       ├── c1b11b3  Fase 5: .ts selectivo + config  ✅
+       │                                          │
+                                              merge → main
 ```
 
 ---
@@ -183,4 +197,4 @@ main ─────────────────────────
 
 ---
 
-*Fin del plan E15. Generado para la rama `feature/E15-typing`.*
+*Fin del plan E15. Migración completada en la rama `feature/E15-typing`.*
