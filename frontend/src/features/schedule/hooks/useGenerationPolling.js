@@ -9,6 +9,21 @@ import ScheduleService from '../../../api/schedule';
 export const MAX_ATTEMPTS = 10;
 export const POLL_INTERVAL_MS = 3000;
 
+/**
+ * Ciclo de polling sobre GET /schedules/generation-status.
+ * Llama a `onStatus` en cada intento y `onSettled` al finalizar.
+ * @param {object} params
+ * @param {typeof ScheduleService} [params.scheduleService] - Servicio de API inyectable (para testing)
+ * @param {number} [params.intervalMs=3000] - Intervalo entre intentos en ms
+ * @param {number} [params.maxAttempts=10] - Máximo de intentos antes de TIMEOUT
+ * @param {(texto: string, status: import('../../types/api').GenerationStatus, attempt: number) => void} [params.onStatus] - Callback por cada intento
+ * @param {(resultado: { tipo: 'DONE' | 'FAILED' | 'PENDING_TIMEOUT' | 'ERROR', status?: import('../../types/api').GenerationStatus, error?: Error, attempts: number }) => void} [params.onSettled] - Callback al finalizar el polling
+ * @returns {{
+ *   start: (periodoId: number) => void,
+ *   stop: () => void,
+ *   pollRef: React.MutableRefObject<ReturnType<typeof setInterval> | null>,
+ * }}
+ */
 export const useGenerationPolling = ({
   scheduleService = ScheduleService,
   intervalMs = POLL_INTERVAL_MS,
