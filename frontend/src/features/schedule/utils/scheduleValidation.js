@@ -2,6 +2,18 @@
 // Logica pura de validacion de movimientos en Modo Demo, extraida de Horarios.jsx (E10).
 // Replica (de forma local) los mismos error_code que devuelve validate_move en el backend.
 
+/**
+ * Valida un movimiento de horario en Modo Demo (réplica local de validate_move).
+ * @param {object} params
+ * @param {number} params.horarioId - ID del horario a mover
+ * @param {number} params.nuevoBloqueId - ID del bloque destino
+ * @param {number} params.nuevaAulaId - ID del aula destino
+ * @param {import('../../../types/api').FullCalendarEvent[]} params.eventosDemo - Eventos actuales en demo
+ * @param {import('../../../types/entities').Aula[]} params.aulas - Catálogo de aulas
+ * @param {import('../../../types/entities').BloqueHorario[]} params.bloques - Catálogo de bloques
+ * @param {number} params.periodoId - ID del periodo activo
+ * @returns {import('../../../types/api').ValidationResult}
+ */
 export const validateMoveMock = ({
   horarioId,
   nuevoBloqueId,

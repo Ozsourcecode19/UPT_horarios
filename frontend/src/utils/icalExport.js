@@ -15,7 +15,11 @@ const PRODID = '-//UPT Bolivar//Sistema de Horarios//ES';
 
 // --- Utilidades de formato ---
 
-// Escapa texto para propiedades ICS (RFC 5545 §3.3.11).
+/**
+ * Escapa texto para propiedades ICS (RFC 5545 §3.3.11).
+ * @param {string} texto
+ * @returns {string}
+ */
 export const escaparICal = (texto) =>
   String(texto ?? '')
     .replace(/\\/g, '\\\\')
@@ -23,8 +27,11 @@ export const escaparICal = (texto) =>
     .replace(/,/g, '\\,')
     .replace(/\r?\n/g, '\\n');
 
-// Plega líneas que exceden 75 caracteres: cada continuación empieza con un
-// espacio (RFC 5545 §3.1). Se usa margen de 74 para contenido no-ASCII.
+/**
+ * Plega líneas que exceden 75 caracteres (RFC 5545 §3.1).
+ * @param {string} linea
+ * @returns {string}
+ */
 export const plegarLinea = (linea) => {
   if (!linea || linea.length <= 75) return linea ?? '';
   const partes = [linea.slice(0, 75)];
@@ -36,8 +43,11 @@ export const plegarLinea = (linea) => {
   return partes.join(CRLF);
 };
 
-// Parsea "YYYY-MM-DDTHH:MM[:SS]" como hora de Caracas y devuelve Date UTC.
-// Ignora cualquier zona del string: los ISO del backend son hora pared Caracas.
+/**
+ * Parsea "YYYY-MM-DDTHH:MM[:SS]" como hora de Caracas y devuelve Date UTC.
+ * @param {string} isoLocal
+ * @returns {Date | null}
+ */
 export const parsearHoraCaracas = (isoLocal) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(isoLocal ?? ''));
   if (!m) return null;
@@ -45,7 +55,11 @@ export const parsearHoraCaracas = (isoLocal) => {
   return new Date(Date.UTC(+y, +mes - 1, +d, +h + OFFSET_CARACAS_HORAS, +mi, +(s ?? 0)));
 };
 
-// Formatea un Date como "YYYYMMDDTHHMMSSZ" (UTC form #2 de RFC 5545).
+/**
+ * Formatea un Date como "YYYYMMDDTHHMMSSZ" (UTC form #2 de RFC 5545).
+ * @param {Date} date
+ * @returns {string}
+ */
 export const formatearUTC = (date) => {
   if (!date || isNaN(date.getTime())) return '';
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -85,8 +99,19 @@ const slugBase = (texto) =>
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
 
+/**
+ * Slug seguro para nombres de archivo (sin acentos ni símbolos).
+ * @param {string} texto
+ * @returns {string}
+ */
 export const slugArchivo = (texto) => slugBase(texto) || 'horario';
 
+/**
+ * Genera el nombre del archivo de exportación (.ics).
+ * @param {string} periodoNombre - Nombre del periodo académico
+ * @param {string} filtroDescripcion - Descripción legible del filtro activo
+ * @returns {string} Nombre de archivo (ej. "horario-2026-i-matutino.ics")
+ */
 export const nombreArchivoExport = (periodoNombre, filtroDescripcion) => {
   // Las partes vacías no generan segmentos (evita "horario-horario.ics").
   const partes = [slugBase(periodoNombre), slugBase(filtroDescripcion)].filter(Boolean);
@@ -95,11 +120,14 @@ export const nombreArchivoExport = (periodoNombre, filtroDescripcion) => {
 
 // --- Generador principal ---
 
-// genera el contenido completo del calendario .ics.
-// - eventos: listado FullCalendar (con extendedProps del backend)
-// - periodo: { nombre?, fecha_fin? } acota la repetición semanal (UNTIL)
-// - filtroDescripcion: descripción legible del filtro activo (para el nombre
-//   del calendario); ej. "todos", "Aula: 101", "Docente: Pérez, Juan".
+/**
+ * Genera el contenido completo del calendario .ics.
+ * @param {object} params
+ * @param {import('../types/api').FullCalendarEvent[]} params.eventos - Listado FullCalendar
+ * @param {{ nombre?: string, fecha_fin?: string }} params.periodo - Periodo académico
+ * @param {string} params.filtroDescripcion - Descripción del filtro activo
+ * @returns {string} Contenido ICS completo
+ */
 export const generarICal = ({ eventos, periodo, filtroDescripcion }) => {
   const sesiones = [];
   const vistos = new Map();
@@ -176,8 +204,11 @@ export const generarICal = ({ eventos, periodo, filtroDescripcion }) => {
   return lineas.map(plegarLinea).join(CRLF) + CRLF;
 };
 
-// --- Efecto de descarga (separado del generador puro para poder testearlo) ---
-
+/**
+ * Descarga un archivo .ics en el navegador del usuario.
+ * @param {string} contenido - Contenido ICS generado
+ * @param {string} nombreArchivo - Nombre del archivo a descargar
+ */
 export const descargarICal = (contenido, nombreArchivo) => {
   const blob = new Blob([contenido], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);

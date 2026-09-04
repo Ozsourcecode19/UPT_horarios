@@ -5,10 +5,12 @@
 const HORA_MS = 3.6e6;
 const COLOR_FALLBACK = '#6366f1';
 
-// Convierte los eventos FullCalendar del periodo en carga horaria semanal por docente.
-// Suma la duracion (end - start) de todas sus clases: como cada evento representa
-// una clase semanal recurrente, el total equivale a horas/semana del docente.
-// Devuelve [{ docente, horas }] ordenado de mayor a menor carga.
+/**
+ * Convierte los eventos FullCalendar del periodo en carga horaria semanal por docente.
+ * Suma la duración (end - start) de todas sus clases.
+ * @param {import('../types/api').FullCalendarEvent[]} eventos
+ * @returns {import('../types/schedule').CargaDocente[]} Ordenado de mayor a menor carga
+ */
 export const cargaHorariaPorDocente = (eventos) => {
   const acum = {};
 
@@ -29,8 +31,11 @@ export const cargaHorariaPorDocente = (eventos) => {
     .sort((a, b) => b.horas - a.horas);
 };
 
-// Cuenta las clases por materia usando el color del evento (extendedProps.backgroundColor).
-// Devuelve [{ materia, count, color }] ordenado de mayor a menor numero de clases.
+/**
+ * Cuenta las clases por materia usando el color del evento.
+ * @param {import('../types/api').FullCalendarEvent[]} eventos
+ * @returns {import('../types/schedule').DistribucionMateria[]} Ordenado de mayor a menor
+ */
 export const distribucionPorMateria = (eventos) => {
   const acum = {};
 
@@ -44,10 +49,13 @@ export const distribucionPorMateria = (eventos) => {
   return Object.values(acum).sort((a, b) => b.count - a.count);
 };
 
-// Deriva la salud del periodo a partir del checklist previo a la generacion
-// (GET /schedules/pre-generation-check) y del estado de la ultima generacion
-// (GET /schedules/generation-status; null si nunca se genero / 404).
-// Devuelve { nivel: 'ok'|'warn'|'error'|'sin-datos', total, items }.
+/**
+ * Deriva la salud del periodo a partir del checklist previo a la generación
+ * y del estado de la última generación.
+ * @param {import('../types/api').PreGenerationCheck | null} preCheck
+ * @param {import('../types/api').GenerationStatus | null} generationStatus
+ * @returns {import('../types/schedule').ResumenConflictos}
+ */
 export const resumenConflictos = (preCheck, generationStatus) => {
   const items = [];
   let nivel = 'sin-datos';

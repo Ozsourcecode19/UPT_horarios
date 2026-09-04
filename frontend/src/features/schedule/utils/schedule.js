@@ -2,8 +2,12 @@
 // Logica pura del calendario de horarios, extraida de Horarios.jsx (E10)
 // para poder testearla de forma aislada (vitest).
 
-// Convierte los eventos de la API al formato de color del horario:
-// expone backgroundColor de extendedProps como color real del evento.
+/**
+ * Convierte los eventos de la API al formato de color del horario:
+ * expone backgroundColor de extendedProps como color real del evento.
+ * @param {import('../../../types/api').FullCalendarEvent[]} eventos
+ * @returns {import('../../../types/api').FullCalendarEvent[]}
+ */
 export const mapScheduleEvents = (eventos) => {
   return (eventos || []).map(ev => ({
     ...ev,
@@ -13,18 +17,31 @@ export const mapScheduleEvents = (eventos) => {
   }));
 };
 
-// Minutos desde medianoche a partir de "H:MM[:SS]".
+/**
+ * Convierte una hora "H:MM[:SS]" a minutos desde medianoche.
+ * @param {string} hms - Hora en formato "H:MM" o "HH:MM:SS"
+ * @returns {number} Minutos desde medianoche
+ */
 export const horaAMinutos = (hms) => {
   const partes = String(hms).split(':').map(Number);
   return (partes[0] || 0) * 60 + (partes[1] || 0);
 };
 
+/**
+ * Formatea minutos como "H:MM" (sin cero inicial).
+ * @param {number} min - Minutos desde medianoche
+ * @returns {string}
+ */
 const fmtMinutos = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 
-// Filtra los eventos generados por tipo de vista (grupo/docente/aula).
-// Matcheo primero por IDs reales (extendedProps.grupo_id/docente_id/aula_id,
-// enviados por el backend); si el evento no trae IDs (Modo Demo), cae al
-// matcheo legado por nombre para no romper la simulacion local.
+/**
+ * Filtra los eventos generados por tipo de vista (grupo/docente/aula).
+ * Matchea primero por IDs reales; si el evento no trae IDs (Modo Demo), cae al
+ * matcheo legado por nombre para no romper la simulación local.
+ * @param {import('../../../types/api').FullCalendarEvent[]} eventos
+ * @param {import('../../../types/schedule').FilterOptions} opciones
+ * @returns {import('../../../types/api').FullCalendarEvent[]}
+ */
 export const filterEvents = (eventos, { filterType = 'todos', filterValue = '', docentes = [], grupos = [] }) => {
   return (eventos || []).filter(evento => {
     if (filterType === 'todos' || !filterValue) return true;
@@ -68,7 +85,11 @@ const VENTANAS_TURNO_DEFAULT = {
 
 const DIVISIONES_VALIDAS = Object.keys(VENTANAS_TURNO_DEFAULT);
 
-// Normaliza una hora a 'HH:MM:SS'; devuelve null si es invalida.
+/**
+ * Normaliza una hora a 'HH:MM:SS'; devuelve null si es inválida.
+ * @param {unknown} valor
+ * @returns {string | null}
+ */
 const normalizarHora = (valor) => {
   if (typeof valor !== 'string') return null;
   const parts = valor.split(':').map(Number);
@@ -79,7 +100,11 @@ const normalizarHora = (valor) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-// Extrae { inicio, fin } del valor de una clave ventana_* (objeto JSON o string JSON).
+/**
+ * Extrae { inicio, fin } del valor de una clave ventana_* (objeto JSON o string JSON).
+ * @param {unknown} raw - Valor crudo de la configuración
+ * @returns {import('../../../types/schedule').VentanaTurno | null}
+ */
 const extraerVentanaConfig = (raw) => {
   let obj = raw;
   if (typeof obj === 'string') {
@@ -91,9 +116,13 @@ const extraerVentanaConfig = (raw) => {
   return inicio && fin && fin > inicio ? { inicio, fin } : null;
 };
 
-// Resuelve la ventana [inicio, fin] de un turno concreto (MATUTINO/VESPERTINO/
-// NOCTURNO): lee ventana_{division} de configuracion y cae a la ventana estandar
-// si falta o está malformada. Devuelve null si la división no es válida.
+/**
+ * Resuelve la ventana [inicio, fin] de un turno concreto (MATUTINO/VESPERTINO/NOCTURNO).
+ * Lee ventana_{division} de configuración y cae a la ventana estándar si falta o está malformada.
+ * @param {string} division - Nombre de la división (MATUTINO, VESPERTINO, NOCTURNO)
+ * @param {import('../../../types/entities').Configuracion[]} configs
+ * @returns {import('../../../types/schedule').VentanaTurno | null} null si la división no es válida
+ */
 export const resolveVentanaTurno = (division, configs = []) => {
   const div = String(division || '').toUpperCase();
   if (!DIVISIONES_VALIDAS.includes(div)) return null;
@@ -101,11 +130,13 @@ export const resolveVentanaTurno = (division, configs = []) => {
   return desdeConfig || VENTANAS_TURNO_DEFAULT[div];
 };
 
-// Resuelve la ventana [inicio, fin] que debe cubrir la grilla del calendario:
-// - Vista por grupo: la ventana del turno del grupo (ventana_{division} de
-//   configuracion, con fallback a la ventana estandar del turno).
-// - Grupos sin division, docentes y aulas: jornada completa general
-//   (hora_inicio_jornada / hora_fin_jornada), fallback 07:00-19:30.
+/**
+ * Resuelve la ventana [inicio, fin] que debe cubrir la grilla del calendario.
+ * - Vista por grupo: la ventana del turno del grupo.
+ * - Grupos sin división, docentes y aulas: jornada completa general.
+ * @param {import('../../../types/schedule').ResolveVentanaGrillaParams} params
+ * @returns {import('../../../types/schedule').VentanaTurno}
+ */
 export const resolveVentanaGrilla = ({ filterType, item, configs = [] } = {}) => {
   if (filterType === 'grupo') {
     const ventana = resolveVentanaTurno(item?.division, configs);
@@ -118,9 +149,13 @@ export const resolveVentanaGrilla = ({ filterType, item, configs = [] } = {}) =>
   return { inicio, fin: fin && fin > inicio ? fin : '19:30:00' };
 };
 
-// División efectiva de un evento de horario: extendedProps.division (backend)
-// o lookup en el catálogo de grupos por id y luego por nombre (Modo Demo).
-// Devuelve la división en MAYÚSCULAS o null si no se puede resolver.
+/**
+ * División efectiva de un evento de horario: extendedProps.division (backend)
+ * o lookup en el catálogo de grupos por id y luego por nombre (Modo Demo).
+ * @param {import('../../../types/api').FullCalendarExtendedProps} extendedProps
+ * @param {import('../../../types/entities').Grupo[]} grupos
+ * @returns {string | null} División en MAYÚSCULAS o null
+ */
 export const resolverDivisionEvento = (extendedProps = {}, grupos = []) => {
   if (extendedProps?.division) return String(extendedProps.division).toUpperCase();
   let grupo = null;
@@ -134,9 +169,14 @@ export const resolverDivisionEvento = (extendedProps = {}, grupos = []) => {
   return grupo ? String(grupo.division || '').toUpperCase() || null : null;
 };
 
-// ¿El bloque cabe COMPLETO dentro de la ventana? Mismo criterio que el solver
-// (or_tools_adapter): bloque_inicio >= ven_inicio Y bloque_fin <= ven_fin.
-// Sin ventana definida no hay restricción (jornada global).
+/**
+ * ¿El bloque cabe COMPLETO dentro de la ventana? Mismo criterio que el solver:
+ * bloque_inicio >= ven_inicio Y bloque_fin <= ven_fin.
+ * Sin ventana definida no hay restricción (jornada global).
+ * @param {import('../../../types/entities').BloqueHorario} bloque
+ * @param {import('../../../types/schedule').VentanaTurno | null} ventana
+ * @returns {boolean}
+ */
 export const bloqueDentroVentana = (bloque, ventana) => {
   if (!bloque || !ventana) return true;
   const ini = horaAMinutos(bloque.hora_inicio);
@@ -151,9 +191,15 @@ export const bloqueDentroVentana = (bloque, ventana) => {
 // exacto. sedeIds vacío = unión de todas las sedes (docente/Demo).
 // ============================================================
 
-// Bandas del eje: agrupa bloques activos por hora de inicio de las sedes
-// indicadas; el fin de la banda es el máximo fin del grupo, recortado a la
-// ventana horaria (jornada/turno). Devuelve [{iniMin, finMin, etiqueta}].
+/**
+ * Bandas del eje: agrupa bloques activos por hora de inicio de las sedes
+ * indicadas; el fin de la banda es el máximo fin del grupo, recortado a la
+ * ventana horaria (jornada/turno).
+ * @param {import('../../../types/entities').BloqueHorario[]} bloques
+ * @param {number[]} sedeIds - IDs de sedes a incluir; vacío = unión de todas
+ * @param {import('../../../types/schedule').VentanaTurno | null} ventana
+ * @returns {import('../../../types/schedule').BandaEje[]}
+ */
 export const construirBandasEje = (bloques = [], sedeIds = [], ventana = null) => {
   const porInicio = new Map(); // iniMin -> finMax
   bloques
@@ -185,7 +231,11 @@ export const construirBandasEje = (bloques = [], sedeIds = [], ventana = null) =
   return bandas;
 };
 
-// Índice id -> {dia, iniMin, sedeId} para resolver eventos/celdas exactamente.
+/**
+ * Índice id → { dia, iniMin, sedeId } para resolver eventos/celdas exactamente.
+ * @param {import('../../../types/entities').BloqueHorario[]} bloques
+ * @returns {Map<number, import('../../../types/schedule').BloqueIndice>}
+ */
 export const indiceBloques = (bloques = []) => {
   const map = new Map();
   (bloques || []).forEach((b) => {
@@ -198,9 +248,13 @@ export const indiceBloques = (bloques = []) => {
   return map;
 };
 
-// Bloque activo EXACTO para una celda (día + inicio de banda + sede del aula).
-// null si no existe (hora sin bloque o banda de otra sede) → el drop se rechaza
-// con mensaje claro en lugar de adivinar el bloque más cercano.
+/**
+ * Bloque activo EXACTO para una celda (día + inicio de banda + sede del aula).
+ * null si no existe → el drop se rechaza con mensaje claro.
+ * @param {import('../../../types/entities').BloqueHorario[]} bloques
+ * @param {{ dia: number, iniMin: number, sedeId: number }} params
+ * @returns {import('../../../types/entities').BloqueHorario | null}
+ */
 export const resolverBloqueDeCelda = (bloques = [], { dia, iniMin, sedeId } = {}) => {
   if (dia == null || iniMin == null || sedeId == null) return null;
   return (bloques || []).find(b =>
@@ -210,7 +264,11 @@ export const resolverBloqueDeCelda = (bloques = [], { dia, iniMin, sedeId } = {}
     horaAMinutos(b.hora_inicio) === iniMin) || null;
 };
 
-// Extrae {dia (1..7), min} de un start ISO local ("2026-06-29T08:30:00").
+/**
+ * Extrae { dia (1..7), min } de un start ISO local ("2026-06-29T08:30:00").
+ * @param {string} iso
+ * @returns {{ dia: number, min: number } | null}
+ */
 const diaYMinutoDeISO = (iso) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -221,9 +279,14 @@ const diaYMinutoDeISO = (iso) => {
   };
 };
 
-// Agrupa eventos por celda "dia|iniMin". Clave preferente: extendedProps.bloque_id
-// vía indiceBloques (exacto). Fallback temporal por solape con bandas (eventos del
-// Modo Demo sin bloque válido).
+/**
+ * Agrupa eventos por celda "dia|iniMin". Clave preferente: extendedProps.bloque_id
+ * vía indiceBloques (exacto). Fallback temporal por solape con bandas.
+ * @param {import('../../../types/api').FullCalendarEvent[]} eventos
+ * @param {Map<number, import('../../../types/schedule').BloqueIndice>} indice
+ * @param {import('../../../types/schedule').BandaEje[]} bandas
+ * @returns {import('../../../types/schedule').CeldaEventos}
+ */
 export const agruparEventosPorCelda = (eventos = [], indice = new Map(), bandas = []) => {
   const celdas = new Map();
   const push = (clave, ev) => {
@@ -246,8 +309,15 @@ export const agruparEventosPorCelda = (eventos = [], indice = new Map(), bandas 
   return celdas;
 };
 
-// Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.
-// Devuelve el evento actualizado (puro; la mutacion del estado la hace el componente).
+/**
+ * Calcula el nuevo start/end/resourceId de un evento al moverlo en Modo Demo.
+ * @param {import('../../../types/api').FullCalendarEvent} evento
+ * @param {import('../../../types/entities').BloqueHorario} targetBlock
+ * @param {number} aulaId
+ * @param {Date} fechaBase - Fecha normalizada a T00:00:00
+ * @param {import('../../../types/entities').Aula[]} aulas
+ * @returns {import('../../../types/api').FullCalendarEvent} Evento actualizado (puro)
+ */
 export const recalcularEventoDemo = (evento, targetBlock, aulaId, fechaBase, aulas = []) => {
   // Encontrar la fecha de inicio del periodo academico activo (fechaBase = Date normalizada a T00:00:00)
 
@@ -283,8 +353,13 @@ export const recalcularEventoDemo = (evento, targetBlock, aulaId, fechaBase, aul
   };
 };
 
-// Genera los eventos simulados que se inyectan al horario del periodo en Modo Demo
-// tras "generar" (misma simulación que antes vivía inline en triggerAutoGeneration de Horarios.jsx, E10).
+/**
+ * Genera los eventos simulados que se inyectan al horario del periodo en Modo Demo
+ * tras "generar" (misma simulación que antes vivía inline en Horarios.jsx, E10).
+ * @param {string} baseDate - Fecha en formato "YYYY-MM-DD"
+ * @param {number} periodoId
+ * @returns {import('../../../types/api').FullCalendarEvent[]}
+ */
 export const generarEventosSimulados = (baseDate, periodoId) => {
   const pid = Number(periodoId);
   return [
