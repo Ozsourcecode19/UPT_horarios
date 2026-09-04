@@ -4,8 +4,13 @@
 // real de autorización vive en el backend (require_role).
 import { useAuth } from '../context/AuthContext';
 
+/** @type {import('../../types/context').Rol[]} */
 export const ROLES_ESCRITURA = ['ADMIN', 'JEFE-PNF'];
 
+/**
+ * Indica si el usuario autenticado tiene permisos de escritura (ADMIN o JEFE-PNF).
+ * @returns {boolean} true si el usuario puede escribir
+ */
 const useCanWrite = () => {
   const { user } = useAuth();
   return ROLES_ESCRITURA.includes(user?.role);

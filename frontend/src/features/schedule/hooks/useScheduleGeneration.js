@@ -11,6 +11,25 @@ import { generarEventosSimulados } from '../utils/schedule';
 
 const DEMO_DELAY_MS = 2500;
 
+/**
+ * Receta de generación automática: combina modo real (POST + polling) y Modo Demo.
+ * Servicio de API y hook de polling inyectables para testing.
+ * @param {object} params
+ * @param {boolean} params.demoMode - Si true, genera eventos simulados localmente
+ * @param {number | null} params.selectedPeriodoId - ID del periodo seleccionado
+ * @param {import('../../types/entities').PeriodoAcademico | null} params.selectedPeriodo - Objeto completo del periodo
+ * @param {React.Dispatch<React.SetStateAction<import('../../types/api').FullCalendarEvent[]>>} params.setDemoHorarios - Setter de eventos demo
+ * @param {() => void} [params.onRefetch] - Refetch de datos reales del calendario
+ * @param {() => void} [params.onInvalidate] - Invalidación de queries de TanStack
+ * @param {(msg: string, type?: string) => void} [params.showToast] - Feedback visual
+ * @param {typeof ScheduleService} [params.scheduleService] - Servicio de API inyectable
+ * @param {typeof useGenerationPolling} [params.pollingHook] - Hook de polling inyectable
+ * @returns {{
+ *   isGenerating: boolean,
+ *   genStatusText: string,
+ *   triggerAutoGeneration: () => Promise<void>,
+ * }}
+ */
 export const useScheduleGeneration = ({
   demoMode,
   selectedPeriodoId,

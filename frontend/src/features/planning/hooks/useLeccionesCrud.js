@@ -8,6 +8,28 @@ import GruposService from '../../../api/grupos';
 import LeccionesService from '../../../api/lecciones';
 import { toPayloadGrupo, toPayloadLeccion } from '../schemas';
 
+/**
+ * Receta CRUD dual de Grupos y Lecciones. Servicios inyectables para testing.
+ * Los handlers devuelven true si la operación se aplicó.
+ * @param {object} params
+ * @param {boolean} params.demoMode - Si true, aplica cambios localmente
+ * @param {boolean} [params.puedeEscribir=true] - Si false, bloquea crear/editar/eliminar
+ * @param {(msg: string, type?: string) => void} [params.showToast] - Feedback visual
+ * @param {import('../../types/entities').Grupo[]} [params.demoGrupos] - Grupos del modo demo
+ * @param {React.Dispatch<React.SetStateAction<import('../../types/entities').Grupo[]>>} [params.setDemoGrupos] - Setter de grupos demo
+ * @param {import('../../types/entities').Leccion[]} [params.demoLecciones] - Lecciones del modo demo
+ * @param {React.Dispatch<React.SetStateAction<import('../../types/entities').Leccion[]>>} [params.setDemoLecciones] - Setter de lecciones demo
+ * @param {import('../../types/entities').Leccion[]} [params.listadoLecciones] - Listado activo (guard de eliminación)
+ * @param {() => void} [params.onInvalidateGrupos] - Invalidación de queries de grupos
+ * @param {() => void} [params.onInvalidateLecciones] - Invalidación de queries de lecciones
+ * @param {{ grupos: typeof GruposService, lecciones: typeof LeccionesService }} [params.servicios] - Servicios inyectables
+ * @returns {{
+ *   handleSaveGrupo: (data: object, editing?: import('../../types/entities').Grupo | null) => Promise<boolean>,
+ *   handleSaveLeccion: (data: object, editing?: import('../../types/entities').Leccion | null) => Promise<boolean>,
+ *   handleDeleteGrupo: (grupo?: import('../../types/entities').Grupo | null) => Promise<boolean>,
+ *   handleDeleteLeccion: (leccion?: import('../../types/entities').Leccion | null) => Promise<boolean>,
+ * }}
+ */
 export const useLeccionesCrud = ({
   demoMode,
   puedeEscribir = true,
