@@ -1,7 +1,8 @@
 # E15 — Tipado de Entidades y Contratos (TypeScript / JSDoc)
 
-**Estado:** Pendiente
+**Estado:** En progreso (Fases 1–2 completadas)
 **Rama:** `feature/E15-typing`
+**Commits:** `87fe13d` (plan) → `cfbb680` (Fase 1) → `d7e681b` (Fase 2)
 **Estimación:** ~8–10 h (5 fases incrementales)
 
 ---
@@ -14,7 +15,9 @@ El proyecto tiene 93 archivos fuente (.js/.jsx) sin ninguno .ts/.tsx. Una migrac
 
 ---
 
-## Fase 1 — Archivos `.d.ts` de tipos ambientales (0 riesgo)
+## Fase 1 — Archivos `.d.ts` de tipos ambientales (0 riesgo) ✅ COMPLETADA
+
+**Commit:** `cfbb680` — 5 archivos, 827 líneas
 
 Crear `frontend/src/types/` con 5 archivos:
 
@@ -30,7 +33,9 @@ Crear `frontend/src/types/` con 5 archivos:
 
 ---
 
-## Fase 2 — JSDoc en utilidades puras (~50 funciones)
+## Fase 2 — JSDoc en utilidades puras (~50 funciones) ✅ COMPLETADA
+
+**Commit:** `d7e681b` — 7 archivos modificados, ~33 funciones anotadas, +239/-73 líneas
 
 Anotar `@param` y `@returns` en:
 
@@ -125,12 +130,14 @@ Convertir de `.js` → `.ts` los archivos puros más críticos (sin dependencias
 
 ## Archivos a crear/modificar
 
-| Tipo | Cantidad | Descripción |
-|---|---|---|
-| **Nuevos** `.d.ts` | 5 | `src/types/{entities,enums,api,schedule,context}.d.ts` |
-| **Modificados** `.js` | ~30 | JSDoc annotations en utilidades, API clients, hooks |
-| **Renombrados** `.js` → `.ts` | 6 | Utilidades puras (fase 5) |
-| **Archivos React** (.jsx) | 0 | Sin cambios (solo JSDoc opcional) |
+| Tipo | Cantidad | Estado | Descripción |
+|---|---|---|---|
+| **Nuevos** `.d.ts` | 5 | ✅ Creados | `src/types/{entities,enums,api,schedule,context}.d.ts` |
+| **Modificados** `.js` (utilidades) | 7 | ✅ Anotados | JSDoc en utilidades puras (~33 funciones) |
+| **Modificados** `.js` (API) | 15 | Pendiente | JSDoc en clientes API |
+| **Modificados** `.js` (hooks) | 6 | Pendiente | JSDoc en hooks custom |
+| **Renombrados** `.js` → `.ts` | 6 | Pendiente | Utilidades puras (fase 5) |
+| **Archivos React** (.jsx) | 0 | — | Sin cambios (solo JSDoc opcional) |
 
 ---
 
@@ -154,13 +161,14 @@ git push origin main
 main ──────────────────────────────────────────────
   │
   └── feature/E15-typing
-       ├── Fase 1: src/types/*.d.ts          → commit + verify
-       ├── Fase 2: JSDoc utilidades           → commit + verify
-       ├── Fase 3: JSDoc API clients          → commit + verify
-       ├── Fase 4: JSDoc hooks                → commit + verify
-       └── Fase 5: .ts selectivo              → commit + verify
-                                                  │
-                                            merge → main
+       ├── 87fe13d  E15_plan.md
+       ├── cfbb680  Fase 1: src/types/*.d.ts      ✅
+       ├── d7e681b  Fase 2: JSDoc utilidades       ✅
+       ├── Fase 3: JSDoc API clients               (pendiente)
+       ├── Fase 4: JSDoc hooks                     (pendiente)
+       └── Fase 5: .ts selectivo                   (pendiente)
+                                                   │
+                                             merge → main
 ```
 
 ---
