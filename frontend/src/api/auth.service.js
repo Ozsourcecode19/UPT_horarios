@@ -2,8 +2,14 @@
 import apiClient from './client';
 
 const AuthService = {
+  /**
+   * Inicia sesión con credenciales de usuario.
+   * FastAPI requiere form-data para el endpoint /token.
+   * @param {string} username
+   * @param {string} password
+   * @returns {Promise<import('../types/api').Token>}
+   */
   login: async (username, password) => {
-    // FastAPI requiere form-data para el token
     const data = new FormData();
     data.append('username', username);
     data.append('password', password);
@@ -13,12 +19,14 @@ const AuthService = {
     });
     return response.data;
   },
-  
+
+  /**
+   * Cierra sesión: limpia token, datos de usuario y datos de Demo del localStorage.
+   * @returns {void}
+   */
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Limpiar también los datos del Modo Demo (pueden contener PII tipeada
-    // por el usuario y no deben persistir tras cerrar sesión).
     Object.keys(localStorage)
       .filter((k) => k.startsWith('demo_'))
       .forEach((k) => localStorage.removeItem(k));

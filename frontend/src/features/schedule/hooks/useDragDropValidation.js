@@ -10,6 +10,43 @@ import ScheduleService from '../../../api/schedule';
 import { recalcularEventoDemo, resolveVentanaTurno, bloqueDentroVentana, resolverDivisionEvento, horaAMinutos } from '../utils/schedule';
 import { validateMoveMock } from '../utils/scheduleValidation';
 
+/**
+ * Receta de drag & drop + edición de eventos: valida movimientos, gestiona el
+ * modal de edición rápida y maneja la asignación manual (E20) con soporte
+ * para pares de bloques consecutivos. Servicio de API inyectable para testing.
+ * @param {object} params
+ * @param {boolean} params.demoMode - Si true, aplica movimientos localmente
+ * @param {import('../../types/api').FullCalendarEvent[]} params.demoHorarios - Eventos del modo demo
+ * @param {React.Dispatch<React.SetStateAction<import('../../types/api').FullCalendarEvent[]>>} params.setDemoHorarios - Setter de eventos demo
+ * @param {import('../../types/api').FullCalendarEvent[]} params.listadoHorarios - Filas ACTIVO visibles (para detectar el par de un span)
+ * @param {import('../../types/api').FullCalendarEvent[]} params.todosLosHorarios - Filas ACTIVO sin filtrar (conflictos cross-view)
+ * @param {import('../../types/entities').Aula[]} params.aulas - Catálogo de aulas
+ * @param {import('../../types/entities').BloqueHorario[]} params.bloques - Catálogo de bloques horarios
+ * @param {import('../../types/entities').Configuracion[]} [params.configuraciones] - Ventanas por turno para restringir movimientos
+ * @param {import('../../types/entities').Grupo[]} [params.grupos] - Catálogo de grupos (fallback de división)
+ * @param {import('../../types/entities').PeriodoAcademico | null} params.selectedPeriodo - Periodo seleccionado
+ * @param {number | null} params.selectedPeriodoId - ID del periodo seleccionado
+ * @param {boolean} [params.puedeEscribir=true] - Si false, bloquea mover/editar/eliminar (UX)
+ * @param {(msg: string, type?: string) => void} [params.showToast] - Feedback visual
+ * @param {() => void} [params.onInvalidate] - Invalidación de queries
+ * @param {typeof ScheduleService} [params.scheduleService] - Servicio de API inyectable
+ * @returns {{
+ *   selectedEvent: object | null,
+ *   isEditModalOpen: boolean,
+ *   setIsEditModalOpen: React.Dispatch<React.SetStateAction<boolean>>,
+ *   editAulaId: string | number,
+ *   setEditAulaId: React.Dispatch<React.SetStateAction<string | number>>,
+ *   editBloqueId: string | number,
+ *   setEditBloqueId: React.Dispatch<React.SetStateAction<string | number>>,
+ *   moveScheduleMutation: import('@tanstack/react-query').UseMutationResult,
+ *   handleMoverCelda: (params: { horario: import('../../types/api').FullCalendarEvent, bloqueDestino: import('../../types/entities').BloqueHorario }) => Promise<boolean>,
+ *   guardarAsignacionManual: (params: { horario: object, aulaId: number, bloqueDestinos: import('../../types/entities').BloqueHorario[] }) => Promise<boolean>,
+ *   eliminarHorario: (params: { horario: object }) => Promise<boolean>,
+ *   handleEventClick: (clickInfo: object) => void,
+ *   handleSaveChangesModal: (abarca: number, aulaId?: number, bloqueId?: number) => Promise<void>,
+ *   handleDeleteSchedule: () => Promise<void>,
+ * }}
+ */
 export const useDragDropValidation = ({
   demoMode,
   demoHorarios,

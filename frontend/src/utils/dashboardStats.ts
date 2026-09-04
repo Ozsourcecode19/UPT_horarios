@@ -1,16 +1,23 @@
-// src/utils/dashboardStats.js
+// src/utils/dashboardStats.ts
 // Logica pura del panel analitico del Dashboard (E11), extraida para poder
 // testearla de forma aislada (vitest) igual que el resto de utils de horarios.
+
+import type { FullCalendarEvent, PreGenerationCheck, GenerationStatus } from '../types/api';
+import type { CargaDocente, DistribucionMateria, ResumenConflictos } from '../types/schedule';
 
 const HORA_MS = 3.6e6;
 const COLOR_FALLBACK = '#6366f1';
 
-// Convierte los eventos FullCalendar del periodo en carga horaria semanal por docente.
-// Suma la duracion (end - start) de todas sus clases: como cada evento representa
-// una clase semanal recurrente, el total equivale a horas/semana del docente.
-// Devuelve [{ docente, horas }] ordenado de mayor a menor carga.
-export const cargaHorariaPorDocente = (eventos) => {
-  const acum = {};
+type NivelObservacion = 'ok' | 'warn' | 'error' | 'sin-datos';
+
+/**
+ * Convierte los eventos FullCalendar del periodo en carga horaria semanal por docente.
+ * Suma la duración (end - start) de todas sus clases.
+ * @param eventos
+ * @returns Ordenado de mayor a menor carga
+ */
+export const cargaHorariaPorDocente = (eventos: FullCalendarEvent[]): CargaDocente[] => {
+  const acum: Record<string, number> = {};
 
   (eventos || []).forEach(ev => {
     const start = new Date(ev?.start);
@@ -29,10 +36,13 @@ export const cargaHorariaPorDocente = (eventos) => {
     .sort((a, b) => b.horas - a.horas);
 };
 
-// Cuenta las clases por materia usando el color del evento (extendedProps.backgroundColor).
-// Devuelve [{ materia, count, color }] ordenado de mayor a menor numero de clases.
-export const distribucionPorMateria = (eventos) => {
-  const acum = {};
+/**
+ * Cuenta las clases por materia usando el color del evento.
+ * @param eventos
+ * @returns Ordenado de mayor a menor
+ */
+export const distribucionPorMateria = (eventos: FullCalendarEvent[]): DistribucionMateria[] => {
+  const acum: Record<string, DistribucionMateria> = {};
 
   (eventos || []).forEach(ev => {
     const materia = ev?.extendedProps?.materia || 'Materia no asignada';
@@ -44,22 +54,28 @@ export const distribucionPorMateria = (eventos) => {
   return Object.values(acum).sort((a, b) => b.count - a.count);
 };
 
-// Deriva la salud del periodo a partir del checklist previo a la generacion
-// (GET /schedules/pre-generation-check) y del estado de la ultima generacion
-// (GET /schedules/generation-status; null si nunca se genero / 404).
-// Devuelve { nivel: 'ok'|'warn'|'error'|'sin-datos', total, items }.
-export const resumenConflictos = (preCheck, generationStatus) => {
-  const items = [];
-  let nivel = 'sin-datos';
+/**
+ * Deriva la salud del periodo a partir del checklist previo a la generación
+ * y del estado de la última generación.
+ * @param preCheck
+ * @param generationStatus
+ * @returns Resumen de conflictos
+ */
+export const resumenConflictos = (
+  preCheck: PreGenerationCheck | null,
+  generationStatus: GenerationStatus | null
+): ResumenConflictos => {
+  const items: Array<{ clave: string; label: string; nivel: NivelObservacion; mensaje: string }> = [];
+  let nivel: NivelObservacion = 'sin-datos';
 
-  const add = (itemNivel, label, mensaje) => {
+  const add = (itemNivel: NivelObservacion, label: string, mensaje: string) => {
     items.push({ clave: `${label}:${items.length}`, label, nivel: itemNivel, mensaje });
-    const peso = { error: 3, warn: 2, ok: 1 }[itemNivel] || 0;
-    if (peso > ({ error: 3, warn: 2, ok: 1 }[nivel] || 0)) nivel = itemNivel;
+    const peso = ({ error: 3, warn: 2, ok: 1 } as const)[itemNivel] || 0;
+    if (peso > (({ error: 3, warn: 2, ok: 1 } as const)[nivel] || 0)) nivel = itemNivel;
   };
 
   if (preCheck) {
-    const causas = [];
+    const causas: string[] = [];
     if (preCheck.lecciones_activas === 0) causas.push('no hay lecciones activas');
     if (preCheck.aulas === 0) causas.push('no hay aulas activas');
     if (preCheck.bloques === 0) causas.push('no hay bloques activos');
