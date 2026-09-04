@@ -11,7 +11,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
   - `createdb -U postgres horarios_upt`
   - `sudo -u postgres psql -d horarios_upt -f database/schema_horarios_v2.1.1.sql` (esquema base)
   - Upgrades/seed/limpieza en `database/actualizaciones/`, `database/operaciones/` (`Reset_y_poblar_datos.sql` puebla datos de prueba).
-- **Tests:** backend con suite `pytest`/`httpx` en `backend/tests/` (E9, 46 tests) sobre SQLite in-memory (`pytest.ini` con `pythonpath = .`; fix `JSONB→JSON` en `conftest.py`); **no** dependen de la BD Postgres ni de triggers. Frontend con suite `vitest` (E10, 54 tests en `src/utils/__tests__/` y `src/hooks/__tests__/` — lógica pura + hooks `useGenerationPolling`/`useScheduleGeneration`/`useDragDropValidation`; `vitest.config.js` + `src/test/setup.js`). No hay lint/typecheck configurados. Correr: backend `cd backend && source .venv/bin/activate && pytest`; frontend `cd frontend && pnpm test`.
+- **Tests:** backend con suite `pytest`/`httpx` en `backend/tests/` (E9, 46 tests) sobre SQLite in-memory (`pytest.ini` con `pythonpath = .`; fix `JSONB→JSON` en `conftest.py`); **no** dependen de la BD Postgres ni de triggers. Frontend con suite `vitest` (E15, 164 tests en `src/utils/__tests__/`, `src/hooks/__tests__/` y `src/features/schedule/__tests__/` — lógica pura, hooks `useGenerationPolling`/`useScheduleGeneration`/`useDragDropValidation`, validación de schedule; `vitest.config.js` + `src/test/setup.js`). No hay lint configurados. Correr: backend `cd backend && source .venv/bin/activate && pytest`; frontend `cd frontend && pnpm test`.
 
 ## Gotchas críticos
 
@@ -24,6 +24,7 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
 - CORS solo permite `http://localhost:3000`.
 - Los PDFs de `docs/` están vacíos (0 bytes); no son una fuente válida.
 - **Cada función nueva de `crud/*.py` debe exportarse en `crud/__init__.py`** (import + `__all__`). El router accede vía `crud.<func>`, y si no se exporta falla con `AttributeError` solo en runtime (HTTP 500) aunque `import main` pase.
+- **Mixta JS/TS (E15):** el frontend tiene `tsconfig.json` (`strict: false`, `noEmit: true`) y 6 archivos `.ts` puros (errors, jwt, icalExport, dashboardStats, scheduleValidation, schedule). Los `.jsx` se mantienen en JS con JSDoc. Los `.ts` son utilidades puras sin dependencias React; al convertir nuevos archivos, respetar este patrón.
 
 ## Arquitectura
 
