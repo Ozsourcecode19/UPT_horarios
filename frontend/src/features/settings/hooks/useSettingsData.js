@@ -1,53 +1,62 @@
 // src/features/settings/hooks/useSettingsData.js
 // Hook que encapsula las 4 queries de Settings + modo demo.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ConfiguracionesService from '../../../api/configuraciones';
 import UsuariosService from '../../../api/usuarios';
 import DatabaseService from '../../../api/database';
+import { useDemo } from '../../../context/DemoContext';
 import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_CONFIGURACIONES } from '../demoData';
+import { MSG_SERVIDOR_DESCONECTADO } from '../../../constants/messages';
+import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
 
 export function useSettingsData() {
   const queryClient = useQueryClient();
-  const [demoMode, setDemoMode] = useState(false);
+  const { demoMode, setDemoMode } = useDemo();
   const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   const [demoConfigs, setDemoConfigs] = useState(() => {
-    const saved = localStorage.getItem('demo_configuraciones');
-    return saved ? JSON.parse(saved) : MOCK_CONFIGURACIONES;
+    try {
+      const saved = localStorage.getItem('demo_configuraciones');
+      return saved ? JSON.parse(saved) : MOCK_CONFIGURACIONES;
+    } catch { return MOCK_CONFIGURACIONES; }
   });
 
   useEffect(() => { localStorage.setItem('demo_configuraciones', JSON.stringify(demoConfigs)); }, [demoConfigs]);
 
   const { data: configsReal = [], isLoading: isConfigsLoading, isError: isConfigsError, error: configsError, refetch: refetchConfigs } = useQuery({
     queryKey: ['configuraciones'],
-    queryFn: async () => { const res = await ConfiguracionesService.getConfiguraciones(0, 1000); return res.items || res || []; },
+    queryFn: async () => { const res = await ConfiguracionesService.getConfiguraciones(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
   });
 
   useEffect(() => {
     if (isConfigsError && esErrorDeServidor(configsError) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isConfigsError]);
+  }, [isConfigsError, configsError, demoMode]);
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   const { data: usuariosData = { items: [], total: 0 }, isLoading: isUsuariosLoading, refetch: refetchUsuarios } = useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => await UsuariosService.getUsuarios(0, 100, null),
-    retry: 0,
+    enabled: !demoMode, retry: 0,
   });
 
   const { data: dbHealth, isLoading: isDbHealthLoading, refetch: refetchDbHealth } = useQuery({
     queryKey: ['database-health'],
     queryFn: () => DatabaseService.getHealth(),
-    retry: 0,
+    enabled: !demoMode, retry: 0,
   });
 
   const { data: notifConfigs = [], isLoading: isNotifLoading, refetch: refetchNotifConfigs } = useQuery({
@@ -57,7 +66,7 @@ export function useSettingsData() {
       const items = res.items || res || [];
       return items.filter(c => ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_use_tls', 'notificaciones_email_generacion', 'notificaciones_email_errores'].includes(c.clave));
     },
-    retry: 0,
+    enabled: !demoMode, retry: 0,
   });
 
   return {

@@ -1,7 +1,10 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AuthService from '../api/auth.service';
 import { decodeJwt, isTokenExpired } from '../utils/jwt';
+import { LS_KEYS } from '../constants';
+import { setNavigate } from '../api/redirect';
 
 const AuthContext = createContext(null);
 
@@ -15,7 +18,7 @@ const buildUserFromToken = (token, fallbackUsername = '') => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(localStorage.getItem(LS_KEYS.token));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,19 +32,27 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
       } else {
         const userInfo = buildUserFromToken(token);
-        localStorage.setItem('user', JSON.stringify(userInfo));
+        localStorage.setItem(LS_KEYS.user, JSON.stringify(userInfo));
         setUser(userInfo);
       }
     }
     setLoading(false);
   }, [token]);
 
+  const clearSession = () => {
+    setToken(null);
+    setUser(null);
+  };
+
+  const navigate = useNavigate();
+  useEffect(() => { setNavigate(navigate, clearSession); }, [navigate]);
+
   const login = async (username, password) => {
     try {
       const data = await AuthService.login(username, password);
-      localStorage.setItem('token', data.access_token);
+      localStorage.setItem(LS_KEYS.token, data.access_token);
       const userInfo = buildUserFromToken(data.access_token, username);
-      localStorage.setItem('user', JSON.stringify(userInfo));
+      localStorage.setItem(LS_KEYS.user, JSON.stringify(userInfo));
 
       setToken(data.access_token);
       setUser(userInfo);

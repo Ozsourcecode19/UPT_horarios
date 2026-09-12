@@ -1,5 +1,7 @@
 // src/api/client.js
 import axios from 'axios';
+import { LS_KEYS } from '../constants';
+import { redirectToLogin } from './redirect';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -8,10 +10,13 @@ const apiClient = axios.create({
   },
 });
 
+// Flag para evitar multiples ejecuciones del interceptor 401 en cascada
+let isRedirecting = false;
+
 // Interceptor para Inyectar Token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(LS_KEYS.token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,18 +29,19 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // No redirigir si el fallo es del propio intento de login (POST /token):
-      // la página de Login debe poder mostrar el mensaje de credenciales inválidas.
+    if (error.response && error.response.status === 401 && !isRedirecting) {
       const esPeticionLogin = typeof error.config?.url === 'string' && error.config.url.includes('/token');
       if (!esPeticionLogin) {
-        // Token inválido o expirado -> Limpiar, guardar ruta de retorno y redirigir
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        isRedirecting = true;
+        localStorage.removeItem(LS_KEYS.token);
+        localStorage.removeItem(LS_KEYS.user);
+        localStorage.removeItem('global_demo_mode');
         try {
-          sessionStorage.setItem('auth_return_url', window.location.pathname + window.location.search);
+          sessionStorage.setItem(LS_KEYS.authReturnUrl, window.location.pathname + window.location.search);
         } catch (e) { /* sessionStorage no disponible */ }
-        window.location.href = '/login';
+        redirectToLogin();
+        // Resetear el flag despues de un breve delay para permitir futuras peticiones
+        setTimeout(() => { isRedirecting = false; }, 2000);
       }
     }
     return Promise.reject(error);

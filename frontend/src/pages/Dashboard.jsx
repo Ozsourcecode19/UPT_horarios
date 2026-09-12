@@ -28,7 +28,7 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {demoMode && <DemoBanner onReconnect={reconectarApi} />}
+      {demoMode && <DemoBanner onReconnect={reconectarApi} description="Operando con estadísticas de prueba en almacenamiento local." />}
       <Toast toast={toast} />
       <WelcomeHero username={user?.username} />
       <StatsGrid stats={stats} demoMode={demoMode} isDocentesPending={isDocentesPending} isMateriasPending={isMateriasPending} isAulasPending={isAulasPending} isPeriodosPending={isPeriodosPending} isHorariosPending={isHorariosPending} periodoVigente={periodoVigente} />

@@ -1,6 +1,6 @@
 // src/features/horarios/hooks/useHorariosData.js
 // Hook principal: 8 queries, demo mode, auto-selecciones, toast, restore version.
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PeriodosService from '../../../api/periodos';
 import AulasService from '../../../api/aulas';
@@ -10,9 +10,13 @@ import BloquesService from '../../../api/bloques';
 import ConfiguracionesService from '../../../api/configuraciones';
 import ScheduleService from '../../../api/schedule';
 import { useAuth } from '../../../context/AuthContext';
+import { useDemo } from '../../../context/DemoContext';
+import { FETCH_ALL_LIMIT } from '../../../constants';
+import { ROLES_ESCRITURA } from '../../../constants';
 import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_PERIODOS, MOCK_AULAS, MOCK_DOCENTES, MOCK_GRUPOS, MOCK_BLOQUES, MOCK_HORARIOS_INICIALES } from '../../schedule';
 import { Users, GraduationCap, MapPin } from 'lucide-react';
+import { TOAST_DURATION, TOAST_DURATION_ERROR } from '../../../constants';
 
 const TIPOS_VISTA = [
   { valor: 'grupo', etiqueta: 'Grupos', Icono: Users },
@@ -23,29 +27,35 @@ const TIPOS_VISTA = [
 export default function useHorariosData() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canRestore = ['ADMIN', 'JEFE-PNF'].includes(user?.role);
+  const canRestore = ROLES_ESCRITURA.includes(user?.role);
+
+  const { demoMode, setDemoMode } = useDemo();
+  const toastTimerRef = useRef(null);
 
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
   const [filterType, setFilterType] = useState('grupo');
   const [filterValue, setFilterValue] = useState('');
-  const [demoMode, setDemoMode] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState(null);
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    const duracion = (type === 'error' || type === 'warning') ? 12000 : 4000;
-    setTimeout(() => setToast(null), duracion);
-  };
+    const duracion = (type === 'error' || type === 'warning') ? TOAST_DURATION_ERROR : TOAST_DURATION;
+    toastTimerRef.current = setTimeout(() => setToast(null), duracion);
+  }, []);
 
   const [demoHorarios, setDemoHorarios] = useState(() => {
     const saved = localStorage.getItem('demo_horarios');
-    return saved ? JSON.parse(saved) : MOCK_HORARIOS_INICIALES;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
+    return MOCK_HORARIOS_INICIALES;
   });
 
   useEffect(() => {
     localStorage.setItem('demo_horarios', JSON.stringify(demoHorarios));
   }, [demoHorarios]);
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   // --- QUERIES ---
 
@@ -53,10 +63,11 @@ export default function useHorariosData() {
     queryKey: ['periodos'],
     queryFn: async () => {
       try {
-        const res = await PeriodosService.getPeriodos(0, 1000);
+        const res = await PeriodosService.getPeriodos(0, FETCH_ALL_LIMIT);
         return res.items || res || [];
       } catch { return MOCK_PERIODOS; }
     },
+    enabled: !demoMode,
     retry: 0,
   });
   const periodos = demoMode || isPeriodosError ? MOCK_PERIODOS : periodosReal;
@@ -72,9 +83,10 @@ export default function useHorariosData() {
   const { data: aulasReal = [], isError: isAulasError } = useQuery({
     queryKey: ['aulas'],
     queryFn: async () => {
-      try { const res = await AulasService.getAulas(0, 1000); return res.items || res || []; }
+      try { const res = await AulasService.getAulas(0, FETCH_ALL_LIMIT); return res.items || res || []; }
       catch { return MOCK_AULAS; }
     },
+    enabled: !demoMode,
     retry: 0,
   });
   const aulas = demoMode || isAulasError ? MOCK_AULAS : aulasReal;
@@ -82,9 +94,10 @@ export default function useHorariosData() {
   const { data: docentesReal = [], isError: isDocentesError } = useQuery({
     queryKey: ['docentes'],
     queryFn: async () => {
-      try { const res = await DocentsService.getDocents(0, 1000); return res.items || res || []; }
+      try { const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT); return res.items || res || []; }
       catch { return MOCK_DOCENTES; }
     },
+    enabled: !demoMode,
     retry: 0,
   });
   const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
@@ -92,9 +105,10 @@ export default function useHorariosData() {
   const { data: gruposReal = [], isError: isGruposError } = useQuery({
     queryKey: ['grupos'],
     queryFn: async () => {
-      try { const res = await GruposService.getGrupos(0, 1000); return res.items || res || []; }
+      try { const res = await GruposService.getGrupos(0, FETCH_ALL_LIMIT); return res.items || res || []; }
       catch { return MOCK_GRUPOS; }
     },
+    enabled: !demoMode,
     retry: 0,
   });
   const grupos = demoMode || isGruposError ? MOCK_GRUPOS : gruposReal;
@@ -102,9 +116,10 @@ export default function useHorariosData() {
   const { data: bloquesReal = [], isError: isBloquesError } = useQuery({
     queryKey: ['bloques'],
     queryFn: async () => {
-      try { const result = await BloquesService.getBloques(0, 1000); return result.items || result; }
+      try { const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT); return result.items || result; }
       catch { return MOCK_BLOQUES; }
     },
+    enabled: !demoMode,
     retry: 0,
   });
   const bloques = demoMode || isBloquesError ? MOCK_BLOQUES : bloquesReal;
@@ -112,7 +127,7 @@ export default function useHorariosData() {
   const { data: configuraciones = [] } = useQuery({
     queryKey: ['configuraciones'],
     queryFn: async () => {
-      try { const res = await ConfiguracionesService.getConfiguraciones(0, 1000); return res.items || res || []; }
+      try { const res = await ConfiguracionesService.getConfiguraciones(0, FETCH_ALL_LIMIT); return res.items || res || []; }
       catch { return []; }
     },
     enabled: !demoMode,
@@ -182,7 +197,7 @@ export default function useHorariosData() {
       setDemoMode(true);
       showToast("API del servidor desconectada. Modo Demo activado con persistencia local.", "warning");
     }
-  }, [isHorariosError]);
+  }, [isHorariosError, horariosError, demoMode]);
 
   // Auto-seleccionar entidad del filtro
   useEffect(() => {

@@ -1,5 +1,6 @@
 // src/api/bloques.js
 import apiClient from './client';
+import { PAGE_SIZE } from '../constants';
 
 const BloquesService = {
   /**
@@ -10,7 +11,7 @@ const BloquesService = {
    * @param {number | null} sedeId - Filtrar por ID de sede (opcional)
    * @returns {Promise<import('../types/api').PaginatedResponse<import('../types/entities').BloqueHorario>>}
    */
-  getBloques: async (skip = 0, limit = 20, search = null, sedeId = null) => {
+  getBloques: async (skip = 0, limit = PAGE_SIZE, search = null, sedeId = null) => {
     const params = { skip, limit };
     if (search) params.search = search;
     if (sedeId) params.sede_id = sedeId;

@@ -5,7 +5,7 @@ export { buildDefaultValues, buildZodSchema, buildPayload, toTimeInput, toTimeDb
 export { MOCK_CONFIGURACIONES } from './demoData';
 export { WIDGETS, GRUPOS, CLAVE_GRUPO, GRUPO_NOTAS, DIAS_SEMANA, ROLES_CONFIG } from './constants';
 export { default as Toast } from './components/Toast';
-export { default as DemoBanner } from './components/DemoBanner';
+export { default as DemoBanner } from '../../components/shared/DemoBanner';
 export { default as SettingsTabs } from './components/SettingsTabs';
 export { default as ConfigWidget, widgetIcon } from './components/ConfigWidget';
 export { default as AlgoritmoTab } from './components/AlgoritmoTab';

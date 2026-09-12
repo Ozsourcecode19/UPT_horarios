@@ -1,5 +1,6 @@
 // src/api/docents.js
 import apiClient from './client';
+import { PAGE_SIZE } from '../constants';
 
 const DocentsService = {
   /**
@@ -9,7 +10,7 @@ const DocentsService = {
    * @param {string | null} search - Término de búsqueda (opcional)
    * @returns {Promise<import('../types/api').PaginatedResponse<import('../types/entities').Docente>>}
    */
-  getDocents: async (skip = 0, limit = 20, search = null) => {
+  getDocents: async (skip = 0, limit = PAGE_SIZE, search = null) => {
     const params = { skip, limit };
     if (search) params.search = search;
     const response = await apiClient.get('/docentes/', { params });

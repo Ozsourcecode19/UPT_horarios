@@ -57,7 +57,7 @@ const Lecciones = () => {
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
 
       {demoMode && (
-        <DemoBanner onReconnect={() => { setDemoMode(false); refetchGrupos(); refetchLecciones(); showToast("Intentando reconectar con API real...", "info"); }} />
+        <DemoBanner onReconnect={() => { setDemoMode(false); refetchGrupos(); refetchLecciones(); showToast("Intentando reconectar con API real...", "info"); }} title="Modo Demo de Planificación Activado" description="Operando localmente en el navegador. Ideal para simulaciones de carga académica y configuraciones de grupos." />
       )}
 
       <Toast toast={toast} />

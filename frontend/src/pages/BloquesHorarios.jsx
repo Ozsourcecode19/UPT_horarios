@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Plus, Sparkles, RefreshCw, AlertTriangle, CheckCircle, AlertCircle, Database, CalendarDays } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ROLES_ESCRITURA } from '../constants';
 import Pagination from '../components/ui/Pagination';
 import {
   useBloquesCrud,
@@ -14,7 +15,7 @@ import {
 
 const BloquesHorarios = () => {
   const { user } = useAuth();
-  const isWritable = user?.role === 'ADMIN' || user?.role === 'JEFE-PNF';
+  const isWritable = ROLES_ESCRITURA.includes(user?.role);
 
   const [selectedSedeId, setSelectedSedeId] = useState('');
 

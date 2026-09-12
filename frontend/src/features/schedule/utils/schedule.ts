@@ -10,6 +10,7 @@ import type {
   BandaEje, BloqueIndice, CeldaEventos,
   VentanaTurno, FilterOptions, ResolveVentanaGrillaParams,
 } from '../../../types/schedule';
+import { COLOR_FALLBACK } from '../../../constants';
 
 // ─── Constantes ─────────────────────────────────────────────
 
@@ -89,8 +90,8 @@ const diaYMinutoDeISO = (iso: string): { dia: number; min: number } | null => {
 export const mapScheduleEvents = (eventos: FullCalendarEvent[]): FullCalendarEvent[] => {
   return (eventos || []).map(ev => ({
     ...ev,
-    backgroundColor: ev.extendedProps?.backgroundColor || '#6366f1',
-    borderColor: ev.extendedProps?.backgroundColor || '#6366f1',
+    backgroundColor: ev.extendedProps?.backgroundColor || COLOR_FALLBACK,
+    borderColor: ev.extendedProps?.backgroundColor || COLOR_FALLBACK,
     textColor: '#ffffff'
   }));
 };

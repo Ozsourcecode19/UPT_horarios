@@ -4,9 +4,9 @@
 
 import type { FullCalendarEvent, PreGenerationCheck, GenerationStatus } from '../types/api';
 import type { CargaDocente, DistribucionMateria, ResumenConflictos } from '../types/schedule';
+import { COLOR_FALLBACK } from '../constants';
 
 const HORA_MS = 3.6e6;
-const COLOR_FALLBACK = '#6366f1';
 
 type NivelObservacion = 'ok' | 'warn' | 'error' | 'sin-datos';
 

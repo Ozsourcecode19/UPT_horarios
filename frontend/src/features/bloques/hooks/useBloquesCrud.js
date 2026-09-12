@@ -2,14 +2,16 @@
 // Hook de CRUD de bloques horarios con soporte Modo Demo (E21),
 // extraido de pages/BloquesHorarios.jsx.
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BloquesService from '../../../api/bloques';
 import SedesService from '../../../api/sedes';
 import ConfiguracionesService from '../../../api/configuraciones';
 import useDebounce from '../../../hooks/useDebounce';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
 import { DURACIONES_VALIDAS } from '../schemas';
+import { TOAST_DURATION, DEBOUNCE_DELAY, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
 import { MOCK_SEDES, MOCK_BLOQUES } from '../demoData';
 import { horaCompleta, generarSimulacionDemo } from '../utils/bloques';
 
@@ -26,7 +28,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
 
   // --- ESTADOS LOCALES ---
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 300);
+  const debouncedSearch = useDebounce(searchTerm, DEBOUNCE_DELAY);
   const [onlyActivos, setOnlyActivos] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBloque, setEditingBloque] = useState(null);
@@ -37,18 +39,21 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
   const [generarLoading, setGenerarLoading] = useState(false);
 
   // Modo Demo
-  const [demoMode, setDemoMode] = useState(false);
+  const { demoMode, setDemoMode } = useDemo();
   const [demoBloques, setDemoBloques] = useState(() => {
     const saved = localStorage.getItem('demo_bloques_horarios');
-    return saved ? JSON.parse(saved) : MOCK_BLOQUES;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_BLOQUES;
   });
 
   // Toast
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   // Persistir estado demo
   useEffect(() => {
@@ -72,7 +77,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
 
   const { data: sedesReal = [], isError: isSedesError } = useQuery({
     queryKey: ['sedes'],
-    queryFn: async () => { const res = await SedesService.getSedes(0, 1000); return res.items || res || []; },
+    queryFn: async () => { const res = await SedesService.getSedes(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode,
     retry: 0,
   });
@@ -80,7 +85,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
   const { data: configuraciones = [] } = useQuery({
     queryKey: ['configuraciones'],
     queryFn: async () => {
-      const res = await ConfiguracionesService.getConfiguraciones(0, 1000);
+      const res = await ConfiguracionesService.getConfiguraciones(0, FETCH_ALL_LIMIT);
       return res.items || res || [];
     },
     enabled: !demoMode,
@@ -93,7 +98,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
       setDemoMode(true);
       showToast('Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.', 'warning');
     }
-  }, [isBloquesError]);
+  }, [isBloquesError, demoMode]);
 
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
   const sedeActual = sedes.find(s => s.id === Number(selectedSedeId));
@@ -103,8 +108,8 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
     const s = `${b.dia_semana} ${b.hora_inicio}`.toLowerCase();
     return s.includes(debouncedSearch.toLowerCase());
   }) : [];
-  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
-  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / PAGE_SIZE));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
 
   const listadoBloques = demoMode ? demoPageItems : bloquesReal;
   const totalBloques = demoMode ? demoFiltered.length : (totalBloquesReal ?? 0);
@@ -113,7 +118,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
   const { data: allBloquesStats = [] } = useQuery({
     queryKey: ['bloques-stats'],
     queryFn: async () => {
-      const result = await BloquesService.getBloques(0, 1000);
+      const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT);
       return result.items || result;
     },
     enabled: !demoMode,
@@ -128,9 +133,12 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
 
   // Duración por defecto para el generador
   const duracionDefault = useMemo(() => {
-    const fuente = demoMode
-      ? (JSON.parse(localStorage.getItem('demo_configuraciones') || 'null') || [])
-      : configuraciones;
+    let fuente;
+    if (demoMode) {
+      try { fuente = JSON.parse(localStorage.getItem('demo_configuraciones') || 'null') || []; } catch { fuente = []; }
+    } else {
+      fuente = configuraciones;
+    }
     const cfg = fuente.find(c => c.clave === 'duracion_bloque_default');
     const val = cfg ? Number(cfg.valor) : 45;
     return DURACIONES_VALIDAS.includes(val) ? val : 45;
@@ -282,6 +290,8 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
       setGenerarLoading(false);
     }
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     // State

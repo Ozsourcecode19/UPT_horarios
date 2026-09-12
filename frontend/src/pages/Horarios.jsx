@@ -122,7 +122,7 @@ const Horarios = () => {
 
   return (
     <div className="horarios-page max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {demoMode && <DemoBanner onReconnect={() => { setDemoMode(false); refetchHorarios(); showToast("Intentando conectar con API real...", "info"); }} />}
+      {demoMode && <DemoBanner onReconnect={() => { setDemoMode(false); refetchHorarios(); showToast("Intentando conectar con API real...", "info"); }} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
       <Toast toast={toast} />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
 

@@ -28,7 +28,7 @@ export { default as DeleteConfirmModal } from './components/DeleteConfirmModal';
 export { LeccionesStats, GruposStats } from './components/PlanningStatsCards';
 export { default as PlanningTabs } from './components/PlanningTabs';
 export { default as PlanningFilterBar } from './components/PlanningFilterBar';
-export { default as DemoBanner } from './components/DemoBanner';
+export { default as DemoBanner } from '../../components/shared/DemoBanner';
 
 // Datos demo (Modo Demo)
 export {
