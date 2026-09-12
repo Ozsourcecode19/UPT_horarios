@@ -10,6 +10,9 @@ import SedesService from '../api/sedes';
 import { esErrorDeServidor } from '../utils/errors';
 import DocenteDisponibilidad from '../components/docentes/DocenteDisponibilidad';
 import DocenteTabs from '../components/docentes/DocenteTabs';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO } from '../constants/messages';
+import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../constants';
+import { useDemo } from '../context/DemoContext';
 
 const MOCK_DOCENTES = [
   { id: 101, nombre: "Luis Alberto", apellido: "Mendoza", email: "l.mendoza@upt.edu.ve", carga_maxima: 20, sede_principal_id: 1, activo: true },
@@ -28,19 +31,19 @@ const DocenteDisponibilidadPage = () => {
   const [searchParams] = useSearchParams();
   const initialDocenteId = searchParams.get('docente');
 
-  // Modo Demo / Fallback local
-  const [demoMode, setDemoMode] = useState(false);
+  // Modo Demo / Fallback global
+  const { demoMode, setDemoMode } = useDemo();
   const [toast, setToast] = useState(null);
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), TOAST_DURATION);
   };
 
   // --- QUERY DE SEDES ---
   const { data: sedesReal = [], isError: isSedesError } = useQuery({
     queryKey: ['sedes'],
     queryFn: async () => {
-      const res = await SedesService.getSedes(0, 1000);
+      const res = await SedesService.getSedes(0, FETCH_ALL_LIMIT);
       return res.items || res || [];
     },
     retry: 0,
@@ -50,7 +53,7 @@ const DocenteDisponibilidadPage = () => {
   const { data: docentesReal = [], isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => {
-      const res = await DocentsService.getDocents(0, 1000);
+      const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT);
       return res.items || res || [];
     },
     enabled: !demoMode,
@@ -61,9 +64,9 @@ const DocenteDisponibilidadPage = () => {
   useEffect(() => {
     if (isDocentesError && esErrorDeServidor(docentesError) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isDocentesError, docentesError]);
+  }, [isDocentesError, docentesError, demoMode]);
 
   const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
@@ -91,7 +94,7 @@ const DocenteDisponibilidadPage = () => {
             onClick={() => {
               setDemoMode(false);
               refetchDocentes();
-              showToast("Intentando conectar con API real...", "info");
+              showToast(MSG_RECONECTANDO, "info");
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >

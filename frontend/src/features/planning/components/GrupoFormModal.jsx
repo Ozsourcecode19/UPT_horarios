@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X, AlertTriangle } from 'lucide-react';
 import ModalPortal from '../../../components/ui/ModalPortal';
+import { FETCH_ALL_LIMIT } from '../../../constants';
 
 import BloquesService from '../../../api/bloques';
 import ConfiguracionesService from '../../../api/configuraciones';
@@ -43,7 +44,7 @@ const GrupoFormModal = ({
     queryKey: ['bloques'],
     queryFn: async () => {
       try {
-        const result = await BloquesService.getBloques(0, 1000);
+        const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT);
         return result.items || result;
       } catch (err) {
         return [];

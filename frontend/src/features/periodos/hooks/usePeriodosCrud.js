@@ -1,30 +1,36 @@
 // src/features/periodos/hooks/usePeriodosCrud.js
 // Hook de CRUD de periodos académicos con soporte Modo Demo.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import PeriodosService from '../../../api/periodos';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
 import { MOCK_PERIODOS } from '../demoData';
+import { TOAST_DURATION, PAGE_SIZE } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR } from '../../../constants/messages';
 
 const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPeriodo, setEditingPeriodo] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoPeriodos, setDemoPeriodos] = useState(() => {
     const saved = localStorage.getItem('demo_periodos');
-    return saved ? JSON.parse(saved) : MOCK_PERIODOS;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_PERIODOS;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_periodos', JSON.stringify(demoPeriodos));
@@ -47,16 +53,16 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
   useEffect(() => {
     if (isError && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isError]);
+  }, [isError, demoMode]);
 
   const demoFiltered = demoMode ? demoPeriodos.filter(p => {
     const s = `${p.nombre} ${p.tipo_corte} ${p.anio_academico} ${p.estado}`.toLowerCase();
     return s.includes(debouncedSearch.toLowerCase());
   }) : [];
-  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
-  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / PAGE_SIZE));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
 
   const listado = demoMode ? demoPageItems : periodosReal;
   const total = demoMode ? demoFiltered.length : (totalPeriodosReal ?? 0);
@@ -97,7 +103,7 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
         setIsModalOpen(false);
       } catch (err) {
         console.error(err);
-        showToast("Error al guardar en el servidor", "error");
+        showToast(MSG_GUARDADO_ERROR, "error");
       }
     }
   };
@@ -133,8 +139,10 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['periodos'] });
-    showToast("Intentando conectar con API real...", "info");
+    showToast(MSG_RECONECTANDO, "info");
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     listado, total, totalPages, demoTotalPages, page, setPage,

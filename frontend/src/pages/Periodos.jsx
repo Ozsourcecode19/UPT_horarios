@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Plus, RefreshCw, AlertTriangle, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useDebounce from '../hooks/useDebounce';
+import { DEBOUNCE_DELAY } from '../constants';
 import Pagination from '../components/ui/Pagination';
 import {
   usePeriodosCrud, calcularEstadisticas,
@@ -18,7 +19,7 @@ const Periodos = () => {
   const isAdmin = user?.role === 'ADMIN';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 300);
+  const debouncedSearch = useDebounce(searchTerm, DEBOUNCE_DELAY);
 
   const {
     listado, total, totalPages, demoTotalPages, page, setPage,

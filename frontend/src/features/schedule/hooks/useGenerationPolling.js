@@ -5,9 +5,10 @@
 
 import { useEffect, useRef } from 'react';
 import ScheduleService from '../../../api/schedule';
+import { MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS } from '../../../constants';
 
-export const MAX_ATTEMPTS = 10;
-export const POLL_INTERVAL_MS = 3000;
+export const MAX_ATTEMPTS = MAX_POLL_ATTEMPTS;
+export { POLL_INTERVAL_MS };
 
 /**
  * Ciclo de polling sobre GET /schedules/generation-status.

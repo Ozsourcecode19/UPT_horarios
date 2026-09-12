@@ -2,30 +2,37 @@
 // Hook de CRUD de sedes con soporte Modo Demo (E22),
 // extraido de pages/Aulas.jsx.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import SedesService from '../../../api/sedes';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_SEDES } from '../demoData';
+import { TOAST_DURATION } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, MSG_RECONECTANDO_API } from '../../../constants/messages';
 
 const useSedesCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSede, setEditingSede] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoSedes, setDemoSedes] = useState(() => {
     const saved = localStorage.getItem('demo_sedes');
-    return saved ? JSON.parse(saved) : MOCK_SEDES;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_SEDES;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_sedes', JSON.stringify(demoSedes));
@@ -39,18 +46,19 @@ const useSedesCrud = ({ searchTerm, debouncedSearch }) => {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['sedes'],
     (skip, limit, search) => SedesService.getSedes(skip, limit, search),
-    { searchTerm: demoMode ? '' : debouncedSearch }
+    { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo de Infraestructura automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   const demoFiltered = demoMode ? demoSedes.filter(s => {
     const str = `${s.nombre} ${s.codigo} ${s.direccion || ''}`.toLowerCase();
@@ -133,8 +141,10 @@ const useSedesCrud = ({ searchTerm, debouncedSearch }) => {
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['sedes'] });
-    showToast("Intentando reconectar con API real...", "info");
+    showToast(MSG_RECONECTANDO_API, "info");
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     listado, total, totalPages, page, setPage,

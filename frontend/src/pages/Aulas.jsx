@@ -5,7 +5,9 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ROLES_ESCRITURA } from '../constants';
 import useDebounce from '../hooks/useDebounce';
+import { DEBOUNCE_DELAY } from '../constants';
 import Pagination from '../components/ui/Pagination';
 import {
   useSedesCrud, useAulasCrud,
@@ -16,11 +18,11 @@ import {
 
 const Aulas = () => {
   const { user } = useAuth();
-  const isWritable = user?.role === 'ADMIN' || user?.role === 'JEFE-PNF';
+  const isWritable = ROLES_ESCRITURA.includes(user?.role);
 
   const [activeTab, setActiveTab] = useState('aulas');
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 300);
+  const debouncedSearch = useDebounce(searchTerm, DEBOUNCE_DELAY);
 
   const sedes = useSedesCrud({ searchTerm, debouncedSearch });
   const aulas = useAulasCrud({ searchTerm, debouncedSearch, sedes: sedes.listado });

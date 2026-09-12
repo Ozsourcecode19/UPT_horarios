@@ -2,31 +2,38 @@
 // Hook de CRUD de docentes con soporte Modo Demo,
 // extraido de pages/Docentes.jsx.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import DocentsService from '../../../api/docents';
 import SedesService from '../../../api/sedes';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_DOCENTES, MOCK_SEDES } from '../demoData';
+import { TOAST_DURATION, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocente, setEditingDocente] = useState(null);
   const [deleteConfirmDocente, setDeleteConfirmDocente] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoDocentes, setDemoDocentes] = useState(() => {
     const saved = localStorage.getItem('demo_docentes');
-    return saved ? JSON.parse(saved) : MOCK_DOCENTES;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_DOCENTES;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_docentes', JSON.stringify(demoDocentes));
@@ -37,7 +44,7 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
     queryKey: ['sedes'],
     queryFn: async () => {
       try {
-        const res = await SedesService.getSedes(0, 1000);
+        const res = await SedesService.getSedes(0, FETCH_ALL_LIMIT);
         return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando sedes del backend, usando MOCK_SEDES");
@@ -58,27 +65,28 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['docents'],
     (skip, limit, search) => DocentsService.getDocents(skip, limit, search),
-    { searchTerm: demoMode ? '' : debouncedSearch }
+    { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
   // Activar modo demo si el backend cae
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   // Demo: filtrar localmente
   const demoFiltered = demoMode ? demoDocentes.filter(d => {
     const s = `${d.nombre} ${d.apellido} ${d.email || ''}`.toLowerCase();
     return s.includes(debouncedSearch.toLowerCase());
   }) : [];
-  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
-  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / PAGE_SIZE));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
 
   const listado = demoMode ? demoPageItems : docentesReal;
   const total = demoMode ? demoFiltered.length : (totalDocentesReal ?? 0);
@@ -87,7 +95,7 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
   const { data: allDocentesStats = [] } = useQuery({
     queryKey: ['docents-stats'],
     queryFn: async () => {
-      const result = await DocentsService.getDocents(0, 1000);
+      const result = await DocentsService.getDocents(0, FETCH_ALL_LIMIT);
       return result.items || result;
     },
     enabled: !demoMode,
@@ -138,7 +146,7 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
         setIsModalOpen(false);
       } catch (err) {
         console.error(err);
-        showToast("Error al guardar en el servidor", "error");
+        showToast(MSG_GUARDADO_ERROR, "error");
       }
     }
   };
@@ -159,7 +167,7 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
         setDeleteConfirmDocente(null);
       } catch (err) {
         console.error(err);
-        showToast("Error al eliminar del servidor", "error");
+        showToast(MSG_ELIMINADO_ERROR, "error");
       }
     }
   };
@@ -167,8 +175,10 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['docents'] });
-    showToast("Intentando conectar con API real...", "info");
+    showToast(MSG_RECONECTANDO, "info");
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     listado, total, totalDocentesReal, totalPages, demoTotalPages, page, setPage,

@@ -1,32 +1,39 @@
 // src/features/trayectos/hooks/useTrayectosCrud.js
 // Hook de CRUD de trayectos académicos con soporte Modo Demo.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import TrayectosService from '../../../api/trayectos';
 import CarrerasService from '../../../api/carreras';
 import GruposService from '../../../api/grupos';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_TRAYECTOS, MOCK_CARRERAS, MOCK_GRUPOS } from '../demoData';
+import { TOAST_DURATION, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrayecto, setEditingTrayecto] = useState(null);
   const [deleteConfirmTrayecto, setDeleteConfirmTrayecto] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoTrayectos, setDemoTrayectos] = useState(() => {
     const saved = localStorage.getItem('demo_trayectos');
-    return saved ? JSON.parse(saved) : MOCK_TRAYECTOS;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_TRAYECTOS;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_trayectos', JSON.stringify(demoTrayectos));
@@ -41,10 +48,11 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['trayectos'],
     (skip, limit, search) => TrayectosService.getTrayectos(skip, limit, search),
-    { searchTerm: demoMode ? '' : debouncedSearch }
+    { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
   // Query de carreras (dependencia del dropdown)
@@ -52,7 +60,7 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
     queryKey: ['carreras'],
     queryFn: async () => {
       try {
-        return await CarrerasService.getCarreras(0, 1000);
+        return await CarrerasService.getCarreras(0, FETCH_ALL_LIMIT);
       } catch (err) {
         return { items: [] };
       }
@@ -68,7 +76,7 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
   const { data: gruposReal = [] } = useQuery({
     queryKey: ['grupos'],
     queryFn: async () => {
-      const res = await GruposService.getGrupos(0, 1000);
+      const res = await GruposService.getGrupos(0, FETCH_ALL_LIMIT);
       return res.items || res || [];
     },
     enabled: !demoMode,
@@ -77,11 +85,11 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
 
   // Activar modo demo si el backend cae
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   const listadoCarreras = demoMode ? MOCK_CARRERAS : carrerasReal;
   const listadoGrupos = demoMode ? MOCK_GRUPOS : gruposReal;
@@ -92,8 +100,8 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
     const s = `${t.nombre} ${t.anio_academico} ${t.estado} ${carreraNombre}`.toLowerCase();
     return s.includes(debouncedSearch.toLowerCase());
   }) : [];
-  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / 20));
-  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * 20, page * 20) : [];
+  const demoTotalPages = Math.max(1, Math.ceil(demoFiltered.length / PAGE_SIZE));
+  const demoPageItems = demoMode ? demoFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
 
   const listado = demoMode ? demoPageItems : trayectosReal;
   const total = demoMode ? demoFiltered.length : (totalTrayectosReal ?? 0);
@@ -145,7 +153,7 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
         setIsModalOpen(false);
       } catch (err) {
         console.error(err);
-        showToast(err?.response?.data?.detail || "Error al guardar en el servidor", "error");
+        showToast(err?.response?.data?.detail || MSG_GUARDADO_ERROR, "error");
       }
     }
   };
@@ -173,7 +181,7 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
         setDeleteConfirmTrayecto(null);
       } catch (err) {
         console.error(err);
-        showToast("Error al eliminar del servidor", "error");
+        showToast(MSG_ELIMINADO_ERROR, "error");
       }
     }
   };
@@ -181,8 +189,10 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['trayectos'] });
-    showToast("Intentando conectar con API real...", "info");
+    showToast(MSG_RECONECTANDO, "info");
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     listado, total, totalPages, demoTotalPages, page, setPage,

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
 import { recalcularEventoDemo, resolveVentanaTurno, bloqueDentroVentana, resolverDivisionEvento, horaAMinutos } from '../utils/schedule';
+import { MSG_SIN_PERMISO_MODIFICAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_CLASES } from '../../../constants/messages';
 import { validateMoveMock } from '../utils/scheduleValidation';
 
 /**
@@ -100,7 +101,7 @@ export const useDragDropValidation = ({
   // Returns true si el movimiento se aplico, false si fue rechazado/revocado.
   const aplicarMovimiento = async ({ horarioId, nuevoBloqueId, nuevaAulaId, divisionEvento, revert }) => {
     if (!puedeEscribir) {
-      showToast("No tienes permisos para modificar horarios.", "error");
+      showToast(MSG_SIN_PERMISO_MODIFICAR_HORARIOS, "error");
       revert?.();
       return false;
     }
@@ -191,7 +192,7 @@ export const useDragDropValidation = ({
     if (!horario || !bloqueDestinos?.length) return false;
 
     if (!puedeEscribir) {
-      showToast("No tienes permisos para modificar horarios.", "error");
+      showToast(MSG_SIN_PERMISO_MODIFICAR_HORARIOS, "error");
       return false;
     }
 
@@ -299,7 +300,7 @@ export const useDragDropValidation = ({
   const eliminarHorario = async ({ horario }) => {
     if (!horario) return false;
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar horarios.", "error");
+      showToast(MSG_SIN_PERMISO_ELIMINAR_HORARIOS, "error");
       return false;
     }
     const fuente = demoMode ? demoHorarios : listadoHorarios;
@@ -415,7 +416,7 @@ export const useDragDropValidation = ({
     if (!selectedEvent) return;
 
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar clases del horario.", "error");
+      showToast(MSG_SIN_PERMISO_ELIMINAR_CLASES, "error");
       return;
     }
 

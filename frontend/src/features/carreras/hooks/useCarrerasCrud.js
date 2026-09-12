@@ -1,32 +1,39 @@
 // src/features/carreras/hooks/useCarrerasCrud.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import CarrerasService from '../../../api/carreras';
 import TrayectosService from '../../../api/trayectos';
 import useCanWrite from '../../../hooks/useCanWrite';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_CARRERAS, MOCK_TRAYECTOS } from '../demoData';
+import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 export function useCarrerasCrud() {
   const queryClient = useQueryClient();
   const puedeEscribir = useCanWrite();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCarrera, setEditingCarrera] = useState(null);
   const [deleteConfirmCarrera, setDeleteConfirmCarrera] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoCarreras, setDemoCarreras] = useState(() => {
     const saved = localStorage.getItem('demo_carreras');
-    return saved ? JSON.parse(saved) : MOCK_CARRERAS;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_CARRERAS;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_carreras', JSON.stringify(demoCarreras));
@@ -40,17 +47,18 @@ export function useCarrerasCrud() {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['carreras'],
     (skip, limit, search) => CarrerasService.getCarreras(skip, limit, search),
-    { searchTerm: demoMode ? '' : searchTerm }
+    { searchTerm: demoMode ? '' : searchTerm, enabled: !demoMode }
   );
 
   const { data: trayectosResponse = {} } = useQuery({
     queryKey: ['trayectos'],
     queryFn: async () => {
       try {
-        return await TrayectosService.getTrayectos(0, 1000);
+        return await TrayectosService.getTrayectos(0, FETCH_ALL_LIMIT);
       } catch {
         return { items: [] };
       }
@@ -64,11 +72,11 @@ export function useCarrerasCrud() {
     : Array.isArray(trayectosResponse) ? trayectosResponse : [];
 
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   const items = demoMode ? demoCarreras : carrerasReal;
   const total = demoMode ? demoCarreras.length : (totalCarrerasReal ?? 0);
@@ -77,7 +85,7 @@ export function useCarrerasCrud() {
   const { data: allCarrerasStats = [] } = useQuery({
     queryKey: ['carreras-stats'],
     queryFn: async () => {
-      const result = await CarrerasService.getCarreras(0, 1000);
+      const result = await CarrerasService.getCarreras(0, FETCH_ALL_LIMIT);
       return result.items || result;
     },
     enabled: !demoMode,
@@ -96,7 +104,7 @@ export function useCarrerasCrud() {
 
   const handleSave = async (data) => {
     if (!puedeEscribir) {
-      showToast("No tienes permisos para crear o editar carreras.", "error");
+      showToast(MSG_SIN_PERMISO_CREAR('carreras'), "error");
       return;
     }
     if (demoMode) {
@@ -123,7 +131,7 @@ export function useCarrerasCrud() {
         queryClient.invalidateQueries({ queryKey: ['trayectos'] });
         closeModal();
       } catch (err) {
-        showToast(err?.response?.data?.detail || "Error al guardar en el servidor", "error");
+        showToast(err?.response?.data?.detail || MSG_GUARDADO_ERROR, "error");
       }
     }
   };
@@ -131,7 +139,7 @@ export function useCarrerasCrud() {
   const handleDelete = async () => {
     if (!deleteConfirmCarrera) return;
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar carreras.", "error");
+      showToast(MSG_SIN_PERMISO_ELIMINAR('carreras'), "error");
       setDeleteConfirmCarrera(null);
       return;
     }
@@ -154,10 +162,12 @@ export function useCarrerasCrud() {
         showToast("Carrera eliminada exitosamente", "info");
         setDeleteConfirmCarrera(null);
       } catch {
-        showToast("Error al eliminar del servidor", "error");
+        showToast(MSG_ELIMINADO_ERROR, "error");
       }
     }
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     searchTerm, setSearchTerm,

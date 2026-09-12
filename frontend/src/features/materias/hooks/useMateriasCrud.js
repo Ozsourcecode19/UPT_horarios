@@ -1,31 +1,38 @@
 // src/features/materias/hooks/useMateriasCrud.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import SubjectsService from '../../../api/subjects';
 import useCanWrite from '../../../hooks/useCanWrite';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_MATERIAS } from '../demoData';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
+import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
 
 export function useMateriasCrud() {
   const queryClient = useQueryClient();
   const puedeEscribir = useCanWrite();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMateria, setEditingMateria] = useState(null);
   const [deleteConfirmMateria, setDeleteConfirmMateria] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoMaterias, setDemoMaterias] = useState(() => {
     const saved = localStorage.getItem('demo_materias');
-    return saved ? JSON.parse(saved) : MOCK_MATERIAS;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_MATERIAS;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_materias', JSON.stringify(demoMaterias));
@@ -39,18 +46,19 @@ export function useMateriasCrud() {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['subjects'],
     (skip, limit, search) => SubjectsService.getSubjects(skip, limit, search),
-    { searchTerm: demoMode ? '' : searchTerm }
+    { searchTerm: demoMode ? '' : searchTerm, enabled: !demoMode }
   );
 
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   const items = demoMode ? demoMaterias : materiasReal;
   const total = demoMode ? demoMaterias.length : (totalMateriasReal ?? 0);
@@ -58,7 +66,7 @@ export function useMateriasCrud() {
   const { data: allMateriasStats = [] } = useQuery({
     queryKey: ['subjects-stats'],
     queryFn: async () => {
-      const result = await SubjectsService.getSubjects(0, 1000);
+      const result = await SubjectsService.getSubjects(0, FETCH_ALL_LIMIT);
       return result.items || result;
     },
     enabled: !demoMode,
@@ -77,7 +85,7 @@ export function useMateriasCrud() {
 
   const handleSave = async (data) => {
     if (!puedeEscribir) {
-      showToast("No tienes permisos para crear o editar materias.", "error");
+      showToast(MSG_SIN_PERMISO_CREAR('materias'), "error");
       return;
     }
     if (demoMode) {
@@ -102,7 +110,7 @@ export function useMateriasCrud() {
         queryClient.invalidateQueries({ queryKey: ['subjects'] });
         closeModal();
       } catch {
-        showToast("Error al guardar en el servidor", "error");
+        showToast(MSG_GUARDADO_ERROR, "error");
       }
     }
   };
@@ -110,7 +118,7 @@ export function useMateriasCrud() {
   const handleDelete = async () => {
     if (!deleteConfirmMateria) return;
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar materias.", "error");
+      showToast(MSG_SIN_PERMISO_ELIMINAR('materias'), "error");
       setDeleteConfirmMateria(null);
       return;
     }
@@ -125,10 +133,12 @@ export function useMateriasCrud() {
         showToast("Materia eliminada exitosamente", "info");
         setDeleteConfirmMateria(null);
       } catch {
-        showToast("Error al eliminar del servidor", "error");
+        showToast(MSG_ELIMINADO_ERROR, "error");
       }
     }
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     searchTerm, setSearchTerm,

@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { horaAMinutos } from '../utils/schedule';
+import { COLOR_FALLBACK } from '../../../constants';
 
 const DIAS = [
   { dia: 1, nombre: 'LUNES' },
@@ -253,7 +254,7 @@ const GridSemanalBloques = ({
                           <div
                             key={ev.id}
                             className={`evento-card ${esContinuacion ? 'evento-continuacion' : ''}`}
-                            style={{ '--ev-c': ev.extendedProps?.backgroundColor || '#6366f1' }}
+                            style={{ '--ev-c': ev.extendedProps?.backgroundColor || COLOR_FALLBACK }}
                             draggable
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));

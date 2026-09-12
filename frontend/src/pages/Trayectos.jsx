@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Plus, RefreshCw, AlertTriangle, Sparkles } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
 import useDebounce from '../hooks/useDebounce';
+import { DEBOUNCE_DELAY } from '../constants';
 import Pagination from '../components/ui/Pagination';
 import {
   useTrayectosCrud, calcularEstadisticas,
@@ -17,7 +18,7 @@ const Trayectos = () => {
   const puedeEscribir = useCanWrite();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 300);
+  const debouncedSearch = useDebounce(searchTerm, DEBOUNCE_DELAY);
 
   const {
     listado, total, totalPages, demoTotalPages, page, setPage,

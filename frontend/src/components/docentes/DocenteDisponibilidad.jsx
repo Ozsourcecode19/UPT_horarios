@@ -7,6 +7,9 @@ import {
 import DisponibilidadesService from '../../api/disponibilidades';
 import BloquesService from '../../api/bloques';
 import ConfiguracionesService from '../../api/configuraciones';
+import { FETCH_ALL_LIMIT } from '../../constants';
+import { DIAS_COMPLETOS } from '../../constants';
+import { DEBOUNCE_DELAY } from '../../constants';
 
 // 18 bloques estándar de 45 minutos (fallback de contingencia)
 const FALLBACK_BLOQUES_TIME = [
@@ -30,16 +33,7 @@ const FALLBACK_BLOQUES_TIME = [
   { start: "19:45:00", end: "20:30:00", label: "Bloque 18" }
 ];
 
-// Nombres de los días de la semana (1=Lunes, 7=Domingo)
-const DIAS_NOMBRES = {
-  1: 'Lunes',
-  2: 'Martes',
-  3: 'Miércoles',
-  4: 'Jueves',
-  5: 'Viernes',
-  6: 'Sábado',
-  7: 'Domingo'
-};
+// Nombres de los días de la semana (1=Lunes, 7=Domingo) — desde constants
 
 // Días laborables por defecto si no hay configuración (Lun-Vie)
 const DIAS_LABORABLES_DEFAULT = [1, 2, 3, 4, 5];
@@ -87,7 +81,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     queryKey: ['bloques'],
     queryFn: async () => {
       try {
-        const result = await BloquesService.getBloques(0, 1000);
+        const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT);
         return result.items || result;
       } catch (err) {
         console.warn("Error cargando bloques, usando fallback.");
@@ -130,7 +124,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     return sanitized.length > 0 ? sanitized : DIAS_LABORABLES_DEFAULT;
   }, [configsReal, demoMode]);
 
-  const dias = diasLaborables.map(id => ({ id, nombre: DIAS_NOMBRES[id] || `Día ${id}` }));
+  const dias = diasLaborables.map(id => ({ id, nombre: DIAS_COMPLETOS[id] || `Día ${id}` }));
 
   // Ventana de jornada según la configuración: la grilla solo muestra bloques
   // dentro de [hora_inicio_jornada, hora_fin_jornada] (hora de inicio + duración),
@@ -323,7 +317,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
           delete copy[cellKey];
           return copy;
         });
-      }, 300);
+      }, DEBOUNCE_DELAY);
     }
   };
 

@@ -2,30 +2,37 @@
 // Hook de CRUD de aulas con soporte Modo Demo (E22),
 // extraido de pages/Aulas.jsx.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import AulasService from '../../../api/aulas';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
+import { useDemo } from '../../../context/DemoContext';
+import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_AULAS } from '../demoData';
+import { TOAST_DURATION } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, MSG_RECONECTANDO_API } from '../../../constants/messages';
 
 const useAulasCrud = ({ searchTerm, debouncedSearch, sedes = [] }) => {
   const queryClient = useQueryClient();
+  const { demoMode, setDemoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAula, setEditingAula] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const [demoMode, setDemoMode] = useState(false);
   const [demoAulas, setDemoAulas] = useState(() => {
     const saved = localStorage.getItem('demo_aulas');
-    return saved ? JSON.parse(saved) : MOCK_AULAS;
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore corrupt data */ } }
+    return MOCK_AULAS;
   });
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('demo_aulas', JSON.stringify(demoAulas));
@@ -39,18 +46,19 @@ const useAulasCrud = ({ searchTerm, debouncedSearch, sedes = [] }) => {
     setPage,
     isLoading,
     isError,
+    error,
   } = usePaginatedQuery(
     ['aulas'],
     (skip, limit, search) => AulasService.getAulas(skip, limit, search),
-    { searchTerm: demoMode ? '' : debouncedSearch }
+    { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
   useEffect(() => {
-    if (isError && !demoMode) {
+    if (isError && esErrorDeServidor(error) && !demoMode) {
       setDemoMode(true);
-      showToast("Servidor API desconectado. Se activó el Modo Demo de Infraestructura automáticamente.", "warning");
+      showToast(MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, "warning");
     }
-  }, [isError]);
+  }, [isError, error, demoMode]);
 
   const demoFiltered = demoMode ? demoAulas.filter(a => {
     const sedeNombre = sedes.find(s => s.id === a.sede_id)?.nombre || '';
@@ -135,8 +143,10 @@ const useAulasCrud = ({ searchTerm, debouncedSearch, sedes = [] }) => {
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['aulas'] });
-    showToast("Intentando reconectar con API real...", "info");
+    showToast(MSG_RECONECTANDO_API, "info");
   };
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   return {
     listado, total, totalPages, page, setPage,

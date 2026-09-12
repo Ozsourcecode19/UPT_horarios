@@ -10,6 +10,7 @@ import {
 import HabilitacionesService from '../../api/habilitaciones';
 import ModalPortal from '../ui/ModalPortal';
 import SubjectsService from '../../api/subjects';
+import { FETCH_ALL_LIMIT } from '../../constants';
 
 // Esquema de validación para añadir habilitación
 const habilitacionSchema = z.object({
@@ -84,7 +85,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
     queryKey: ['materias'],
     queryFn: async () => {
       try {
-        const res = await SubjectsService.getSubjects(0, 1000);
+        const res = await SubjectsService.getSubjects(0, FETCH_ALL_LIMIT);
         return res.items || res || [];
       } catch (err) {
         console.warn("Error cargando materias, usando mock.");

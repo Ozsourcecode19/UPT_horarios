@@ -1,5 +1,6 @@
 // src/api/auth.service.js
 import apiClient from './client';
+import { LS_KEYS } from '../constants';
 
 const AuthService = {
   /**
@@ -25,8 +26,9 @@ const AuthService = {
    * @returns {void}
    */
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem(LS_KEYS.token);
+    localStorage.removeItem(LS_KEYS.user);
+    localStorage.removeItem('global_demo_mode');
     Object.keys(localStorage)
       .filter((k) => k.startsWith('demo_'))
       .forEach((k) => localStorage.removeItem(k));

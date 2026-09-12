@@ -2,12 +2,10 @@
 // Esquemas de validación y constantes para bloques horarios (E21), extraidos de pages/BloquesHorarios.jsx.
 
 import { z } from 'zod';
+import { DIAS_COMPLETOS, DURACIONES_BLOQUE } from '../../constants';
 
-export const DIAS_NOMBRES = {
-  1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
-};
-
-export const DURACIONES_VALIDAS = [30, 45, 60, 90, 120];
+export { DIAS_COMPLETOS as DIAS_NOMBRES } from '../../constants';
+export { DURACIONES_BLOQUE as DURACIONES_VALIDAS } from '../../constants';
 
 export const bloqueSchema = z.object({
   sede_id: z.number({ invalid_type_error: 'Debe seleccionar una sede' }),
