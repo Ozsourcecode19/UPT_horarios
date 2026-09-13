@@ -216,35 +216,35 @@ class ScheduleGenerator:
                 self.model.AddExactlyOne(vars_for_lesson)
 
         # b. Unicidad Docente/Grupo/Aula en (día, bloque)
-        # Docente
+        # Docente: un docente puede estar en UN solo lugar (aula) por bloque
         for docente in docentes:
-            # CORREGIDO: Filtrar lecciones para el docente en el bucle exterior
-            lecciones_docente = [l for l in lecciones if l.docente_id == docente.id] # <-- CORREGIDO: Comparación SQLAlchemy en filtro
+            lecciones_docente = [l for l in lecciones if l.docente_id == docente.id]
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue
-                for aula in aulas:
-                    # CORREGIDO: Usar self.assignment_vars
-                    vars_for_conflict = [self.assignment_vars[(l.id, bloque.id, aula.id)] # <-- Ahora usa self.assignment_vars
-                                         for l in lecciones_docente # <-- Usar la lista filtrada
-                                         if (l.id, bloque.id, aula.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
-                    if len(vars_for_conflict) > 1:
-                        self.model.AddAtMostOne(vars_for_conflict)
+                vars_for_conflict = [
+                    self.assignment_vars[(l.id, bloque.id, a.id)]
+                    for l in lecciones_docente
+                    for a in aulas
+                    if (l.id, bloque.id, a.id) in self.assignment_vars
+                ]
+                if len(vars_for_conflict) > 1:
+                    self.model.AddAtMostOne(vars_for_conflict)
 
-        # Grupo
+        # Grupo: un grupo puede estar en UN solo aula por bloque
         for grupo in grupos:
-            # CORREGIDO: Filtrar lecciones para el grupo en el bucle exterior
-            lecciones_grupo = [l for l in lecciones if l.grupo_id == grupo.id] # <-- CORREGIDO: Comparación SQLAlchemy en filtro
+            lecciones_grupo = [l for l in lecciones if l.grupo_id == grupo.id]
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue
-                for aula in aulas:
-                    # CORREGIDO: Usar self.assignment_vars
-                    vars_for_conflict = [self.assignment_vars[(l.id, bloque.id, aula.id)] # <-- Ahora usa self.assignment_vars
-                                         for l in lecciones_grupo # <-- Usar la lista filtrada
-                                         if (l.id, bloque.id, aula.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
-                    if len(vars_for_conflict) > 1:
-                        self.model.AddAtMostOne(vars_for_conflict)
+                vars_for_conflict = [
+                    self.assignment_vars[(l.id, bloque.id, a.id)]
+                    for l in lecciones_grupo
+                    for a in aulas
+                    if (l.id, bloque.id, a.id) in self.assignment_vars
+                ]
+                if len(vars_for_conflict) > 1:
+                    self.model.AddAtMostOne(vars_for_conflict)
 
         # Aula
         for aula in aulas:
