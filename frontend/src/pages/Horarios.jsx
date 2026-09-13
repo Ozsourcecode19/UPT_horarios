@@ -51,8 +51,18 @@ const Horarios = () => {
 
   const itemSeleccionado = useMemo(() => {
     if (filterType === 'grupo') return grupos.find(g => String(g.id) === String(filterValue));
+    if (filterType === 'docente') return docentes.find(d => String(d.id) === String(filterValue));
+    if (filterType === 'aula') return aulas.find(a => String(a.id) === String(filterValue));
     return null;
-  }, [filterType, filterValue, grupos]);
+  }, [filterType, filterValue, grupos, docentes, aulas]);
+
+  const sedesDelFiltro = useMemo(() => {
+    if (filterType === 'docente' || filterType === 'aula') {
+      const nombres = [...new Set(listadoHorarios.map(e => e.extendedProps?.sede).filter(Boolean))];
+      return nombres.join(', ');
+    }
+    return '';
+  }, [filterType, listadoHorarios]);
 
   const ventanaGrilla = useMemo(
     () => resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones }),
@@ -72,6 +82,26 @@ const Horarios = () => {
     () => construirBandasEje(bloques, sedesEje, ventanaGrilla),
     [bloques, sedesEje, ventanaGrilla]
   );
+
+  const altoBandaPrint = useMemo(() => {
+    const ALTO_HEADER = 20;
+    const ALTO_CABECERA = 6;
+    const ALTO_DESCANSO = 4;
+    const ESPACIO_DISPONIBLE = 194;
+
+    let descansosVisibles = 0;
+    for (let i = 0; i < bandas.length; i++) {
+      const siguiente = bandas[i + 1];
+      if (siguiente) {
+        const hueco = siguiente.iniMin - bandas[i].finMin;
+        if (hueco > 0) descansosVisibles++;
+      }
+    }
+
+    const espacioParaBandas = ESPACIO_DISPONIBLE - ALTO_HEADER - ALTO_CABECERA - (descansosVisibles * ALTO_DESCANSO);
+    const alto = espacioParaBandas / bandas.length;
+    return `${Math.max(alto, 7)}mm`;
+  }, [bandas]);
 
   const {
     selectedEvent, isEditModalOpen, setIsEditModalOpen,
@@ -193,8 +223,8 @@ const Horarios = () => {
         <div className="no-print"><VersionPanel versiones={versiones} selectedVersion={selectedVersion} onSelectVersion={setSelectedVersion} onRefresh={() => refetchVersiones()} onRestore={(v) => restoreVersionMutation.mutate({ version: v })} restorePending={restoreVersionMutation.isPending} isGenerating={isGenerating} canRestore={canRestore} /></div>
       )}
 
-      <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden">
-        <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} />
+      <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
+        <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
         <GridSemanalBloques
           eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
           bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}

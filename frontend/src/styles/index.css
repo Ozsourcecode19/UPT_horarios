@@ -312,12 +312,36 @@ table.grilla-bloques {
 @media print {
   @page {
     size: A4 landscape;
-    margin: 0; /* Sin zona de márgenes: el navegador omite título/URL/pie (localhost:3000) */
+    margin: 0;
   }
 
-  /* Los elementos marcados .no-print se colapsan por completo (display:none
-     viene de la regla más abajo), de modo que el documento termina donde
-     termina la tabla → sin páginas sobrantes. */
+  /* Contadores CSS para numeración de páginas */
+  @page {
+    @bottom-center {
+      counter-increment: page;
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: sans-serif;
+      font-size: 9px;
+      color: #94a3b8;
+    }
+    @bottom-left {
+      content: "UPT Bolívar — Sistema de Horarios";
+      font-family: sans-serif;
+      font-size: 9px;
+      color: #94a3b8;
+    }
+    @bottom-right {
+      content: "Generado: " target-counter(attr(data-fecha), page);
+      font-family: sans-serif;
+      font-size: 9px;
+      color: #94a3b8;
+    }
+  }
+
+  /* Reset de contadores */
+  body {
+    counter-reset: page;
+  }
 
   /* Sin animaciones/transiciones durante el renderizado de impresión
      (evita snapshots de las animaciones de entrada en opacidad 0) */
@@ -369,17 +393,19 @@ table.grilla-bloques {
     left: 0;
     top: 0;
     width: 100%;
+    max-height: 210mm;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    padding: 8mm !important;
+    padding: 6mm !important;
+    padding-bottom: 10mm !important;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    page-break-inside: avoid;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    --alto-banda: 11mm;
-    --print-zoom: 1.46;
-    zoom: var(--print-zoom, 1);
+    --alto-banda: 9mm;
   }
 
   /* Tabla de la grilla por bandas: bordes firmes, filas íntegras */
@@ -412,10 +438,18 @@ table.grilla-bloques {
     border: 1px solid #94a3b8 !important;
     border-left: 4px solid var(--ev-c, #6366f1) !important;
     box-shadow: none !important;
+    padding: 0.25rem 0.4rem;
+    margin-bottom: 0.15rem;
   }
 
   .print-area .evento-card * {
     color: #1e293b !important;
+  }
+
+  /* Reducir padding de celdas en impresión */
+  .print-area .grilla-bloques td,
+  .print-area .grilla-bloques th {
+    padding: 0.2rem 0.3rem !important;
   }
 
   /* Controles que no aportan en papel */
@@ -423,10 +457,46 @@ table.grilla-bloques {
     display: none !important;
   }
 
-  /* La grilla fluye completa (sin alto de pantalla ni scroller) */
+  /* Ocultar botones de eliminar (evitar que aparezcan en PDF) */
+  .print-area .ev-del {
+    display: none !important;
+  }
+
+  /* Ocultar badges de conflicto en impresión */
+  .print-area .conflicto-badge,
+  .print-area .conflicto-punto {
+    display: none !important;
+  }
+
+  /* La grilla fluye completa y rellena el espacio disponible */
   .print-area .grilla-scroll {
+    flex: 1;
     height: auto !important;
     overflow: visible !important;
+  }
+
+  /* Ocultar filas de descanso silenciosas (hueco < 30 min) */
+  .print-area .fila-descanso.silenciosa {
+    display: none !important;
+  }
+
+  /* Control de saltos de página en separadores de banda */
+  .print-area .fila-descanso {
+    page-break-before: auto;
+    page-break-after: avoid;
+  }
+
+  .print-area .grilla-bloques tr {
+    page-break-inside: avoid;
+  }
+
+  /* Repetir cabecera de tabla en cada página */
+  .print-area .grilla-bloques thead {
+    display: table-header-group;
+  }
+
+  .print-area .grilla-bloques thead tr {
+    background: #f1f5f9 !important;
   }
 }
 
