@@ -84,6 +84,7 @@ Cada sección (grupo) ocupa **exactamente 1 página**. El PDF completo tiene mú
 - [x] `PrintHeader` con logo institucional, info del filtro, fecha
 - [x] Altura dinámica de bandas (`altoBandaPrint`) — ajusta filas para llenar 1 página
 - [x] Dark mode override en print — siempre imprime en claro
+- [x] **Impresión multi-entidad** — imprimir todos los grupos, docentes o aulas en un solo PDF (cada uno en su propia página)
 
 ### Pendiente de implementar
 - [ ] `table-layout: fixed` + `<colgroup>` — anclar anchos de columna para consistencia entre vistas
@@ -91,7 +92,6 @@ Cada sección (grupo) ocupa **exactamente 1 página**. El PDF completo tiene mú
 - [ ] `word-wrap: break-word` en materias largas
 - [ ] `@page margin: 10mm` — actual es 0mm; 10mm da aspecto más profesional
 - [ ] Altura de celda fija (65px según referencia) — actual es dinámica; considerar fija para simplificar
-- [ ] Paginación por grupo (`page-break-after: always`) — actual comprime todo en 1 página; multi-página es cambio mayor
 
 ### Bug conocido
 - **Unicidad docente en solver:** `AddAtMostOne` aplicado por `(docente, bloque, aula)` en vez de `(docente, bloque)` — corregido en `or_tools_adapter.py`
@@ -135,3 +135,41 @@ Al imprimir desde Chrome/Edge, configurar:
 - **Márgenes:** Ninguno o Mínimo
 - **Escala:** Predeterminada (100%) — NO "Ajustar al área de impresión"
 - **Gráficos de fondo:** Activado
+
+---
+
+## Impresión Multi-Entidad
+
+### Funcionalidad
+Permite imprimir **todos los grupos**, **todos los docentes** o **todas las aulas** en un solo archivo PDF. Cada entidad aparece en su propia página con su encabezado y grilla independiente.
+
+### Componentes
+- **`PrintMultiSection.jsx`** — Renderiza múltiples secciones, una por cada entidad del tipo seleccionado
+- **`usePrintMultiEntity.js`** — Hook que prepara datos: filtra eventos, calcula bandas y ventanas para cada entidad
+- **Selector "Imprimir Todos"** — Botón con menú desplegable en la barra de herramientas
+
+### Cómo funciona
+1. El usuario hace clic en "Imprimir Todos" y selecciona el tipo (Grupo/Docente/Aula)
+2. `usePrintMultiEntity` itera sobre todas las entidades del tipo seleccionado
+3. Para cada entidad, filtra sus eventos y calcula sus bandas/ventana
+4. `PrintMultiSection` renderiza cada sección con su `PrintHeader` + `GridSemanalBloques`
+5. CSS usa `page-break-before: always` entre secciones para saltos de página
+6. Se ejecuta `window.print()` y el área multi se oculta automáticamente después
+
+### CSS clave
+```css
+/* En pantalla: oculto */
+.print-multi-area { display: none !important; }
+
+/* En impresión: visible y posicionado */
+@media print {
+  .print-multi-area { display: block !important; position: absolute; ... }
+  .print-section + .print-section { page-break-before: always; }
+}
+```
+
+### Solución de problemas anteriores
+- **Páginas en blanco:** Eliminado `page-break-inside: avoid` del contenedor padre
+- **Cabeceras sueltas:** Cada sección es una tabla independiente con su propio `<thead>`
+- **`max-height` fijo:** Eliminado para permitir contenido fluido entre páginas
+- **`overflow: hidden`:** Eliminado para evitar recorte de contenido

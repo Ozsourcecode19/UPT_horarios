@@ -758,6 +758,13 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 4. **Verificación pendiente del usuario:** recarga dura → Ctrl+P en claro y oscuro: preview con encabezado propio + grilla completa + eventos legibles; guardar PDF landscape.
 5. **Segunda pasada (misma sesión):** tras el fix de contención la grilla pintaba **colapsada en una fila** — causa: FC v6 posiciona `.fc-view` en absoluto llenando el harness cuando hay altura fija; el `position:static` del hack rompía esa contención. Solución correcta: dejar que **FC se re-layoute él mismo** — `ScheduleCalendarView` escucha `beforeprint`/`afterprint` y alterna `setOption('height','auto')` ↔ `680` (retirado el `position:static` del CSS). Además, la cabecera impresa ahora identifica la entidad de la vista en grande (`descripcionFiltro`: "Grupo:/Docente:/Aula: X") + turno/ventana (grupos) o jornada general, semana visible (nuevo prop opcional `onDatesSet` → `lunesImpresion`) y fecha de generación.
 
+### Contexto de la Sesión Actual (2026-09-13) — Bugfix: impresión multi-entidad en blanco
+
+1. **Síntoma:** el botón "Imprimir Todos" → cualquier tipo (grupos/docentes/aulas) generaba exactamente 1 página en blanco en la vista previa de impresión; el contenido (headers + grillas) no era visible.
+2. **Causa raíz:** CSS source order en `index.css`. Dentro de `@media print` (L523): `.print-multi-area { display: block !important; }`. Fuera de `@media print` (L648): `.print-multi-area { display: none !important; }`. Ambas reglas tienen especificidad `0,1,0` y `!important`; el navegador elige la que aparece después en el archivo → `display: none` gana incluso durante impresión. Las reglas externas fueron agregadas para ocultar el elemento en pantalla, pero son redundantes porque el elemento se renderiza condicionalmente (`{printMode && seccionesPrint.length > 0 && ...}`) y no existe en el DOM cuando `printMode` es null.
+3. **Fix:** eliminar el bloque completo "ESTILOS FUERA DE IMPRESIÓN PARA MULTI-ENTIDAD" (11 líneas: L644-654 de `index.css`). La grilla multi-entidad ahora se muestra correctamente en impresión.
+4. **Verificación:** `pnpm build` OK. Prueba manual: "Imprimir Todos" → Grupos → PDF muestra todas las entidades, cada una en su página con header + grilla.
+
 ### Contexto de la Sesión Actual (2026-08-25) — E17: coherencia división/habilitación entre CRUD y generación
 
 1. **Movimientos restringidos por la división del grupo (3 capas, criterio "cabe completo" = solver):**

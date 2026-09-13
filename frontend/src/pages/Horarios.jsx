@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Sparkles, Clock, Users, Download, Printer } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Calendar, Sparkles, Clock, Users, Download, Printer, FileText } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
 import { DeleteConfirmModal } from '../features/planning';
 import {
@@ -14,6 +14,7 @@ import {
   useBloqueSeleccionado, useSedeAulaEdicion,
   useBloqueConsecutivo, usePreviewRango, detectarSpanExistente,
   Toast, DemoBanner, GeneratingOverlay, EventRenderer, PrintHeader,
+  usePrintMultiEntity, PrintMultiSection,
 } from '../features/horarios';
 
 const Horarios = () => {
@@ -124,6 +125,10 @@ const Horarios = () => {
 
   const [editAbarca, setEditAbarca] = useState(1);
   const [confirmEliminar, setConfirmEliminar] = useState(null);
+  const [printMode, setPrintMode] = useState(null); // null | 'grupo' | 'docente' | 'aula'
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const closeMenuTimer = useRef(null);
+  const printAreaRef = useRef(null);
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
@@ -137,6 +142,18 @@ const Horarios = () => {
   const puedeAbarcarDos = !!bloqueConsecutivo;
   const previewRango = usePreviewRango(bloqueSeleccionado, bloqueConsecutivo, editAbarca);
 
+  // Hook para impresión multi-entidad
+  const { secciones: seccionesPrint, descripcionTipo } = usePrintMultiEntity({
+    tipoEntidad: printMode,
+    todosLosHorarios: listadoHorariosRaw,
+    grupos,
+    docentes,
+    aulas,
+    bloques,
+    configuraciones,
+    selectedPeriodo,
+  });
+
   const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
     demoMode, selectedPeriodoId, selectedPeriodo,
     setDemoHorarios, onRefetch: refetchHorarios,
@@ -147,6 +164,26 @@ const Horarios = () => {
   const onDropEnCelda = useMemo(() => createDropHandler({
     bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios,
   }), [bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios]);
+
+  // Función para imprimir multi-entidad
+  const handlePrintMultiEntity = (tipo) => {
+    setPrintMode(tipo);
+    // Esperar a que se renderice el componente y luego imprimir
+    setTimeout(() => {
+      window.print();
+      // Limpiar el modo de impresión después de imprimir
+      setTimeout(() => setPrintMode(null), 500);
+    }, 100);
+  };
+
+  // Hover controlado para el dropdown de impresión
+  const handlePrintMenuEnter = () => {
+    clearTimeout(closeMenuTimer.current);
+    setPrintMenuOpen(true);
+  };
+  const handlePrintMenuLeave = () => {
+    closeMenuTimer.current = setTimeout(() => setPrintMenuOpen(false), 150);
+  };
 
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
@@ -172,6 +209,31 @@ const Horarios = () => {
             <button onClick={() => window.print()} disabled={listadoHorarios.length === 0} title="Imprimir o guardar como PDF" className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
               <Printer className="w-4 h-4" /><span>Imprimir / PDF</span>
             </button>
+            <div
+              className="relative"
+              onMouseEnter={handlePrintMenuEnter}
+              onMouseLeave={handlePrintMenuLeave}
+            >
+              <button disabled={listadoHorarios.length === 0} title="Imprimir todas las entidades del tipo seleccionado" className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                <FileText className="w-4 h-4" /><span>Imprimir Todos</span>
+              </button>
+              {printMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 min-w-[180px]">
+                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('grupo'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-500" />
+                    <span>Todos los Grupos</span>
+                  </button>
+                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('docente'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-green-500" />
+                    <span>Todos los Docentes</span>
+                  </button>
+                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('aula'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-purple-500" />
+                    <span>Todas las Aulas</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <button onClick={triggerAutoGeneration} disabled={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir} title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)} className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none">
             <Sparkles className="w-5 h-5 animate-pulse" /><span>Generación Inteligente</span>
@@ -221,6 +283,19 @@ const Horarios = () => {
       {!demoMode && preCheck && <div className="no-print"><ChecklistPanel preCheck={preCheck} onRevalidar={refetchPreCheck} /></div>}
       {!demoMode && (
         <div className="no-print"><VersionPanel versiones={versiones} selectedVersion={selectedVersion} onSelectVersion={setSelectedVersion} onRefresh={() => refetchVersiones()} onRestore={(v) => restoreVersionMutation.mutate({ version: v })} restorePending={restoreVersionMutation.isPending} isGenerating={isGenerating} canRestore={canRestore} /></div>
+      )}
+
+      {/* Área de impresión multi-entidad (oculta en pantalla, visible solo al imprimir) */}
+      {printMode && seccionesPrint.length > 0 && (
+        <div className="print-multi-area" ref={printAreaRef}>
+          <PrintMultiSection
+            secciones={seccionesPrint}
+            tipoEntidad={printMode}
+            selectedPeriodo={selectedPeriodo}
+            bloques={bloques}
+            onEventoClick={handleEventClick}
+          />
+        </div>
       )}
 
       <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
