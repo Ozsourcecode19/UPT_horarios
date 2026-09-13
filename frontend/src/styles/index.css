@@ -388,6 +388,11 @@ table.grilla-bloques {
     visibility: visible;
   }
 
+  .print-multi-area,
+  .print-multi-area * {
+    visibility: visible;
+  }
+
   .print-area {
     position: absolute;
     left: 0;
@@ -457,6 +462,11 @@ table.grilla-bloques {
     display: none !important;
   }
 
+  /* Ocultar en pantalla, mostrar solo al imprimir */
+  .no-print-screen {
+    display: none !important;
+  }
+
   /* Ocultar botones de eliminar (evitar que aparezcan en PDF) */
   .print-area .ev-del {
     display: none !important;
@@ -497,6 +507,137 @@ table.grilla-bloques {
 
   .print-area .grilla-bloques thead tr {
     background: #f1f5f9 !important;
+  }
+
+  /* ============================================================
+     IMPRESIÓN MULTI-ENTIDAD (nueva funcionalidad)
+     Para imprimir todas las entidades de un tipo (grupos, docentes o aulas)
+     en un solo PDF, cada una en su propia página.
+     ============================================================ */
+  
+  /* Ocultar el área de impresión normal cuando hay modo multi-entidad */
+  .print-multi-area ~ .print-area {
+    display: none !important;
+  }
+  
+  .print-multi-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .print-multi-area .print-section {
+    display: block !important;
+  }
+  
+  /* Cada sección de impresión */
+  .print-section {
+    page-break-inside: avoid;
+    page-break-after: auto;
+    padding: 6mm !important;
+    padding-bottom: 10mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Saltos de página entre secciones */
+  .print-section + .print-section {
+    page-break-before: always;
+  }
+  
+  /* Estilos para la grilla dentro de cada sección */
+  .print-section .grilla-bloques th,
+  .print-section .grilla-bloques td {
+    border: 1px solid #64748b !important;
+    position: static !important;
+    background: transparent !important;
+  }
+  
+  .print-section .grilla-bloques th {
+    background: #f1f5f9 !important;
+  }
+  
+  .print-section .grilla-bloques {
+    border-collapse: separate !important;
+    border-spacing: 0;
+  }
+  
+  .print-section .grilla-bloques tr,
+  .print-section .grilla-bloques td,
+  .print-section .grilla-bloques th {
+    break-inside: avoid;
+  }
+  
+  /* Eventos sobrios en papel para multi-entidad */
+  .print-section .evento-card {
+    background: #fff !important;
+    color: #1e293b !important;
+    border: 1px solid #94a3b8 !important;
+    border-left: 4px solid var(--ev-c, #6366f1) !important;
+    box-shadow: none !important;
+    padding: 0.25rem 0.4rem;
+    margin-bottom: 0.15rem;
+  }
+  
+  .print-section .evento-card * {
+    color: #1e293b !important;
+  }
+  
+  /* Reducir padding de celdas en impresión multi-entidad */
+  .print-section .grilla-bloques td,
+  .print-section .grilla-bloques th {
+    padding: 0.2rem 0.3rem !important;
+  }
+  
+  /* Ocultar botones de eliminar en multi-entidad */
+  .print-section .ev-del {
+    display: none !important;
+  }
+  
+  /* Ocultar badges de conflicto en multi-entidad */
+  .print-section .conflicto-badge,
+  .print-section .conflicto-punto {
+    display: none !important;
+  }
+  
+  /* La grilla fluye completa en multi-entidad */
+  .print-section .grilla-scroll {
+    flex: 1;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
+  /* Ocultar filas de descanso silenciosas en multi-entidad */
+  .print-section .fila-descanso.silenciosa {
+    display: none !important;
+  }
+  
+  /* Control de saltos de página en separadores de banda multi-entidad */
+  .print-section .fila-descanso {
+    page-break-before: auto;
+    page-break-after: avoid;
+  }
+  
+  .print-section .grilla-bloques tr {
+    page-break-inside: avoid;
+  }
+  
+  /* NO repetir cabecera de tabla en multi-entidad (cada sección es独立) */
+  .print-section .grilla-bloques thead {
+    display: table-row-group;
   }
 }
 
