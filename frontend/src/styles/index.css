@@ -413,31 +413,44 @@ table.grilla-bloques {
     --alto-banda: 9mm;
   }
 
+  /* ============================================================
+     Reglas compartidas: grilla, eventos, ocultamiento
+     (consolidación de .print-area y .print-section, fix 2026-09-15)
+     ============================================================ */
+
   /* Tabla de la grilla por bandas: bordes firmes, filas íntegras */
   .print-area .grilla-bloques th,
-  .print-area .grilla-bloques td {
+  .print-area .grilla-bloques td,
+  .print-section .grilla-bloques th,
+  .print-section .grilla-bloques td {
     border: 1px solid #64748b !important;
     position: static !important;
     background: transparent !important;
   }
 
-  .print-area .grilla-bloques th {
+  .print-area .grilla-bloques th,
+  .print-section .grilla-bloques th {
     background: #f1f5f9 !important;
   }
 
-  .print-area .grilla-bloques {
+  .print-area .grilla-bloques,
+  .print-section .grilla-bloques {
     border-collapse: separate !important;
     border-spacing: 0;
   }
 
   .print-area .grilla-bloques tr,
   .print-area .grilla-bloques td,
-  .print-area .grilla-bloques th {
+  .print-area .grilla-bloques th,
+  .print-section .grilla-bloques tr,
+  .print-section .grilla-bloques td,
+  .print-section .grilla-bloques th {
     break-inside: avoid;
   }
 
   /* Eventos sobrios en papel: fondo blanco, borde fino y acento de materia */
-  .print-area .evento-card {
+  .print-area .evento-card,
+  .print-section .evento-card {
     background: #fff !important;
     color: #1e293b !important;
     border: 1px solid #94a3b8 !important;
@@ -447,13 +460,16 @@ table.grilla-bloques {
     margin-bottom: 0.15rem;
   }
 
-  .print-area .evento-card * {
+  .print-area .evento-card *,
+  .print-section .evento-card * {
     color: #1e293b !important;
   }
 
   /* Reducir padding de celdas en impresión */
   .print-area .grilla-bloques td,
-  .print-area .grilla-bloques th {
+  .print-area .grilla-bloques th,
+  .print-section .grilla-bloques td,
+  .print-section .grilla-bloques th {
     padding: 0.2rem 0.3rem !important;
   }
 
@@ -468,39 +484,69 @@ table.grilla-bloques {
   }
 
   /* Ocultar botones de eliminar (evitar que aparezcan en PDF) */
-  .print-area .ev-del {
+  .print-area .ev-del,
+  .print-section .ev-del {
     display: none !important;
   }
 
   /* Ocultar badges de conflicto en impresión */
   .print-area .conflicto-badge,
-  .print-area .conflicto-punto {
+  .print-area .conflicto-punto,
+  .print-section .conflicto-badge,
+  .print-section .conflicto-punto {
     display: none !important;
   }
 
   /* La grilla fluye completa y rellena el espacio disponible */
-  .print-area .grilla-scroll {
+  .print-area .grilla-scroll,
+  .print-section .grilla-scroll {
     flex: 1;
     height: auto !important;
     overflow: visible !important;
   }
 
   /* Ocultar filas de descanso silenciosas (hueco < 30 min) */
-  .print-area .fila-descanso.silenciosa {
+  .print-area .fila-descanso.silenciosa,
+  .print-section .fila-descanso.silenciosa {
     display: none !important;
   }
 
   /* Control de saltos de página en separadores de banda */
-  .print-area .fila-descanso {
+  .print-area .fila-descanso,
+  .print-section .fila-descanso {
     page-break-before: auto;
     page-break-after: avoid;
   }
 
-  .print-area .grilla-bloques tr {
+  .print-area .grilla-bloques tr,
+  .print-section .grilla-bloques tr {
     page-break-inside: avoid;
   }
 
-  /* Repetir cabecera de tabla en cada página */
+  /* ============================================================
+     .print-area: impresión de entidad individual
+     ============================================================ */
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-height: 210mm;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 6mm !important;
+    padding-bottom: 10mm !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    --alto-banda: 9mm;
+  }
+
+  /* Repetir cabecera de tabla en cada página (individual) */
   .print-area .grilla-bloques thead {
     display: table-header-group;
   }
@@ -510,16 +556,16 @@ table.grilla-bloques {
   }
 
   /* ============================================================
-     IMPRESIÓN MULTI-ENTIDAD (nueva funcionalidad)
+     IMPRESIÓN MULTI-ENTIDAD
      Para imprimir todas las entidades de un tipo (grupos, docentes o aulas)
      en un solo PDF, cada una en su propia página.
      ============================================================ */
-  
+
   /* Ocultar el área de impresión normal cuando hay modo multi-entidad */
   .print-multi-area ~ .print-area {
     display: none !important;
   }
-  
+
   .print-multi-area {
     display: block !important;
     position: absolute;
@@ -534,12 +580,12 @@ table.grilla-bloques {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  
+
   .print-multi-area .print-section {
     display: block !important;
   }
-  
-  /* Cada sección de impresión */
+
+  /* Cada sección: ocupa toda la hoja A4 landscape */
   .print-section {
     page-break-inside: avoid;
     page-break-after: auto;
@@ -551,91 +597,19 @@ table.grilla-bloques {
     margin: 0 !important;
     width: 100%;
     box-sizing: border-box;
+    min-height: calc(210mm - 16mm);
+    max-height: calc(210mm - 16mm);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
-  
+
   /* Saltos de página entre secciones */
   .print-section + .print-section {
     page-break-before: always;
   }
-  
-  /* Estilos para la grilla dentro de cada sección */
-  .print-section .grilla-bloques th,
-  .print-section .grilla-bloques td {
-    border: 1px solid #64748b !important;
-    position: static !important;
-    background: transparent !important;
-  }
-  
-  .print-section .grilla-bloques th {
-    background: #f1f5f9 !important;
-  }
-  
-  .print-section .grilla-bloques {
-    border-collapse: separate !important;
-    border-spacing: 0;
-  }
-  
-  .print-section .grilla-bloques tr,
-  .print-section .grilla-bloques td,
-  .print-section .grilla-bloques th {
-    break-inside: avoid;
-  }
-  
-  /* Eventos sobrios en papel para multi-entidad */
-  .print-section .evento-card {
-    background: #fff !important;
-    color: #1e293b !important;
-    border: 1px solid #94a3b8 !important;
-    border-left: 4px solid var(--ev-c, #6366f1) !important;
-    box-shadow: none !important;
-    padding: 0.25rem 0.4rem;
-    margin-bottom: 0.15rem;
-  }
-  
-  .print-section .evento-card * {
-    color: #1e293b !important;
-  }
-  
-  /* Reducir padding de celdas en impresión multi-entidad */
-  .print-section .grilla-bloques td,
-  .print-section .grilla-bloques th {
-    padding: 0.2rem 0.3rem !important;
-  }
-  
-  /* Ocultar botones de eliminar en multi-entidad */
-  .print-section .ev-del {
-    display: none !important;
-  }
-  
-  /* Ocultar badges de conflicto en multi-entidad */
-  .print-section .conflicto-badge,
-  .print-section .conflicto-punto {
-    display: none !important;
-  }
-  
-  /* La grilla fluye completa en multi-entidad */
-  .print-section .grilla-scroll {
-    flex: 1;
-    height: auto !important;
-    overflow: visible !important;
-  }
-  
-  /* Ocultar filas de descanso silenciosas en multi-entidad */
-  .print-section .fila-descanso.silenciosa {
-    display: none !important;
-  }
-  
-  /* Control de saltos de página en separadores de banda multi-entidad */
-  .print-section .fila-descanso {
-    page-break-before: auto;
-    page-break-after: avoid;
-  }
-  
-  .print-section .grilla-bloques tr {
-    page-break-inside: avoid;
-  }
-  
-  /* NO repetir cabecera de tabla en multi-entidad (cada sección es独立) */
+
+  /* NO repetir cabecera de tabla en multi-entidad (cada sección es independiente) */
   .print-section .grilla-bloques thead {
     display: table-row-group;
   }
@@ -725,13 +699,47 @@ table.grilla-bloques {
 .dark .border-amber-200\/70 { border-color: rgb(245 158 11 / .3); }
 .dark .text-amber-500 { color: #fbbf24; }
 
-/* ---------- La impresión (E12) SIEMPRE sale clara ---------- */
+/* ---------- La impresión (E12+fix-dark) SIEMPRE sale clara ---------- */
 @media print {
   html.dark body { background-color: #fff !important; }
-  html.dark .print-area { color: #1e293b !important; }
+  html.dark .print-area, html.dark .print-section { color: #1e293b !important; }
   /* Neutraliza el shim dentro de la hoja impresa */
   html.dark .bg-white { background-color: #fff !important; }
   html.dark .text-slate-800, html.dark .text-slate-900 { color: #1e293b !important; }
+
+  /* Reset completo de grilla en dark mode para impresión */
+  html.dark .grilla-bloques th {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border-color: #64748b !important;
+  }
+  html.dark .grilla-bloques td {
+    border-color: #64748b !important;
+    background: transparent !important;
+  }
+  html.dark .celda-hora {
+    background-color: #fff !important;
+    color: #334155 !important;
+  }
+  html.dark .banda-par > td {
+    background: transparent !important;
+  }
+  html.dark .fila-descanso td {
+    background-color: #f1f5f9 !important;
+    color: #94a3b8 !important;
+  }
+
+  /* Reset completo de eventos en dark mode para impresión */
+  html.dark .evento-card {
+    background: #fff !important;
+    color: #1e293b !important;
+  }
+  html.dark .evento-card * {
+    color: #1e293b !important;
+  }
+  html.dark .ev-x2 {
+    color: #1d4ed8 !important;
+  }
 }
 
 /* ============================================================
