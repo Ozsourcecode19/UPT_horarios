@@ -26,6 +26,8 @@
   }
 }
 
+.print-multi-area { display: none; }
+
 /* ============================================================
    GRILLA SEMANAL POR BANDAS DE BLOQUE (GridSemanalBloques, E18)
    Tabla nativa: una fila por BloqueHorario, etiqueta centrada,

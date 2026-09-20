@@ -180,6 +180,108 @@ export const resolveVentanaGrilla = ({ filterType, item, configs = [] }: Resolve
 };
 
 /**
+ * Calcula la ventana dinámica a partir de los eventos reales de una entidad.
+ * Busca el bloque más temprano y el más tardío, con un buffer de 15 min.
+ * Si no hay eventos válidos, retorna la jornada completa.
+ * @param eventos - Eventos filtrados de la entidad
+ * @param bloques - Catálogo de bloques horarios
+ * @param configuraciones - Configuraciones del sistema
+ * @returns VentanaTurno ajustada al rango real de eventos
+ */
+export const ventanaDinamicaDeEventos = (
+  eventos: FullCalendarEvent[],
+  bloques: BloqueHorario[],
+  configuraciones: Configuracion[],
+): VentanaTurno => {
+  const bloqueMap = new Map(bloques.map(b => [Number(b.id), b]));
+  let minIni = Infinity;
+  let maxFin = 0;
+
+  for (const ev of eventos) {
+    const bloque = bloqueMap.get(Number((ev.extendedProps as FullCalendarExtendedProps)?.bloque_id));
+    if (!bloque || bloque.activo === false) continue;
+    const ini = horaAMinutos(bloque.hora_inicio);
+    const fin = ini + (Number(bloque.duracion_minutos) || 0);
+    if (ini < minIni) minIni = ini;
+    if (fin > maxFin) maxFin = fin;
+  }
+
+  if (minIni === Infinity) {
+    return resolveVentanaGrilla({ filterType: 'docente', configs: configuraciones });
+  }
+
+  const BUFFER = 15;
+  const toHMS = (min: number): string =>
+    `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00`;
+
+  return {
+    inicio: toHMS(Math.max(0, minIni - BUFFER)),
+    fin: toHMS(maxFin + BUFFER),
+  };
+};
+
+/**
+ * Agrupa bandas por ventanas de turno (MATUTINO, VESPERTINO, NOCTURNO).
+ * @param bandas - Bandas del eje temporal
+ * @param configuraciones - Configuraciones del sistema
+ * @returns Array de { nombre, ventana, bandas } por turno presente
+ */
+export const agruparBandasPorTurno = (
+  bandas: BandaEje[],
+  configuraciones: Configuracion[],
+): { nombre: string; ventana: VentanaTurno; bandas: BandaEje[] }[] => {
+  const TURNOS = ['MATUTINO', 'VESPERTINO', 'NOCTURNO'] as const;
+  return TURNOS
+    .map(nombre => {
+      const ventana = resolveVentanaTurno(nombre, configuraciones);
+      if (!ventana) return null;
+      const vIni = horaAMinutos(ventana.inicio);
+      const vFin = horaAMinutos(ventana.fin);
+      const bandasDelTurno = bandas.filter(b => b.finMin > vIni && b.iniMin < vFin);
+      return bandasDelTurno.length > 0 ? { nombre, ventana, bandas: bandasDelTurno } : null;
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+};
+
+/**
+ * Calcula el alto de banda disponible para impresión.
+ * @param numBandas - Número de bandas
+ * @param tieneInfoExtra - Si hay línea de email/capacidad
+ * @param descansosVisibles - Número de filas de descanso visibles
+ * @param espacioDisponible - Espacio total en mm (178 multi, 184 individual)
+ * @returns Alto en mm
+ */
+export const calcularAltoBandaPrint = (
+  numBandas: number,
+  tieneInfoExtra: boolean,
+  descansosVisibles: number,
+  espacioDisponible: number,
+): number => {
+  const ALTO_HEADER = 20;
+  const ALTO_INFO_EXTRA = 4;
+  const ALTO_CABECERA = 6;
+  const ALTO_DESCANSO = 4;
+  const espacio = espacioDisponible
+    - ALTO_HEADER
+    - (tieneInfoExtra ? ALTO_INFO_EXTRA : 0)
+    - ALTO_CABECERA
+    - (descansosVisibles * ALTO_DESCANSO);
+  return espacio / numBandas;
+};
+
+/**
+ * Cuenta las filas de descanso visibles entre bandas consecutivas.
+ */
+export const contarDescansosVisibles = (bandas: BandaEje[]): number => {
+  let count = 0;
+  for (let i = 0; i < bandas.length; i++) {
+    const siguiente = bandas[i + 1];
+    if (siguiente && siguiente.iniMin - bandas[i].finMin > 0) count++;
+  }
+  return count;
+};
+
+/**
  * División efectiva de un evento de horario: extendedProps.division (backend)
  * o lookup en el catálogo de grupos por id y luego por nombre (Modo Demo).
  * @param extendedProps
