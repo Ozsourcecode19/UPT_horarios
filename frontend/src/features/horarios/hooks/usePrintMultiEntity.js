@@ -97,8 +97,10 @@ export default function usePrintMultiEntity({
         }];
       }
 
-      // DOCENTE / AULA: ventana dinámica según eventos reales
-      const ventanaGrilla = ventanaDinamicaDeEventos(eventosFiltrados, bloques, configuraciones);
+      // DOCENTE / AULA: ventana según tipo
+      const ventanaGrilla = tipoEntidad === 'aula'
+        ? resolveVentanaGrilla({ filterType: tipoEntidad, item: entidad, configs: configuraciones })
+        : ventanaDinamicaDeEventos(eventosFiltrados, bloques, configuraciones);
       const bandas = construirBandasEje(bloques, sedesEje, ventanaGrilla);
 
       // Verificar si excede 1 página (fallback por turno)

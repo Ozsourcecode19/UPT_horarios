@@ -149,7 +149,9 @@ const Horarios = () => {
     if (filterType === 'docente' && itemSeleccionado.email) infoAdicional.email = itemSeleccionado.email;
     if (filterType === 'aula' && itemSeleccionado.capacidad) infoAdicional.capacidad = itemSeleccionado.capacidad;
 
-    const ventanaGrilla = ventanaDinamicaDeEventos(eventosFiltrados, bloques, configuraciones);
+    const ventanaGrilla = filterType === 'aula'
+      ? resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones })
+      : ventanaDinamicaDeEventos(eventosFiltrados, bloques, configuraciones);
     const allBandas = construirBandasEje(bloques, sedesEje, ventanaGrilla);
     const turnos = agruparBandasPorTurno(allBandas, configuraciones);
 
