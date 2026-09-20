@@ -29,11 +29,11 @@ def read_aula(aula_id: int, db: Session = Depends(get_db)):
     return db_aula
 
 @router.get("/", response_model=PaginatedResponse[schemas.Aula], dependencies=[Depends(get_current_active_user)])
-def read_aulas(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
+def read_aulas(skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de aulas con paginación.
+    Obtiene una lista de aulas con paginación y filtro por sede.
     """
-    items, total = crud.get_aulas(db, skip=skip, limit=limit, search=search)
+    items, total = crud.get_aulas(db, skip=skip, limit=limit, search=search, sede_id=sede_id)
     return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{aula_id}", response_model=schemas.Aula, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
