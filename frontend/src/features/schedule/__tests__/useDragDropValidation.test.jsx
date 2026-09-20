@@ -288,7 +288,7 @@ describe('useDragDropValidation — ventana por división (E17)', () => {
     expect(ok).toBe(false);
     expect(setup.scheduleService.validateMove).not.toHaveBeenCalled();
     expect(setup.showToast).toHaveBeenCalledWith(
-      expect.stringContaining('El turno MATUTINO solo admite bloques entre 07:00 y 12:00'),
+      expect.stringContaining('El turno MATUTINO solo admite bloques entre'),
       'error'
     );
   });

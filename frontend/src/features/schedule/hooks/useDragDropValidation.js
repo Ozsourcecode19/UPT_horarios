@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
 import { recalcularEventoDemo, resolveVentanaTurno, bloqueDentroVentana, resolverDivisionEvento, horaAMinutos } from '../utils/schedule';
+import { formatHora12 } from '../../../utils/timeFormat';
 import { MSG_SIN_PERMISO_MODIFICAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_CLASES } from '../../../constants/messages';
 import { validateMoveMock } from '../utils/scheduleValidation';
 
@@ -113,7 +114,7 @@ export const useDragDropValidation = ({
     const ventanaTurno = resolveVentanaTurno(divisionEvento, configuraciones);
     if (ventanaTurno && targetBlockVentana && !bloqueDentroVentana(targetBlockVentana, ventanaTurno)) {
       showToast(
-        `El turno ${divisionEvento} solo admite bloques entre ${ventanaTurno.inicio.slice(0, 5)} y ${ventanaTurno.fin.slice(0, 5)}.`,
+        `El turno ${divisionEvento} solo admite bloques entre ${formatHora12(ventanaTurno.inicio.slice(0, 5))} y ${formatHora12(ventanaTurno.fin.slice(0, 5))}.`,
         "error"
       );
       revert?.();
@@ -201,7 +202,7 @@ export const useDragDropValidation = ({
     const ventana = resolveVentanaTurno(divisionEvento, configuraciones);
     for (const destino of bloqueDestinos) {
       if (ventana && !bloqueDentroVentana(destino, ventana)) {
-        showToast(`El turno ${divisionEvento} solo admite bloques entre ${ventana.inicio.slice(0, 5)} y ${ventana.fin.slice(0, 5)}.`, "error");
+        showToast(`El turno ${divisionEvento} solo admite bloques entre ${formatHora12(ventana.inicio.slice(0, 5))} y ${formatHora12(ventana.fin.slice(0, 5))}.`, "error");
         return false;
       }
     }

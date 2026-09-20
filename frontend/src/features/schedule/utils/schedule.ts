@@ -24,6 +24,8 @@ const DIVISIONES_VALIDAS: string[] = Object.keys(VENTANAS_TURNO_DEFAULT);
 
 // ─── Funciones internas ─────────────────────────────────────
 
+import { formatHora12 } from '../../../utils/timeFormat';
+
 /**
  * Formatea minutos como "H:MM" (sin cero inicial).
  * @param min - Minutos desde medianoche
@@ -246,7 +248,7 @@ export const construirBandasEje = (
     .map(([iniMin, finMin]) => ({
       iniMin,
       finMin,
-      etiqueta: `${fmtMinutos(iniMin)} - ${fmtMinutos(finMin)}`,
+      etiqueta: `${formatHora12(fmtMinutos(iniMin))} - ${formatHora12(fmtMinutos(finMin))}`,
     }));
 
   if (ventana) {

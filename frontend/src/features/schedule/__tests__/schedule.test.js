@@ -396,12 +396,12 @@ describe('construirBandasEje', () => {
   it('una banda por hora de inicio, fin = máximo del grupo, etiqueta "H:MM - H:MM"', () => {
     const bandas = construirBandasEje(bloques, []);
     expect(bandas).toHaveLength(2);
-    expect(bandas[0]).toMatchObject({ iniMin: 480, finMin: 570, etiqueta: '8:00 - 9:30' }); // max(45,90)=90
+    expect(bandas[0]).toMatchObject({ iniMin: 480, finMin: 570, etiqueta: '8:00 AM - 9:30 AM' }); // max(45,90)=90
     expect(bandas[1]).toMatchObject({ iniMin: 525, finMin: 615 });
   });
 
   it('filtra por sedes e ignora inactivos', () => {
-    expect(construirBandasEje(bloques, [2]).map(b => b.etiqueta)).toEqual(['8:00 - 9:30']);
+    expect(construirBandasEje(bloques, [2]).map(b => b.etiqueta)).toEqual(['8:00 AM - 9:30 AM']);
   });
 
   it('recorta a la ventana horaria (jornada/turno)', () => {
