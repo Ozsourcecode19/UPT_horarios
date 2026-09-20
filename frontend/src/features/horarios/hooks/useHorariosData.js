@@ -25,6 +25,13 @@ const TIPOS_VISTA = [
   { valor: 'aula', etiqueta: 'Aulas', Icono: MapPin },
 ];
 
+const TURNOS_DISPONIBLES = [
+  { valor: 'TODOS', etiqueta: 'Todos' },
+  { valor: 'MATUTINO', etiqueta: 'Matutino' },
+  { valor: 'VESPERTINO', etiqueta: 'Vespertino' },
+  { valor: 'NOCTURNO', etiqueta: 'Nocturno' },
+];
+
 export default function useHorariosData() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -37,6 +44,7 @@ export default function useHorariosData() {
   const [selectedSedeId, setSelectedSedeId] = useState(null);
   const [filterType, setFilterType] = useState('grupo');
   const [filterValue, setFilterValue] = useState('');
+  const [turnoFilter, setTurnoFilter] = useState('TODOS');
   const [selectedVersion, setSelectedVersion] = useState(null);
 
   const [toast, setToast] = useState(null);
@@ -58,6 +66,11 @@ export default function useHorariosData() {
   }, [demoHorarios]);
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+
+  // Auto-reset turnoFilter al cambiar a vista de grupo (grupos ya tienen su turno por division)
+  useEffect(() => {
+    if (filterType === 'grupo') setTurnoFilter('TODOS');
+  }, [filterType]);
 
   // --- QUERIES ---
 
@@ -241,6 +254,7 @@ export default function useHorariosData() {
     sedes,
     filterType, setFilterType,
     filterValue, setFilterValue,
+    turnoFilter, setTurnoFilter,
     demoMode, setDemoMode,
     selectedVersion, setSelectedVersion,
     toast, showToast,
@@ -252,5 +266,6 @@ export default function useHorariosData() {
     preCheck, refetchPreCheck, canGenerate,
     versiones, refetchVersiones, restoreVersionMutation,
     TIPOS_VISTA,
+    TURNOS_DISPONIBLES,
   };
 }
