@@ -5,6 +5,7 @@ import { formatHora12 } from '../utils/timeFormat';
 import { DeleteConfirmModal } from '../features/planning';
 import {
   filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje,
+  ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
   GridSemanalBloques, VersionPanel, EditEventModal,
@@ -68,10 +69,13 @@ const Horarios = () => {
     return '';
   }, [filterType, listadoHorarios]);
 
-  const ventanaGrilla = useMemo(
-    () => resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones }),
-    [filterType, itemSeleccionado, configuraciones]
-  );
+  const ventanaGrilla = useMemo(() => {
+    if (filterType === 'grupo') {
+      return resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones });
+    }
+    // Docente/Aula: ventana dinámica según eventos reales
+    return ventanaDinamicaDeEventos(listadoHorarios, bloques, configuraciones);
+  }, [filterType, itemSeleccionado, configuraciones, listadoHorarios, bloques]);
 
   const sedesEje = useMemo(() => {
     if (filterType === 'grupo' && itemSeleccionado?.sede_id != null) return [itemSeleccionado.sede_id];
@@ -88,24 +92,59 @@ const Horarios = () => {
   );
 
   const altoBandaPrint = useMemo(() => {
-    const ALTO_HEADER = 20;
-    const ALTO_CABECERA = 6;
-    const ALTO_DESCANSO = 4;
-    const ESPACIO_DISPONIBLE = 194;
-
-    let descansosVisibles = 0;
-    for (let i = 0; i < bandas.length; i++) {
-      const siguiente = bandas[i + 1];
-      if (siguiente) {
-        const hueco = siguiente.iniMin - bandas[i].finMin;
-        if (hueco > 0) descansosVisibles++;
-      }
-    }
-
-    const espacioParaBandas = ESPACIO_DISPONIBLE - ALTO_HEADER - ALTO_CABECERA - (descansosVisibles * ALTO_DESCANSO);
-    const alto = espacioParaBandas / bandas.length;
+    const descansosVisibles = contarDescansosVisibles(bandas);
+    const alto = calcularAltoBandaPrint(bandas.length, false, descansosVisibles, 184);
     return `${Math.max(alto, 7)}mm`;
   }, [bandas]);
+
+  const exceedsSinglePage = useMemo(() => {
+    const descansosVisibles = contarDescansosVisibles(bandas);
+    const alto = calcularAltoBandaPrint(bandas.length, false, descansosVisibles, 184);
+    return alto < 7 && (filterType === 'docente' || filterType === 'aula');
+  }, [bandas, filterType]);
+
+  // Secciones para impresión individual cuando excede 1 página
+  const seccionesPrintIndividual = useMemo(() => {
+    if (!exceedsSinglePage || !itemSeleccionado) return [];
+    const eventosFiltrados = filterEvents(listadoHorarios, {
+      filterType, filterValue, docentes, grupos,
+    });
+    let sedesEje = [];
+    if (filterType === 'aula' && itemSeleccionado?.sede_id != null) sedesEje = [itemSeleccionado.sede_id];
+
+    let descripcionBase = '';
+    if (filterType === 'docente') descripcionBase = `Docente: ${itemSeleccionado.apellido}, ${itemSeleccionado.nombre}`;
+    else if (filterType === 'aula') descripcionBase = `Aula: ${itemSeleccionado.nombre}`;
+
+    const infoAdicional = {};
+    if (filterType === 'docente' && itemSeleccionado.email) infoAdicional.email = itemSeleccionado.email;
+    if (filterType === 'aula' && itemSeleccionado.capacidad) infoAdicional.capacidad = itemSeleccionado.capacidad;
+
+    const ventanaGrilla = ventanaDinamicaDeEventos(eventosFiltrados, bloques, configuraciones);
+    const allBandas = construirBandasEje(bloques, sedesEje, ventanaGrilla);
+    const turnos = agruparBandasPorTurno(allBandas, configuraciones);
+
+    return turnos.map(turno => {
+      const eventosTurno = eventosFiltrados.filter(ev => {
+        const bloque = bloques.find(b => Number(b.id) === Number(ev.extendedProps?.bloque_id));
+        if (!bloque) return false;
+        const ini = (bloque.hora_inicio || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
+        const vIni = (turno.ventana.inicio || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
+        const vFin = (turno.ventana.fin || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
+        return ini >= vIni && ini < vFin;
+      });
+      const turnoLabel = turno.nombre.charAt(0) + turno.nombre.slice(1).toLowerCase();
+      return {
+        id: `${itemSeleccionado.id}-${turno.nombre}`,
+        entidad: itemSeleccionado,
+        descripcion: `${descripcionBase} - ${turnoLabel}`,
+        eventos: eventosTurno,
+        bandas: turno.bandas,
+        ventanaGrilla: turno.ventana,
+        infoAdicional,
+      };
+    }).filter(s => s.eventos.length > 0);
+  }, [exceedsSinglePage, itemSeleccionado, filterType, filterValue, listadoHorarios, bloques, configuraciones, docentes, grupos]);
 
   const {
     selectedEvent, isEditModalOpen, setIsEditModalOpen,
@@ -312,18 +351,34 @@ const Horarios = () => {
         </div>
       )}
 
-      <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
-        <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
-        <GridSemanalBloques
-          eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
-          bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
-          demoMode={demoMode} contextoVista={filterType}
-          onEventoClick={handleEventClick}
-          onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
-          onDropEnCelda={onDropEnCelda}
-          renderEventContent={EventRenderer}
-        />
-      </div>
+      {/* Impresión individual: fallback multi-sección si excede 1 página */}
+      {exceedsSinglePage && seccionesPrintIndividual.length > 0 && (
+        <div className="print-multi-area">
+          <PrintMultiSection
+            secciones={seccionesPrintIndividual}
+            tipoEntidad={filterType}
+            selectedPeriodo={selectedPeriodo}
+            bloques={bloques}
+            onEventoClick={handleEventClick}
+          />
+        </div>
+      )}
+
+      {/* Impresión individual: 1 página cuando cabe */}
+      {!exceedsSinglePage && (
+        <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
+          <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
+          <GridSemanalBloques
+            eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
+            bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
+            demoMode={demoMode} contextoVista={filterType}
+            onEventoClick={handleEventClick}
+            onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
+            onDropEnCelda={onDropEnCelda}
+            renderEventContent={EventRenderer}
+          />
+        </div>
+      )}
 
       {isEditModalOpen && selectedEvent && (
         <EditEventModal
