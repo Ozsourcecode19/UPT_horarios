@@ -15,13 +15,15 @@ def get_grupo(db: Session, grupo_id: int) -> Optional[models.Grupo]:
     """
     return db.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
 
-def get_grupos(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
+def get_grupos(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None):
     """
-    Obtiene una lista de grupos con paginación y búsqueda.
+    Obtiene una lista de grupos con paginación, búsqueda y filtro por sede.
     """
     q = db.query(models.Grupo)
     if search:
         q = q.filter(models.Grupo.nombre.ilike(f"%{search}%"))
+    if sede_id is not None:
+        q = q.filter(models.Grupo.sede_id == sede_id)
     total = q.count()
     items = q.offset(skip).limit(limit).all()
     return items, total

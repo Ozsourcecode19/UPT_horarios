@@ -21,6 +21,8 @@ const Horarios = () => {
   const {
     canRestore,
     selectedPeriodoId, setSelectedPeriodoId,
+    selectedSedeId, setSelectedSedeId,
+    sedes,
     filterType, setFilterType,
     filterValue, setFilterValue,
     demoMode, setDemoMode,
@@ -244,11 +246,22 @@ const Horarios = () => {
       <div className="no-print"><FlowStepper preCheck={preCheck} demoMode={demoMode} /></div>
 
       <div className="no-print bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col md:flex-row items-center gap-6 justify-between">
-        <div className="w-full md:w-auto space-y-1.5 flex-1 max-w-sm">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
-          <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
-            {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.estado})</option>)}
-          </select>
+        <div className={`w-full flex gap-4 ${sedes.length > 1 ? 'md:w-auto md:flex-1' : 'md:w-auto md:flex-1 md:max-w-sm'}`}>
+          <div className={`space-y-1.5 ${sedes.length > 1 ? 'flex-1' : 'w-full'}`}>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
+            <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
+              {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.estado})</option>)}
+            </select>
+          </div>
+          {sedes.length > 1 && (
+            <div className="space-y-1.5 flex-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Sede</label>
+              <select value={selectedSedeId || ''} onChange={(e) => setSelectedSedeId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
+                <option value="">Todas las Sedes</option>
+                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 flex-[2]">
           <div className="space-y-1.5">
@@ -265,7 +278,7 @@ const Horarios = () => {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
               {filterType === 'grupo' ? 'Seleccionar Grupo' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
             </label>
-            <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
+            <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
               {filterType === 'grupo' && grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${g.division}` : ''}</option>)}
               {filterType === 'docente' && docentes.map(d => <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>)}
               {filterType === 'aula' && aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}

@@ -29,11 +29,11 @@ def read_docente(docente_id: int, db: Session = Depends(get_db)):
     return db_docente
 
 @router.get("/", response_model=PaginatedResponse[schemas.Docente], dependencies=[Depends(get_current_active_user)])
-def read_docentes(skip: int = 0, limit: int = 20, search: Optional[str] = None, db: Session = Depends(get_db)):
+def read_docentes(skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
-    Obtiene una lista de docentes con paginación.
+    Obtiene una lista de docentes con paginación y filtro por sede.
     """
-    items, total = crud.get_docentes(db, skip=skip, limit=limit, search=search)
+    items, total = crud.get_docentes(db, skip=skip, limit=limit, search=search, sede_id=sede_id)
     return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{docente_id}", response_model=schemas.Docente, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])

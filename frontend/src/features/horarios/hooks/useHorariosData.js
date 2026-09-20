@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PeriodosService from '../../../api/periodos';
+import SedesService from '../../../api/sedes';
 import AulasService from '../../../api/aulas';
 import DocentsService from '../../../api/docents';
 import GruposService from '../../../api/grupos';
@@ -33,6 +34,7 @@ export default function useHorariosData() {
   const toastTimerRef = useRef(null);
 
   const [selectedPeriodoId, setSelectedPeriodoId] = useState(null);
+  const [selectedSedeId, setSelectedSedeId] = useState(null);
   const [filterType, setFilterType] = useState('grupo');
   const [filterValue, setFilterValue] = useState('');
   const [selectedVersion, setSelectedVersion] = useState(null);
@@ -80,10 +82,29 @@ export default function useHorariosData() {
 
   const selectedPeriodo = periodos.find(p => p.id === Number(selectedPeriodoId));
 
-  const { data: aulasReal = [], isError: isAulasError } = useQuery({
-    queryKey: ['aulas'],
+  const { data: sedesReal = [], isError: isSedesError } = useQuery({
+    queryKey: ['sedes'],
     queryFn: async () => {
-      try { const res = await AulasService.getAulas(0, FETCH_ALL_LIMIT); return res.items || res || []; }
+      try {
+        const res = await SedesService.getSedes(0, FETCH_ALL_LIMIT);
+        return res.items || res || [];
+      } catch { return []; }
+    },
+    enabled: !demoMode,
+    retry: 0,
+  });
+  const sedes = demoMode || isSedesError ? [] : sedesReal;
+
+  useEffect(() => {
+    if (sedes.length === 1 && !selectedSedeId) {
+      setSelectedSedeId(sedes[0].id);
+    }
+  }, [sedes, selectedSedeId]);
+
+  const { data: aulasReal = [], isError: isAulasError } = useQuery({
+    queryKey: ['aulas', selectedSedeId],
+    queryFn: async () => {
+      try { const res = await AulasService.getAulas(0, FETCH_ALL_LIMIT, null, selectedSedeId); return res.items || res || []; }
       catch { return MOCK_AULAS; }
     },
     enabled: !demoMode,
@@ -92,9 +113,9 @@ export default function useHorariosData() {
   const aulas = demoMode || isAulasError ? MOCK_AULAS : aulasReal;
 
   const { data: docentesReal = [], isError: isDocentesError } = useQuery({
-    queryKey: ['docentes'],
+    queryKey: ['docentes', selectedSedeId],
     queryFn: async () => {
-      try { const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT); return res.items || res || []; }
+      try { const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT, null, selectedSedeId); return res.items || res || []; }
       catch { return MOCK_DOCENTES; }
     },
     enabled: !demoMode,
@@ -103,9 +124,9 @@ export default function useHorariosData() {
   const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
 
   const { data: gruposReal = [], isError: isGruposError } = useQuery({
-    queryKey: ['grupos'],
+    queryKey: ['grupos', selectedSedeId],
     queryFn: async () => {
-      try { const res = await GruposService.getGrupos(0, FETCH_ALL_LIMIT); return res.items || res || []; }
+      try { const res = await GruposService.getGrupos(0, FETCH_ALL_LIMIT, null, selectedSedeId); return res.items || res || []; }
       catch { return MOCK_GRUPOS; }
     },
     enabled: !demoMode,
@@ -216,6 +237,8 @@ export default function useHorariosData() {
   return {
     canRestore,
     selectedPeriodoId, setSelectedPeriodoId,
+    selectedSedeId, setSelectedSedeId,
+    sedes,
     filterType, setFilterType,
     filterValue, setFilterValue,
     demoMode, setDemoMode,

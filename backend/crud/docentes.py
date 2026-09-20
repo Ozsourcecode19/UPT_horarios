@@ -17,9 +17,9 @@ def get_docente(db: Session, docente_id: int) -> Optional[models.Docente]:
     """
     return db.query(models.Docente).filter(models.Docente.id == docente_id).first()
 
-def get_docentes(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None):
+def get_docentes(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None):
     """
-    Obtiene una lista de docentes con paginación y búsqueda.
+    Obtiene una lista de docentes con paginación, búsqueda y filtro por sede.
     """
     q = db.query(models.Docente)
     if search:
@@ -27,6 +27,8 @@ def get_docentes(db: Session, skip: int = 0, limit: int = 20, search: Optional[s
             models.Docente.nombre.ilike(f"%{search}%") |
             models.Docente.apellido.ilike(f"%{search}%")
         )
+    if sede_id is not None:
+        q = q.filter(models.Docente.sede_principal_id == sede_id)
     total = q.count()
     items = q.offset(skip).limit(limit).all()
     return items, total

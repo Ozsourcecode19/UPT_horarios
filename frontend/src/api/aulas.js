@@ -10,9 +10,10 @@ const AulasService = {
    * @param {string | null} search - Término de búsqueda (opcional)
    * @returns {Promise<import('../types/api').PaginatedResponse<import('../types/entities').Aula>>}
    */
-  getAulas: async (skip = 0, limit = PAGE_SIZE, search = null) => {
+  getAulas: async (skip = 0, limit = PAGE_SIZE, search = null, sedeId = null) => {
     const params = { skip, limit };
     if (search) params.search = search;
+    if (sedeId) params.sede_id = sedeId;
     const response = await apiClient.get('/aulas/', { params });
     return response.data;
   },
