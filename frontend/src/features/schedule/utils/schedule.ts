@@ -168,15 +168,9 @@ export const resolveVentanaTurno = (division: string, configs: Configuracion[] =
  * @param params
  * @returns Ventana para la grilla
  */
-export const resolveVentanaGrilla = ({ filterType, item, configs = [], turnoFilter = 'TODOS' }: ResolveVentanaGrillaParams = {}): VentanaTurno => {
+export const resolveVentanaGrilla = ({ filterType, item, configs = [] }: ResolveVentanaGrillaParams = {}): VentanaTurno => {
   if (filterType === 'grupo') {
     const ventana = resolveVentanaTurno(item?.division || '', configs);
-    if (ventana) return ventana;
-  }
-
-  // Docente/Aula: si turnoFilter es específico, usar esa ventana
-  if (turnoFilter && turnoFilter !== 'TODOS') {
-    const ventana = resolveVentanaTurno(turnoFilter, configs);
     if (ventana) return ventana;
   }
 

@@ -25,7 +25,6 @@ export default function usePrintMultiEntity({
   bloques = [],
   configuraciones = [],
   selectedPeriodo,
-  turnoFilter = 'TODOS',
 }) {
   const secciones = useMemo(() => {
     if (!tipoEntidad || !['grupo', 'docente', 'aula'].includes(tipoEntidad)) return [];
@@ -51,7 +50,6 @@ export default function usePrintMultiEntity({
         filterType: tipoEntidad,
         item: entidad,
         configs: configuraciones,
-        turnoFilter,
       });
 
       // Resolver sedes para esta entidad
@@ -98,7 +96,7 @@ export default function usePrintMultiEntity({
         infoAdicional,
       };
     }).filter(seccion => seccion.eventos.length > 0); // Solo incluir entidades con eventos
-  }, [tipoEntidad, todosLosHorarios, grupos, docentes, aulas, bloques, configuraciones, turnoFilter]);
+  }, [tipoEntidad, todosLosHorarios, grupos, docentes, aulas, bloques, configuraciones]);
 
   const descripcionTipo = useMemo(() => {
     if (tipoEntidad === 'grupo') return 'Todos los Grupos';

@@ -79,7 +79,6 @@ export interface ResolveVentanaGrillaParams {
   filterType: string
   item?: { sede_id?: number; division?: Division; sede_principal_id?: number } | null
   configs?: Configuracion[]
-  turnoFilter?: string
 }
 
 // ─── Dashboard Stats ────────────────────────────────────────
