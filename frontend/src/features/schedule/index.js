@@ -8,6 +8,7 @@ export {
   resolveVentanaGrilla, resolveVentanaTurno, resolverDivisionEvento, bloqueDentroVentana,
   horaAMinutos, construirBandasEje, indiceBloques, resolverBloqueDeCelda, agruparEventosPorCelda,
   recalcularEventoDemo, generarEventosSimulados,
+  ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
 } from './utils/schedule';
 export { validateMoveMock } from './utils/scheduleValidation';
 
