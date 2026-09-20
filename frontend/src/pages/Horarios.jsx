@@ -4,7 +4,7 @@ import useCanWrite from '../hooks/useCanWrite';
 import { formatHora12 } from '../utils/timeFormat';
 import { DeleteConfirmModal } from '../features/planning';
 import {
-  filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje,
+  filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje, horaAMinutos,
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
@@ -20,6 +20,8 @@ import {
 } from '../features/horarios';
 
 const Horarios = () => {
+  const TURNOS_LABELS = { MATUTINO: 'Matutino', VESPERTINO: 'Vespertino', NOCTURNO: 'Nocturno' };
+  const [turnoActivo, setTurnoActivo] = useState('TODOS');
   const {
     canRestore,
     selectedPeriodoId, setSelectedPeriodoId,
@@ -102,6 +104,34 @@ const Horarios = () => {
     const alto = calcularAltoBandaPrint(bandas.length, false, descansosVisibles, 184);
     return alto < 7 && (filterType === 'docente' || filterType === 'aula');
   }, [bandas, filterType]);
+
+  const turnosDisponibles = useMemo(() => {
+    if (!exceedsSinglePage) return [];
+    return agruparBandasPorTurno(bandas, configuraciones);
+  }, [exceedsSinglePage, bandas, configuraciones]);
+
+  const { bandasActivas, eventosActivos, ventanaActiva } = useMemo(() => {
+    if (!exceedsSinglePage) {
+      return { bandasActivas: bandas, eventosActivos: listadoHorarios, ventanaActiva: ventanaGrilla };
+    }
+    if (turnoActivo === 'TODOS' || !turnoActivo) {
+      return { bandasActivas: bandas, eventosActivos: listadoHorarios, ventanaActiva: ventanaGrilla };
+    }
+    const turno = turnosDisponibles.find(t => t.nombre === turnoActivo);
+    if (!turno) return { bandasActivas: bandas, eventosActivos: listadoHorarios, ventanaActiva: ventanaGrilla };
+    const vIni = horaAMinutos(turno.ventana.inicio);
+    const vFin = horaAMinutos(turno.ventana.fin);
+    const eventosTurno = listadoHorarios.filter(ev => {
+      const bloque = bloques.find(b => Number(b.id) === Number(ev.extendedProps?.bloque_id));
+      if (!bloque) return false;
+      const ini = horaAMinutos(bloque.hora_inicio);
+      return ini >= vIni && ini < vFin;
+    });
+    return { bandasActivas: turno.bandas, eventosActivos: eventosTurno, ventanaActiva: turno.ventana };
+  }, [exceedsSinglePage, turnoActivo, turnosDisponibles, bandas, listadoHorarios, ventanaGrilla, bloques]);
+
+  // Reset turnoActivo al cambiar de entidad
+  useEffect(() => { setTurnoActivo('TODOS'); }, [filterValue]);
 
   // Secciones para impresión individual cuando excede 1 página
   const seccionesPrintIndividual = useMemo(() => {
@@ -351,7 +381,7 @@ const Horarios = () => {
         </div>
       )}
 
-      {/* Impresión individual: fallback multi-sección si excede 1 página */}
+      {/* Impresión individual: fallback multi-sección para impresión cuando excede 1 página */}
       {exceedsSinglePage && seccionesPrintIndividual.length > 0 && (
         <div className="print-multi-area">
           <PrintMultiSection
@@ -361,6 +391,41 @@ const Horarios = () => {
             bloques={bloques}
             onEventoClick={handleEventClick}
           />
+        </div>
+      )}
+
+      {/* Vista principal: tabs de turno + grilla unificada cuando excede 1 página */}
+      {exceedsSinglePage && turnosDisponibles.length > 0 && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl mb-4 self-start no-print">
+            <button onClick={() => setTurnoActivo('TODOS')} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === 'TODOS' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              Todos
+            </button>
+            {turnosDisponibles.map(turno => (
+              <button key={turno.nombre} onClick={() => setTurnoActivo(turno.nombre)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === turno.nombre ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {TURNOS_LABELS[turno.nombre]} ({turno.bandas.length})
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-700">
+              {turnoActivo === 'TODOS' ? 'Todos los turnos' : TURNOS_LABELS[turnoActivo]}
+            </h3>
+            <span className="text-[11px] text-slate-400">
+              {formatHora12(ventanaActiva.inicio.substring(0, 5))} – {formatHora12(ventanaActiva.fin.substring(0, 5))}
+            </span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto" style={{ '--alto-banda': altoBandaPrint }}>
+            <GridSemanalBloques
+              eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
+              bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
+              demoMode={demoMode} contextoVista={filterType}
+              onEventoClick={handleEventClick}
+              onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
+              onDropEnCelda={onDropEnCelda}
+              renderEventContent={EventRenderer}
+            />
+          </div>
         </div>
       )}
 
