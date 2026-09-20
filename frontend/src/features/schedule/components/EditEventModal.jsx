@@ -5,6 +5,7 @@
 
 import { X, Clock, Trash2 } from 'lucide-react';
 import { bloqueDentroVentana } from '../utils/schedule';
+import { formatHora12 } from '../../../utils/timeFormat';
 import ModalPortal from '../../../components/ui/ModalPortal';
 
 const DIAS_NOMBRES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -84,8 +85,8 @@ const EditEventModal = ({
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <span>
                   {evento.start.toLocaleDateString('es-ES', { weekday: 'long' })} de{' '}
-                  {evento.start.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} a{' '}
-                  {evento.end.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  {formatHora12(evento.start.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }))} a{' '}
+                  {formatHora12(evento.end.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }))}
                 </span>
               </span>
             </div>
@@ -115,7 +116,7 @@ const EditEventModal = ({
             >
               {bloquesDisponibles.map(b => (
                   <option key={b.id} value={b.id}>
-                    {DIAS_NOMBRES[b.dia_semana]} - {b.hora_inicio.substring(0, 5)} ({b.duracion_minutos} min)
+                    {DIAS_NOMBRES[b.dia_semana]} - {formatHora12(b.hora_inicio.substring(0, 5))} ({b.duracion_minutos} min)
                   </option>
                 ))}
             </select>

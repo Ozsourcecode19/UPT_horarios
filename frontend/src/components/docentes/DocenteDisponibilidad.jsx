@@ -4,6 +4,7 @@ import {
   Calendar, Clock, Heart, X, Check, Loader2, 
   Trash2, AlertCircle, Building, Sparkles, AlertTriangle 
 } from 'lucide-react';
+import { formatHora12 } from '../../utils/timeFormat';
 import DisponibilidadesService from '../../api/disponibilidades';
 import BloquesService from '../../api/bloques';
 import ConfiguracionesService from '../../api/configuraciones';
@@ -188,7 +189,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
         uniqueTimes.push({
           start: b.hora_inicio,
           end: calcularFin(b),
-          label: `Bloque (${b.hora_inicio.slice(0, 5)})`
+          label: `Bloque (${formatHora12(b.hora_inicio.slice(0, 5))})`
         });
       }
     });
@@ -464,7 +465,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <span className="font-semibold">Ventana de jornada:</span>{' '}
-                {ventanaJornada.inicio.slice(0, 5)} – {ventanaJornada.fin.slice(0, 5)}
+                {formatHora12(ventanaJornada.inicio.slice(0, 5))} – {formatHora12(ventanaJornada.fin.slice(0, 5))}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -500,7 +501,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                         </p>
                         {motivoSinBloques === 'fuera_ventana' && (
                           <p className="text-xs text-slate-400 mt-1">
-                            Ventana actual: {ventanaJornada.inicio.slice(0, 5)} – {ventanaJornada.fin.slice(0, 5)}. Ajusta{' '}
+                            Ventana actual: {formatHora12(ventanaJornada.inicio.slice(0, 5))} – {formatHora12(ventanaJornada.fin.slice(0, 5))}. Ajusta{' '}
                             <span className="font-semibold">hora_fin_jornada</span> en Configuración para ampliarla.
                           </p>
                         )}
@@ -514,7 +515,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                           <div className="flex flex-col">
                             <span className="text-xs text-slate-400 font-bold uppercase">{slot.label}</span>
                             <span className="text-sm font-extrabold text-slate-800 mt-0.5">
-                              {slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}
+                              {formatHora12(slot.start.slice(0, 5))} - {formatHora12(slot.end.slice(0, 5))}
                             </span>
                           </div>
                         </td>

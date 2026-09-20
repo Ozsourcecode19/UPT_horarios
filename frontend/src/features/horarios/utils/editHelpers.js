@@ -2,6 +2,7 @@
 // Cálculos auxiliares para el modal de edición de eventos (E20: extensión 1-2 bloques).
 import { useMemo } from 'react';
 import { horaAMinutos } from '../../schedule';
+import { formatHora12 } from '../../../utils/timeFormat';
 
 /**
  * Bloque seleccionado en el modal de edición.
@@ -52,7 +53,7 @@ export function usePreviewRango(bloqueSeleccionado, bloqueConsecutivo, editAbarc
       fin = fin + (Number(bloqueConsecutivo.duracion_minutos) || 0);
     }
     const fmt = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-    return `${fmt(ini)} - ${fmt(fin)}`;
+    return `${formatHora12(fmt(ini))} - ${formatHora12(fmt(fin))}`;
   }, [bloqueSeleccionado, bloqueConsecutivo, editAbarca]);
 }
 

@@ -2,6 +2,7 @@
 // Tabla de bloques horarios con loading skeleton, empty state y acciones (E21).
 
 import { Clock, Edit2, Power, Trash2, Lock } from 'lucide-react';
+import { formatHora12 } from '../../../utils/timeFormat';
 import { DIAS_NOMBRES } from '../schemas';
 import { calcularFin } from '../utils/bloques';
 
@@ -67,8 +68,8 @@ const BloquesTable = ({
                   {DIAS_NOMBRES[bloque.dia_semana] || `Día ${bloque.dia_semana}`}
                 </span>
               </td>
-              <td className="py-4 px-6 font-semibold text-slate-800">{bloque.hora_inicio.slice(0, 5)}</td>
-              <td className="py-4 px-6 text-slate-500">{calcularFin(bloque.hora_inicio, bloque.duracion_minutos)}</td>
+              <td className="py-4 px-6 font-semibold text-slate-800">{formatHora12(bloque.hora_inicio.slice(0, 5))}</td>
+              <td className="py-4 px-6 text-slate-500">{formatHora12(calcularFin(bloque.hora_inicio, bloque.duracion_minutos))}</td>
               <td className="py-4 px-6 text-center">
                 <span className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200/60">
                   {bloque.duracion_minutos} min

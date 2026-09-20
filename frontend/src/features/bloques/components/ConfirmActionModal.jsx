@@ -2,6 +2,7 @@
 // Modal de confirmación para activar/desactivar/eliminar bloques (E21).
 
 import { Trash2, Power } from 'lucide-react';
+import { formatHora12 } from '../../../utils/timeFormat';
 import ModalPortal from '../../../components/ui/ModalPortal';
 import { DIAS_NOMBRES } from '../schemas';
 
@@ -40,7 +41,7 @@ const ConfirmActionModal = ({
                 <>
                   Estás a punto de eliminar el bloque del{' '}
                   <span className="font-semibold text-slate-700">
-                    {DIAS_NOMBRES[bloque.dia_semana]} {bloque.hora_inicio.slice(0, 5)}
+                    {DIAS_NOMBRES[bloque.dia_semana]} {formatHora12(bloque.hora_inicio.slice(0, 5))}
                   </span>.
                   {' '}<span className="font-bold text-red-600">Advertencia:</span> si el bloque está referenciado por
                   horarios generados, esos horarios se eliminarán en cascada. Prefiere{' '}
@@ -50,7 +51,7 @@ const ConfirmActionModal = ({
                 <>
                   El bloque del{' '}
                   <span className="font-semibold text-slate-700">
-                    {DIAS_NOMBRES[bloque.dia_semana]} {bloque.hora_inicio.slice(0, 5)}
+                    {DIAS_NOMBRES[bloque.dia_semana]} {formatHora12(bloque.hora_inicio.slice(0, 5))}
                   </span>{' '}
                   dejará de considerarse en la generación y la grilla de disponibilidad.
                 </>
@@ -58,7 +59,7 @@ const ConfirmActionModal = ({
                 <>
                   El bloque del{' '}
                   <span className="font-semibold text-slate-700">
-                    {DIAS_NOMBRES[bloque.dia_semana]} {bloque.hora_inicio.slice(0, 5)}
+                    {DIAS_NOMBRES[bloque.dia_semana]} {formatHora12(bloque.hora_inicio.slice(0, 5))}
                   </span>{' '}
                   volverá a considerarse en la generación y la grilla.
                 </>

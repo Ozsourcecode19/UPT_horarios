@@ -38,12 +38,12 @@ export const GRUPO_NOTAS = {
   jornada: (
     <>
       La ventana de jornada (<span className="font-semibold">hora_inicio_jornada</span>–<span className="font-semibold">hora_fin_jornada</span>)
-      filtra los bloques que el solver y la grilla de disponibilidad consideran (hora de inicio + duración dentro del rango). Esto recorta los bloques fuera de la ventana, incluidos los <span className="font-semibold">15:00–20:00</span> de la sede virtual: sube <span className="font-semibold">hora_fin_jornada</span> a <span className="font-semibold">20:00:00</span> para mostrarlos todos. <span className="font-semibold">dias_laborables</span> limita en qué días se programan clases.
+      filtra los bloques que el solver y la grilla de disponibilidad consideran (hora de inicio + duración dentro del rango). Esto recorta los bloques fuera de la ventana, incluidos los <span className="font-semibold">3:00 PM–8:00 PM</span> de la sede virtual: sube <span className="font-semibold">hora_fin_jornada</span> a <span className="font-semibold">20:00:00</span> para mostrarlos todos. <span className="font-semibold">dias_laborables</span> limita en qué días se programan clases.
     </>
   ),
   turnos: (
     <>
-      Cada turno define una <span className="font-semibold">ventana horaria</span> (<span className="font-semibold">hora_inicio</span>–<span className="font-semibold">hora_fin</span>) que el solver respeta al asignar bloques a grupos de esa división. La ventana efectiva es la intersección con la jornada global: un grupo MATUTINO (07:00–12:00) solo recibirá bloques de mañana aunque la jornada global llegue a 15:00. Ajusta las ventanas según los horarios reales de cada turno.
+      Cada turno define una <span className="font-semibold">ventana horaria</span> (<span className="font-semibold">hora_inicio</span>–<span className="font-semibold">hora_fin</span>) que el solver respeta al asignar bloques a grupos de esa división. La ventana efectiva es la intersección con la jornada global: un grupo MATUTINO (7:00 AM–12:00 PM) solo recibirá bloques de mañana aunque la jornada global llegue a 3:00 PM. Ajusta las ventanas según los horarios reales de cada turno.
     </>
   ),
   bloques: (

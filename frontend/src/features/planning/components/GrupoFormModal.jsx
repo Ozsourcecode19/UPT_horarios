@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X, AlertTriangle } from 'lucide-react';
+import { formatHora12 } from '../../../utils/timeFormat';
 import ModalPortal from '../../../components/ui/ModalPortal';
 import { FETCH_ALL_LIMIT } from '../../../constants';
 
@@ -185,9 +186,9 @@ const GrupoFormModal = ({
               {...register('division')}
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
             >
-              <option value="MATUTINO">Matutino (07:00–12:00)</option>
-              <option value="VESPERTINO">Vespertino (13:00–18:00)</option>
-              <option value="NOCTURNO">Nocturno (18:00–22:00)</option>
+              <option value="MATUTINO">Matutino ({formatHora12('07:00')}–{formatHora12('12:00')})</option>
+              <option value="VESPERTINO">Vespertino ({formatHora12('13:00')}–{formatHora12('18:00')})</option>
+              <option value="NOCTURNO">Nocturno ({formatHora12('18:00')}–{formatHora12('22:00')})</option>
             </select>
             {errors.division && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.division.message}</span>}
             {mostrarAvisoSinCobertura && (
@@ -195,7 +196,7 @@ const GrupoFormModal = ({
                 <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <span className="text-xs text-amber-700 leading-relaxed">
                   La sede <strong>{nombreSedeElegida}</strong> no tiene bloques activos dentro de la ventana{' '}
-                  <strong>{divisionElegida}</strong> ({cobertura.ventana.inicio.slice(0, 5)}–{cobertura.ventana.fin.slice(0, 5)}).
+                  <strong>{divisionElegida}</strong> ({formatHora12(cobertura.ventana.inicio.slice(0, 5))}–{formatHora12(cobertura.ventana.fin.slice(0, 5))}).
                   Este grupo quedará sin horario y no aparecerá en la vista de Horarios.
                   Configure bloques en esa ventana (Bloques Horarios) o elija otra división/sede.
                 </span>

@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { horaAMinutos } from '../utils/schedule';
+import { formatHora12 } from '../../../utils/timeFormat';
 import { COLOR_FALLBACK } from '../../../constants';
 
 const DIAS = [
@@ -194,7 +195,7 @@ const GridSemanalBloques = ({
             fila.tipo === 'descanso' ? (
               <tr key={`desc-${i}`} className={`fila-descanso ${fila.silencioso ? 'silenciosa' : ''}`}>
                 <td colSpan={DIAS.length + 1}>
-                  {fila.silencioso ? '' : `Descanso · ${minutosAHora(fila.desde)} – ${minutosAHora(fila.hasta)}`}
+                  {fila.silencioso ? '' : `Descanso · ${formatHora12(minutosAHora(fila.desde))} – ${formatHora12(minutosAHora(fila.hasta))}`}
                 </td>
               </tr>
             ) : (

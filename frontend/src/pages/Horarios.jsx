@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, Sparkles, Clock, Users, Download, Printer, FileText } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
+import { formatHora12 } from '../utils/timeFormat';
 import { DeleteConfirmModal } from '../features/planning';
 import {
   filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje,
@@ -286,7 +287,7 @@ const Horarios = () => {
             {filterType === 'grupo' && itemSeleccionado?.division && (
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                Turno {itemSeleccionado.division} · grilla {ventanaGrilla.inicio.substring(0, 5)}–{ventanaGrilla.fin.substring(0, 5)}
+                Turno {itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
               </p>
             )}
           </div>

@@ -1,6 +1,7 @@
 // src/features/settings/components/ConfigWidget.jsx
 // Switch de renderizado de widgets para campos de configuración.
 import { CalendarDays, Clock, Gauge, Timer, Layers } from 'lucide-react';
+import { formatHora12 } from '../../../utils/timeFormat';
 import { DIAS_SEMANA } from '../constants';
 
 const widgetIcon = (widget) => {
