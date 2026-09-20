@@ -72,11 +72,10 @@ const Horarios = () => {
   }, [filterType, listadoHorarios]);
 
   const ventanaGrilla = useMemo(() => {
-    if (filterType === 'grupo') {
-      return resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones });
+    if (filterType === 'docente') {
+      return ventanaDinamicaDeEventos(listadoHorarios, bloques, configuraciones);
     }
-    // Docente/Aula: ventana dinámica según eventos reales
-    return ventanaDinamicaDeEventos(listadoHorarios, bloques, configuraciones);
+    return resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones });
   }, [filterType, itemSeleccionado, configuraciones, listadoHorarios, bloques]);
 
   const sedesEje = useMemo(() => {
@@ -382,7 +381,7 @@ const Horarios = () => {
       )}
 
       {/* Impresión individual: fallback multi-sección para impresión cuando excede 1 página */}
-      {exceedsSinglePage && seccionesPrintIndividual.length > 0 && (
+      {exceedsSinglePage && !printMode && seccionesPrintIndividual.length > 0 && (
         <div className="print-multi-area">
           <PrintMultiSection
             secciones={seccionesPrintIndividual}
