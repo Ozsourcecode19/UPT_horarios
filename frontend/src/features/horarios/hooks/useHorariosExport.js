@@ -3,12 +3,19 @@
 import { useMemo } from 'react';
 import { generarICal, descargarICal, nombreArchivoExport } from '../../../utils/icalExport';
 
-export default function useHorariosExport({ listadoHorarios, filterType, filterValue, aulas, docentes, grupos, selectedPeriodo, showToast }) {
+export default function useHorariosExport({ listadoHorarios, filterType, filterValue, aulas, docentes, grupos, sedes = [], selectedPeriodo, showToast }) {
+  const sedeMap = useMemo(() => {
+    if (!sedes.length) return {};
+    return Object.fromEntries(sedes.map(s => [s.id, s.nombre]));
+  }, [sedes]);
+
   const descripcionFiltro = useMemo(() => {
     const etiqueta = { aula: 'Aula', docente: 'Docente', grupo: 'Grupo' }[filterType] || filterType;
     let valor = filterValue;
     if (filterType === 'aula') {
-      valor = aulas.find(a => String(a.id) === String(filterValue))?.nombre ?? filterValue;
+      const aula = aulas.find(a => String(a.id) === String(filterValue));
+      valor = aula?.nombre ?? filterValue;
+      if (aula?.sede_id && sedeMap[aula.sede_id]) valor += ` — ${sedeMap[aula.sede_id]}`;
     } else if (filterType === 'docente') {
       const d = docentes.find(x => String(x.id) === String(filterValue));
       valor = d ? `${d.apellido}, ${d.nombre}` : filterValue;
@@ -17,7 +24,7 @@ export default function useHorariosExport({ listadoHorarios, filterType, filterV
       valor = g?.nombre ?? filterValue;
     }
     return `${etiqueta}: ${valor}`;
-  }, [filterType, filterValue, aulas, docentes, grupos]);
+  }, [filterType, filterValue, aulas, docentes, grupos, sedeMap]);
 
   const exportarICalActual = () => {
     if (!listadoHorarios.length) return;

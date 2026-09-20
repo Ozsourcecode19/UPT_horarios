@@ -18,6 +18,7 @@ import {
  * @param {Array} params.aulas - Catálogo de aulas
  * @param {Array} params.bloques - Bloques horarios
  * @param {Array} params.configuraciones - Configuraciones del sistema
+ * @param {Array} params.sedes - Catálogo de sedes
  * @param {Object} params.selectedPeriodo - Periodo seleccionado
  * @returns {Object} { secciones, descripcionTipo }
  */
@@ -29,6 +30,7 @@ export default function usePrintMultiEntity({
   aulas = [],
   bloques = [],
   configuraciones = [],
+  sedes = [],
   selectedPeriodo,
 }) {
   const secciones = useMemo(() => {
@@ -74,8 +76,10 @@ export default function usePrintMultiEntity({
       if (tipoEntidad === 'docente' && entidad.email) {
         infoAdicional.email = entidad.email;
       }
-      if (tipoEntidad === 'aula' && entidad.capacidad) {
-        infoAdicional.capacidad = entidad.capacidad;
+      if (tipoEntidad === 'aula') {
+        if (entidad.capacidad) infoAdicional.capacidad = entidad.capacidad;
+        const sede = sedes.find(s => Number(s.id) === Number(entidad.sede_id));
+        if (sede) infoAdicional.sede = sede.nombre;
       }
 
       // GRUPO: una sección por entidad (comportamiento actual)
