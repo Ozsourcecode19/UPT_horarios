@@ -44,7 +44,7 @@ const PrintMultiSection = ({
   return (
     <div className="print-multi-container">
       {secciones.map((seccion, index) => {
-        const tieneInfoExtra = !!(seccion.infoAdicional?.email || seccion.infoAdicional?.capacidad);
+        const tieneInfoExtra = !!(seccion.infoAdicional?.email || seccion.infoAdicional?.capacidad || seccion.infoAdicional?.sede);
         const altoBanda = calcularAltoBanda(seccion.bandas, tieneInfoExtra);
 
         return (
