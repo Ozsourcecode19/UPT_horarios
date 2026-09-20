@@ -26,7 +26,6 @@ const Horarios = () => {
     sedes,
     filterType, setFilterType,
     filterValue, setFilterValue,
-    turnoFilter, setTurnoFilter,
     demoMode, setDemoMode,
     selectedVersion, setSelectedVersion,
     toast, showToast,
@@ -37,7 +36,6 @@ const Horarios = () => {
     preCheck, refetchPreCheck, canGenerate,
     versiones, refetchVersiones, restoreVersionMutation,
     TIPOS_VISTA,
-    TURNOS_DISPONIBLES,
   } = useHorariosData();
 
   const puedeEscribir = useCanWrite();
@@ -71,8 +69,8 @@ const Horarios = () => {
   }, [filterType, listadoHorarios]);
 
   const ventanaGrilla = useMemo(
-    () => resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones, turnoFilter }),
-    [filterType, itemSeleccionado, configuraciones, turnoFilter]
+    () => resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones }),
+    [filterType, itemSeleccionado, configuraciones]
   );
 
   const sedesEje = useMemo(() => {
@@ -157,7 +155,6 @@ const Horarios = () => {
     bloques,
     configuraciones,
     selectedPeriodo,
-    turnoFilter,
   });
 
   const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
@@ -293,21 +290,7 @@ const Horarios = () => {
                 Turno {itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
               </p>
             )}
-            {(filterType === 'docente' || filterType === 'aula') && turnoFilter !== 'TODOS' && (
-              <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                Turno {turnoFilter} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
-              </p>
-            )}
           </div>
-          {(filterType === 'docente' || filterType === 'aula') && (
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Turno</label>
-              <select value={turnoFilter} onChange={(e) => setTurnoFilter(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
-                {TURNOS_DISPONIBLES.map(t => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
-              </select>
-            </div>
-          )}
         </div>
       </div>
 
