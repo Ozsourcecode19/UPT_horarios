@@ -60,7 +60,7 @@ const PrintMultiSection = ({
               filterType={tipoEntidad}
               itemSeleccionado={seccion.entidad}
               ventanaGrilla={seccion.ventanaGrilla}
-              sedesInfo={seccion.infoAdicional?.sedes || ''}
+              sedesInfo={seccion.infoAdicional?.sede || ''}
             />
 
             {seccion.infoAdicional?.email && (
@@ -71,6 +71,11 @@ const PrintMultiSection = ({
             {seccion.infoAdicional?.capacidad && (
               <p className="text-[9px] text-slate-400 mt-0.5 hidden print:block">
                 Capacidad: {seccion.infoAdicional.capacidad}
+              </p>
+            )}
+            {seccion.infoAdicional?.sede && (
+              <p className="text-[9px] text-slate-400 mt-0.5 hidden print:block">
+                Sede: {seccion.infoAdicional.sede}
               </p>
             )}
 

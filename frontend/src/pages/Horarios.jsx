@@ -53,7 +53,7 @@ const Horarios = () => {
   );
 
   const { descripcionFiltro, exportarICalActual } = useHorariosExport({
-    listadoHorarios, filterType, filterValue, aulas, docentes, grupos, selectedPeriodo, showToast,
+    listadoHorarios, filterType, filterValue, aulas, docentes, grupos, sedes, selectedPeriodo, showToast,
   });
 
   const itemSeleccionado = useMemo(() => {
@@ -70,6 +70,11 @@ const Horarios = () => {
     }
     return '';
   }, [filterType, listadoHorarios]);
+
+  const sedeMap = useMemo(() => {
+    if (!sedes?.length) return {};
+    return Object.fromEntries(sedes.map(s => [s.id, s.nombre]));
+  }, [sedes]);
 
   const ventanaGrilla = useMemo(() => {
     if (filterType === 'docente') {
@@ -224,6 +229,7 @@ const Horarios = () => {
     aulas,
     bloques,
     configuraciones,
+    sedes,
     selectedPeriodo,
   });
 
@@ -352,7 +358,7 @@ const Horarios = () => {
             <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
               {filterType === 'grupo' && grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${g.division}` : ''}</option>)}
               {filterType === 'docente' && docentes.map(d => <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>)}
-              {filterType === 'aula' && aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              {filterType === 'aula' && aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}{sedeMap[a.sede_id] ? ` — ${sedeMap[a.sede_id]}` : ''}</option>)}
             </select>
             {filterType === 'grupo' && itemSeleccionado?.division && (
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
@@ -409,9 +415,14 @@ const Horarios = () => {
             ))}
           </div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-700">
-              {turnoActivo === 'TODOS' ? 'Todos los turnos' : TURNOS_LABELS[turnoActivo]}
-            </h3>
+            <div>
+              <h3 className="text-sm font-bold text-slate-700">
+                {turnoActivo === 'TODOS' ? 'Todos los turnos' : TURNOS_LABELS[turnoActivo]}
+              </h3>
+              {filterType === 'aula' && sedeMap[itemSeleccionado?.sede_id] && (
+                <p className="text-[11px] text-slate-400">{sedeMap[itemSeleccionado.sede_id]}</p>
+              )}
+            </div>
             <span className="text-[11px] text-slate-400">
               {formatHora12(ventanaActiva.inicio.substring(0, 5))} – {formatHora12(ventanaActiva.fin.substring(0, 5))}
             </span>
