@@ -8,7 +8,7 @@ const ALTO_HEADER = 20;    // mm: PrintHeader (logo + título + subtítulo)
 const ALTO_INFO_EXTRA = 4; // mm: línea adicional (email o capacidad)
 const ALTO_CABECERA = 6;   // mm: thead de la tabla
 const ALTO_DESCANSO = 4;   // mm: cada fila de descanso visible
-const ESPACIO_DISPONIBLE = 188; // mm: A4 landscape (210mm) - padding (16mm) - margen seguridad (6mm)
+const ESPACIO_DISPONIBLE = 178; // mm: A4 landscape (210mm) - padding (16mm) con border-box - margen (6mm)
 
 function calcularAltoBanda(bandas, tieneInfoExtra) {
   if (!bandas || bandas.length === 0) return '7mm';
