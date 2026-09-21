@@ -3,32 +3,7 @@
 // Cada sección tiene su propio encabezado y grilla, con salto de página entre ellas.
 import PrintHeader from './PrintHeader';
 import GridSemanalBloques from '../../schedule/components/GridSemanalBloques';
-
-const ALTO_HEADER = 24;    // mm: PrintHeader (logo + título + subtítulo + info adicional)
-const ALTO_CABECERA = 6;   // mm: thead de la tabla
-const ALTO_DESCANSO = 4;   // mm: cada fila de descanso visible
-const ESPACIO_DISPONIBLE = 178; // mm: A4 landscape (210mm) - padding (16mm) con border-box - margen (6mm)
-
-function calcularAltoBanda(bandas) {
-  if (!bandas || bandas.length === 0) return '7mm';
-
-  let descansosVisibles = 0;
-  for (let i = 0; i < bandas.length; i++) {
-    const siguiente = bandas[i + 1];
-    if (siguiente) {
-      const hueco = siguiente.iniMin - bandas[i].finMin;
-      if (hueco > 0) descansosVisibles++;
-    }
-  }
-
-  const espacioParaBandas = ESPACIO_DISPONIBLE
-    - ALTO_HEADER
-    - ALTO_CABECERA
-    - (descansosVisibles * ALTO_DESCANSO);
-
-  const alto = espacioParaBandas / bandas.length;
-  return `${Math.max(alto, 7)}mm`;
-}
+import { calcularAltoBandaPrint, contarDescansosVisibles } from '../../schedule/utils/schedule';
 
 const PrintMultiSection = ({
   secciones = [],
@@ -42,7 +17,10 @@ const PrintMultiSection = ({
   return (
     <div className="print-multi-container">
       {secciones.map((seccion, index) => {
-        const altoBanda = calcularAltoBanda(seccion.bandas);
+        const tieneInfoExtra = !!(seccion.infoAdicional?.email || seccion.infoAdicional?.capacidad);
+        const descansosVisibles = contarDescansosVisibles(seccion.bandas);
+        const alto = calcularAltoBandaPrint(seccion.bandas.length, tieneInfoExtra, descansosVisibles, 178);
+        const altoBanda = `${Math.max(alto, 7)}mm`;
 
         return (
           <div
