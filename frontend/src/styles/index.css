@@ -444,10 +444,7 @@ table.grilla-bloques {
 
   .print-area .grilla-bloques tr,
   .print-area .grilla-bloques td,
-  .print-area .grilla-bloques th,
-  .print-section .grilla-bloques tr,
-  .print-section .grilla-bloques td,
-  .print-section .grilla-bloques th {
+  .print-area .grilla-bloques th {
     break-inside: auto;
   }
 
@@ -521,8 +518,7 @@ table.grilla-bloques {
     page-break-after: avoid;
   }
 
-  .print-area .grilla-bloques tr,
-  .print-section .grilla-bloques tr {
+  .print-area .grilla-bloques tr {
     page-break-inside: auto;
   }
 
@@ -591,7 +587,7 @@ table.grilla-bloques {
 
   /* Cada sección: ocupa toda la hoja A4 landscape */
   .print-section {
-    page-break-inside: auto;
+    page-break-inside: avoid;
     page-break-after: auto;
     padding: 6mm !important;
     padding-bottom: 10mm !important;
@@ -601,9 +597,11 @@ table.grilla-bloques {
     margin: 0 !important;
     width: 100%;
     box-sizing: border-box;
+    min-height: calc(210mm - 16mm);
+    max-height: calc(210mm - 16mm);
     display: flex;
     flex-direction: column;
-    overflow: visible;
+    overflow: hidden;
   }
 
   /* Saltos de página entre secciones */
