@@ -406,10 +406,11 @@ table.grilla-bloques {
     border-radius: 0 !important;
     padding: 6mm !important;
     padding-bottom: 10mm !important;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    page-break-inside: avoid;
+    overflow: visible;
+    page-break-inside: auto;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     --alto-banda: 9mm;
@@ -443,11 +444,8 @@ table.grilla-bloques {
 
   .print-area .grilla-bloques tr,
   .print-area .grilla-bloques td,
-  .print-area .grilla-bloques th,
-  .print-section .grilla-bloques tr,
-  .print-section .grilla-bloques td,
-  .print-section .grilla-bloques th {
-    break-inside: avoid;
+  .print-area .grilla-bloques th {
+    break-inside: auto;
   }
 
   /* Eventos sobrios en papel: fondo blanco, borde fino y acento de materia */
@@ -458,8 +456,8 @@ table.grilla-bloques {
     border: 1px solid #94a3b8 !important;
     border-left: 4px solid var(--ev-c, #6366f1) !important;
     box-shadow: none !important;
-    padding: 0.25rem 0.4rem;
-    margin-bottom: 0.15rem;
+    padding: 0.15rem 0.3rem;
+    margin-bottom: 0.08rem;
   }
 
   .print-area .evento-card *,
@@ -520,9 +518,8 @@ table.grilla-bloques {
     page-break-after: avoid;
   }
 
-  .print-area .grilla-bloques tr,
-  .print-section .grilla-bloques tr {
-    page-break-inside: avoid;
+  .print-area .grilla-bloques tr {
+    page-break-inside: auto;
   }
 
   /* ============================================================
@@ -539,10 +536,11 @@ table.grilla-bloques {
     border-radius: 0 !important;
     padding: 6mm !important;
     padding-bottom: 10mm !important;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    page-break-inside: avoid;
+    overflow: visible;
+    page-break-inside: auto;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     --alto-banda: 9mm;
