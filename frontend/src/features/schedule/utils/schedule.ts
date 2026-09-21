@@ -257,13 +257,11 @@ export const calcularAltoBandaPrint = (
   descansosVisibles: number,
   espacioDisponible: number,
 ): number => {
-  const ALTO_HEADER = 20;
-  const ALTO_INFO_EXTRA = 4;
+  const ALTO_HEADER = 24;
   const ALTO_CABECERA = 6;
   const ALTO_DESCANSO = 4;
   const espacio = espacioDisponible
     - ALTO_HEADER
-    - (tieneInfoExtra ? ALTO_INFO_EXTRA : 0)
     - ALTO_CABECERA
     - (descansosVisibles * ALTO_DESCANSO);
   return espacio / numBandas;
