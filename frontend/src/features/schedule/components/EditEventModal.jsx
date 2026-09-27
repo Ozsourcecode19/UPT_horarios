@@ -14,6 +14,7 @@ const EditEventModal = ({
   evento,
   aulas = [],
   bloques = [],
+  sedeMap = {},
   ventanaDivision = null, // ventana del turno del evento (null = jornada global, sin filtro extra)
   abarca = 1,                    // 1 | 2 bloques (controlado desde la página)
   onAbarcaChange,                // (valor) => void
@@ -101,7 +102,7 @@ const EditEventModal = ({
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700"
             >
               {aulas.map(a => (
-                <option key={a.id} value={a.id}>{a.nombre} (Sede: {a.sede_id === 1 ? 'Principal' : 'Este'})</option>
+                <option key={a.id} value={a.id}>{a.nombre} (Sede: {sedeMap[a.sede_id] || 'Sin sede'})</option>
               ))}
             </select>
           </div>

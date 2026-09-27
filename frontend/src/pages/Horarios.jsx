@@ -459,7 +459,7 @@ const Horarios = () => {
 
       {isEditModalOpen && selectedEvent && (
         <EditEventModal
-          evento={selectedEvent} aulas={aulas} bloques={bloques}
+          evento={selectedEvent} aulas={aulas} bloques={bloques} sedeMap={sedeMap}
           ventanaDivision={ventanaDivisionModal}
           abarca={editAbarca} onAbarcaChange={setEditAbarca}
           puedeAbarcarDos={puedeAbarcarDos} previewRango={previewRango}

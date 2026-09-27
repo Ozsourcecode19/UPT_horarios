@@ -135,9 +135,9 @@ export default function useHorariosData() {
   const grupos = demoMode || isGruposError ? MOCK_GRUPOS : gruposReal;
 
   const { data: bloquesReal = [], isError: isBloquesError } = useQuery({
-    queryKey: ['bloques'],
+    queryKey: ['bloques', selectedSedeId],
     queryFn: async () => {
-      try { const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT); return result.items || result; }
+      try { const result = await BloquesService.getBloques(0, FETCH_ALL_LIMIT, null, selectedSedeId); return result.items || result; }
       catch { return MOCK_BLOQUES; }
     },
     enabled: !demoMode,
@@ -164,6 +164,17 @@ export default function useHorariosData() {
     enabled: !demoMode && !!selectedPeriodoId,
     retry: 0,
   });
+
+  // Filtrar horarios por sede usando las aulas de la sede seleccionada
+  const horariosFiltradosPorSede = useMemo(() => {
+    if (!selectedSedeId) return horariosReal;
+    if (!horariosReal.length || !aulas.length) return [];
+    const aulasSede = new Set(aulas.map(a => a.id));
+    return horariosReal.filter(ev => {
+      const aulaId = ev.extendedProps?.aula_id;
+      return aulaId != null && aulasSede.has(Number(aulaId));
+    });
+  }, [horariosReal, selectedSedeId, aulas]);
 
   const { data: preCheck = null, refetch: refetchPreCheck } = useQuery({
     queryKey: ['pre-generation-check', selectedPeriodoId],
@@ -247,7 +258,7 @@ export default function useHorariosData() {
     demoHorarios, setDemoHorarios,
     periodos, selectedPeriodo,
     aulas, docentes, grupos, bloques, configuraciones,
-    horariosReal, isHorariosLoading, refetchHorarios,
+    horariosReal: horariosFiltradosPorSede, isHorariosLoading, refetchHorarios,
     invalidateHorarios,
     preCheck, refetchPreCheck, canGenerate,
     versiones, refetchVersiones, restoreVersionMutation,
