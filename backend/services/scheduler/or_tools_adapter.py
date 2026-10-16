@@ -165,6 +165,24 @@ class ScheduleGenerator:
         # es MAYÚSCULAS ('MATUTINO') -> normalizar a minúsculas en ambos lados.
         ventana_por_turno = {c.clave.lower(): _parse_ventana_config(c.valor) for c in config_db}
 
+        # 2b. Cargar disponibilidades y habilitaciones ANTES de crear variables.
+        # Se filtra por combinaciones imposibles al momento de crear las
+        # variables x[l][b][a], de modo que AddExactlyOne nunca reciba un
+        # conjunto vacío forzado a 0 (causa de INFEASIBLE).
+        docente_ids_in_lecciones = {l.docente_id for l in lecciones}
+        disponibilidades = self.db.query(models.DisponibilidadDocente).filter(
+            models.DisponibilidadDocente.docente_id.in_(list(docente_ids_in_lecciones))
+        ).all()
+        disp_por_docente: Dict[int, list] = {}
+        for disp in disponibilidades:
+            disp_por_docente.setdefault(disp.docente_id, []).append(disp)
+
+        docente_materia_pairs = [(l.docente_id, l.materia_id) for l in lecciones]
+        habilitaciones = self.db.query(models.HabilitacionDocente).filter(
+            tuple_(models.HabilitacionDocente.docente_id, models.HabilitacionDocente.materia_id).in_(docente_materia_pairs)
+        ).all()
+        habil_map = {(h.docente_id, h.materia_id): True for h in habilitaciones}
+
         # 3. Crear variables de decisión (Booleanas: Leccion-Lugar-Tiempo)
         # La variable x[l_id][b_id][a_id] es True si la leccion l_id se asigna al bloque b_id en la aula a_id
         assignment_vars_local = {} # Dict[(leccion_id, bloque_id, aula_id), Any]
@@ -190,6 +208,39 @@ class ScheduleGenerator:
                     # El bloque debe empezar y terminar dentro de la ventana del turno
                     if bloque_inicio < ven_inicio or bloque_fin_dt > ven_fin:
                         continue # Bloque fuera de la ventana de este turno
+
+                # Verificar disponibilidad del docente para este bloque ANTES de
+                # crear la variable. Si no está disponible, no se crea la variable
+                # y AddExactlyOne no la incluirá (evita INFEASIBLE por vars→0).
+                doc_disps = disp_por_docente.get(leccion.docente_id, [])
+                disponibles_explicit = [d for d in doc_disps if d.tipo_disponibilidad == 'DISPONIBLE']
+                no_disponibles = [d for d in doc_disps if d.tipo_disponibilidad == 'NO_DISPONIBLE']
+
+                disp_bloque_inicio = bloque.hora_inicio
+                disp_bloque_fin = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
+
+                is_blocked = any(
+                    d.dia_semana == bloque.dia_semana and
+                    d.hora_inicio <= disp_bloque_inicio and
+                    d.hora_fin >= disp_bloque_fin
+                    for d in no_disponibles
+                )
+                if disponibles_explicit:
+                    is_in_available = any(
+                        d.dia_semana == bloque.dia_semana and
+                        d.hora_inicio <= disp_bloque_inicio and
+                        d.hora_fin >= disp_bloque_fin
+                        for d in disponibles_explicit
+                    )
+                else:
+                    is_in_available = True
+                if is_blocked or not is_in_available:
+                    continue # Docente no disponible en este bloque
+
+                # Verificar habilitación docente-materia ANTES de crear la variable
+                if not habil_map.get((leccion.docente_id, leccion.materia_id), False):
+                    continue # Docente no habilitado para esta materia
+
                 for aula in aulas:
                     # Restricción de consistencia de Sede (requisito estricto del trigger
                     # PL/pgSQL fn_validar_sede_horario): Aula, Bloque y Lección deben
@@ -212,8 +263,15 @@ class ScheduleGenerator:
                                for b in bloques if b.dia_semana in dias_disponibles
                                for a in aulas
                                if (leccion.id, b.id, a.id) in self.assignment_vars]
-            if vars_for_lesson: # Evitar errores si no hay candidatos
+            if vars_for_lesson:
                 self.model.AddExactlyOne(vars_for_lesson)
+            else:
+                self.logger.warning(
+                    f"Lección {leccion.id} (docente {leccion.docente_id}, "
+                    f"grupo {leccion.grupo_id}, materia {leccion.materia_id}): "
+                    f"0 candidatos disponibles (sede/ventana/disponibilidad/habilitación). "
+                    f"Se omite del modelo."
+                )
 
         # b. Unicidad Docente/Grupo/Aula en (día, bloque)
         # Docente: un docente puede estar en UN solo lugar (aula) por bloque
@@ -258,88 +316,6 @@ class ScheduleGenerator:
                                      if (l.id, bloque.id, aula.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
                 if len(vars_for_conflict) > 1:
                     self.model.AddAtMostOne(vars_for_conflict)
-
-        # c. Cumplimiento de disponibilidad docente (función de la DB)
-        # Cargar disponibilidades para docentes involucrados
-        docente_ids_in_lecciones = {l.docente_id for l in lecciones}
-        disponibilidades = self.db.query(models.DisponibilidadDocente).filter(
-            models.DisponibilidadDocente.docente_id.in_(list(docente_ids_in_lecciones))
-        ).all()
-
-        # Agrupar disponibilidades por docente
-        disp_por_docente = {}
-        for disp in disponibilidades:
-            disp_por_docente.setdefault(disp.docente_id, []).append(disp)
-
-        for leccion in lecciones:
-            docente_id = leccion.docente_id
-            doc_disps = disp_por_docente.get(docente_id, [])
-
-            disponibles_explicit = [d for d in doc_disps if d.tipo_disponibilidad == 'DISPONIBLE']
-            no_disponibles = [d for d in doc_disps if d.tipo_disponibilidad == 'NO_DISPONIBLE']
-
-            for bloque in bloques:
-                if bloque.dia_semana not in dias_disponibles:
-                    continue
-                
-                bloque_inicio = bloque.hora_inicio
-                duracion_minutos_valor = bloque.duracion_minutos
-                bloque_fin_dt = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=duracion_minutos_valor)).time()
-
-                # Verificar si se cruza con algún bloque NO_DISPONIBLE
-                is_blocked = any(
-                    d.dia_semana == bloque.dia_semana and
-                    d.hora_inicio <= bloque_inicio and
-                    d.hora_fin >= bloque_fin_dt
-                    for d in no_disponibles
-                )
-
-                # Si existen registros de DISPONIBLE explícitos, debe encajar en alguno
-                if disponibles_explicit:
-                    is_in_available = any(
-                        d.dia_semana == bloque.dia_semana and
-                        d.hora_inicio <= bloque_inicio and
-                        d.hora_fin >= bloque_fin_dt
-                        for d in disponibles_explicit
-                    )
-                else:
-                    is_in_available = True  # Disponible por defecto si no se han especificado franjas explícitas
-
-                is_available = (not is_blocked) and is_in_available
-
-                if not is_available:
-                    # Si no está disponible, todas las asignaciones posibles para este docente-bloque se cancelan (0)
-                    for aula in aulas:
-                         var_key = (leccion.id, bloque.id, aula.id)
-                         if var_key in self.assignment_vars:
-                             self.model.Add(self.assignment_vars[var_key] == 0)
-
-
-        # d. Cumplimiento de habilitación docente-materia (función de la DB)
-        # Cargar habilitaciones
-        docente_materia_pairs = [(l.docente_id, l.materia_id) for l in lecciones]
-        # CORREGIDO: Asegurarse de que tuple_ esté importado
-        habilitaciones = self.db.query(models.HabilitacionDocente).filter(
-            tuple_(models.HabilitacionDocente.docente_id, models.HabilitacionDocente.materia_id).in_(docente_materia_pairs)
-        ).all()
-
-        # Crear un mapa de habilitación: {(docente_id, materia_id): True/False}
-        habil_map = {(h.docente_id, h.materia_id): True for h in habilitaciones}
-
-        for leccion in lecciones:
-            docente_id = leccion.docente_id
-            materia_id = leccion.materia_id
-            if not habil_map.get((docente_id, materia_id), False):
-                # Si no está habilitado, todas las asignaciones posibles para esta combinación deben ser False
-                for bloque in bloques:
-                    if bloque.dia_semana not in dias_disponibles:
-                        continue
-                    for aula in aulas:
-                        var_key = (leccion.id, bloque.id, aula.id)
-                        # CORREGIDO: Usar self.assignment_vars
-                        if var_key in self.assignment_vars: # <-- Ahora usa self.assignment_vars
-                            self.model.Add(self.assignment_vars[var_key] == 0) # <-- Ahora usa self.assignment_vars
-
 
         # 5. (Opcional) Agregar Restricciones Blandas (Función Objetivo)
         # a. Penalizar huecos (gaps) para docentes
