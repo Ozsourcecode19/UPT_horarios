@@ -262,6 +262,117 @@ describe('useDragDropValidation', () => {
     expect(result.current.isEditModalOpen).toBe(false);
   });
 });
+describe('useDragDropValidation — sesiones N bloques', () => {
+  const bloques2 = [
+    { id: 10, sede_id: 1, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 45 },
+    { id: 11, sede_id: 1, dia_semana: 1, hora_inicio: '08:45:00', duracion_minutos: 45 },
+    { id: 12, sede_id: 1, dia_semana: 1, hora_inicio: '09:30:00', duracion_minutos: 45 },
+    { id: 13, sede_id: 1, dia_semana: 1, hora_inicio: '10:15:00', duracion_minutos: 45 },
+  ];
+  const aulas2 = [{ id: 1, nombre: 'Aula 101', sede_id: 1 }];
+
+  it('guardarAsignacionManual en Demo crea N-1 clones (sesión de 2)', async () => {
+    const demoHorarios = [
+      {
+        id: 1,
+        start: '2026-08-24T08:00:00',
+        extendedProps: {
+          docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica',
+          aula_id: 1, bloque_id: 10, periodo_id: 9, leccion_id: 1,
+          bloques_por_sesion: 2, materia_codigo: 'MAT-1', backgroundColor: '#3B82F6',
+          aula: 'Aula 101', sede: 'Principal', docente_id: 1,
+        },
+      },
+      // segunda fila de la sesión (contigua)
+      {
+        id: 2,
+        start: '2026-08-24T08:45:00',
+        extendedProps: {
+          docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica',
+          aula_id: 1, bloque_id: 11, periodo_id: 9, leccion_id: 1,
+          bloques_por_sesion: 2, materia_codigo: 'MAT-1', backgroundColor: '#3B82F6',
+          aula: 'Aula 101', sede: 'Principal', docente_id: 1,
+        },
+      },
+    ];
+    const setup = baseProps({ demoMode: true, demoHorarios, bloques: bloques2, aulas: aulas2 });
+    const { result } = render(setup);
+
+    let ok;
+    await act(async () => {
+      ok = await result.current.guardarAsignacionManual({
+        horario: demoHorarios[0],
+        aulaId: 1,
+        bloqueDestinos: [bloques2[2], bloques2[3]], // 09:30 y 10:15 (run libre)
+      });
+    });
+
+    expect(ok).toBe(true);
+    // el hook pasa el array final directamente (no un updater)
+    const nuevos = setup.setDemoHorarios.mock.calls[0][0];
+    // la sesión previa (ids 1 y 2) se reemplazó por 2 filas nuevas (M×N=2)
+    expect(nuevos).toHaveLength(2);
+    expect(nuevos.map(e => e.extendedProps.bloque_id).sort()).toEqual([12, 13]);
+  });
+
+  it('handleDeleteSchedule en Demo elimina TODA la sesión (N=2)', async () => {
+    const demoHorarios = [
+      {
+        id: 1,
+        extendedProps: {
+          docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica',
+          aula_id: 1, bloque_id: 10, periodo_id: 9, leccion_id: 1,
+          bloques_por_sesion: 2,
+        },
+      },
+      {
+        id: 2,
+        extendedProps: {
+          docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica',
+          aula_id: 1, bloque_id: 11, periodo_id: 9, leccion_id: 1,
+          bloques_por_sesion: 2,
+        },
+      },
+      // otra sesión de la MISMA lección (día distinto) — NO debe borrarse
+      {
+        id: 3,
+        extendedProps: {
+          docente: 'Perez, Juan', grupo: 'Seccion A', materia: 'Matematica',
+          aula_id: 1, bloque_id: 20, periodo_id: 9, leccion_id: 1,
+          bloques_por_sesion: 1,
+        },
+      },
+    ];
+    const bloques3 = [
+      ...bloques2,
+      { id: 20, sede_id: 1, dia_semana: 2, hora_inicio: '08:00:00', duracion_minutos: 45 },
+    ];
+    const setup = baseProps({ demoMode: true, demoHorarios, bloques: bloques3, aulas: aulas2 });
+    const { result } = render(setup);
+
+    act(() => {
+      result.current.handleEventClick({
+        id: '1',
+        start: lunes(8, 0),
+        end: lunes(8, 45),
+        extendedProps: {
+          materia: 'Matematica', docente: 'Perez, Juan', grupo: 'Seccion A',
+          aula_id: 1, bloque_id: 10, leccion_id: 1, bloques_por_sesion: 2,
+        },
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleDeleteSchedule();
+    });
+
+    const updater = setup.setDemoHorarios.mock.calls[0][0];
+    const trasBorrar = updater(demoHorarios);
+    // quedan solo la sesión del martes (id 3); los ids 1 y 2 se borraron
+    expect(trasBorrar.map(e => e.id)).toEqual([3]);
+  });
+});
+
 describe('useDragDropValidation — ventana por división (E17)', () => {
   const setupVentana = (overrides = {}) => baseProps({
     configuraciones: [{ clave: 'ventana_matutino', valor: { hora_inicio: '07:00:00', hora_fin: '12:00:00' } }],
@@ -288,7 +399,7 @@ describe('useDragDropValidation — ventana por división (E17)', () => {
     expect(ok).toBe(false);
     expect(setup.scheduleService.validateMove).not.toHaveBeenCalled();
     expect(setup.showToast).toHaveBeenCalledWith(
-      expect.stringContaining('El turno MATUTINO solo admite bloques entre'),
+      expect.stringContaining('El turno Mañana solo admite bloques entre'),
       'error'
     );
   });

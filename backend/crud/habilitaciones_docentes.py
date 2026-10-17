@@ -71,10 +71,10 @@ def create_habilitacion_docente(db: Session, habilitacion: schemas.HabilitacionD
             raise HTTPException(status_code=422, detail=f"El docente con ID {habilitacion.docente_id} no existe. No se puede crear la habilitación.")
         # Verificar si el error es específicamente por clave foránea de materia
         elif 'habilitaciones_docentes_materia_id_fkey' in str(e.orig):
-            raise HTTPException(status_code=422, detail=f"La materia con ID {habilitacion.materia_id} no existe. No se puede crear la habilitación.")
+            raise HTTPException(status_code=422, detail=f"La unidad curricular con ID {habilitacion.materia_id} no existe. No se puede crear la habilitación.")
         # Opcional: Manejar la violación de unicidad (UNIQUE(docente_id, materia_id)) si se intenta crear la misma combinación
         elif 'habilitaciones_docentes_docente_id_materia_id_key' in str(e.orig): # Nombre exacto de la constraint de unicidad
-            raise HTTPException(status_code=409, detail=f"Ya existe una habilitación para el docente con ID {habilitacion.docente_id} en la materia con ID {habilitacion.materia_id}. No se puede duplicar.")
+            raise HTTPException(status_code=409, detail=f"Ya existe una habilitación para el docente con ID {habilitacion.docente_id} en la unidad curricular con ID {habilitacion.materia_id}. No se puede duplicar.")
         # Opcional: Manejar la violación de check constraint (chk_fechas_habilitacion)
         elif 'chk_fechas_habilitacion' in str(e.orig).lower(): # Revisar el mensaje buscando la constraint
             raise HTTPException(status_code=422, detail=f"La fecha de fin debe ser mayor o igual a la fecha de inicio.")
@@ -163,7 +163,7 @@ def validate_delete_habilitacion(db: Session, hab_id: int) -> dict:
             "period_status": "ACTIVO",
             "affected_lessons_count": len(affected_lessons),
             "affected_lessons": affected_lessons,
-            "message": "No se puede eliminar la habilitación porque existen lecciones activas en un período académico ACTIVO. Se sugiere establecer una 'fecha hasta' para deshabilitar a futuro."
+            "message": "No se puede eliminar la habilitación porque existen clases activas en un período académico ACTIVO. Se sugiere establecer una 'fecha hasta' para deshabilitar a futuro."
         }
     elif has_planning_period_lessons:
         return {
@@ -173,7 +173,7 @@ def validate_delete_habilitacion(db: Session, hab_id: int) -> dict:
             "period_status": "PLANIFICACION",
             "affected_lessons_count": len(affected_lessons),
             "affected_lessons": affected_lessons,
-            "message": "Existen lecciones vinculadas en período de PLANIFICACIÓN. Al confirmar, se desactivarán automáticamente las lecciones afectadas."
+            "message": "Existen clases vinculadas en período de PLANIFICACIÓN. Al confirmar, se desactivarán automáticamente las clases afectadas."
         }
     else:
         return {
@@ -183,7 +183,7 @@ def validate_delete_habilitacion(db: Session, hab_id: int) -> dict:
             "period_status": "SIN_USO_VIGENTE",
             "affected_lessons_count": 0,
             "affected_lessons": [],
-            "message": "La habilitación se puede eliminar de manera segura ya que no posee lecciones activas en períodos vigentes."
+            "message": "La habilitación se puede eliminar de manera segura ya que no posee clases activas en períodos vigentes."
         }
 
 

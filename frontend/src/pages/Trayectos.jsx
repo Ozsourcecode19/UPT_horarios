@@ -70,7 +70,7 @@ const Trayectos = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión de Trayectos Académicos</h2>
-          <p className="text-slate-500">Administra los niveles académicos de cada carrera para planificar los grupos.</p>
+          <p className="text-slate-500">Administra los niveles académicos de cada carrera para planificar las secciones.</p>
         </div>
         <div className="flex gap-3">
           {puedeEscribir && (

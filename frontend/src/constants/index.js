@@ -38,6 +38,19 @@ export const DIAS_ABREVIADOS = [
 /** Duraciones válidas para bloques horarios (en minutos). */
 export const DURACIONES_BLOQUE = [30, 45, 60, 90, 120];
 
+// ─── Turnos / divisiones ─────────────────────────────────────
+
+/**
+ * Etiquetas de presentación de turnos. Los valores almacenados en BD/API
+ * siguen siendo MATUTINO/VESPERTINO/NOCTURNO; en la UI se muestran como
+ * Mañana/Tarde/Noche.
+ */
+export const TURNOS_LABELS = {
+  MATUTINO: 'Mañana',
+  VESPERTINO: 'Tarde',
+  NOCTURNO: 'Noche',
+};
+
 // ─── Colores ─────────────────────────────────────────────────
 
 /** Color fallback para eventos de horario sin color asignado. */

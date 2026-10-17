@@ -9,6 +9,8 @@ class LeccionBase(BaseModel):
     grupo_id: int
     materia_id: int
     horas_semanales: int = Field(default=2, ge=1, le=20) # ge: greater_equal, le: less_equal (SOLID: Valida en el schema)
+    bloques_por_sesion: int = Field(default=1, ge=1, le=20) # N: bloques consecutivos de cada sesión
+    sesiones_semana: int = Field(default=1, ge=1, le=20)    # M: sesiones de la clase por semana
     prioridad: int = Field(default=0, ge=0, le=10) # DRY: Definir rango aquí
     activo: bool = True
     sede_forzada_id: Optional[int] = None
@@ -24,6 +26,8 @@ class LeccionUpdate(BaseModel):
     grupo_id: Optional[int] = None
     materia_id: Optional[int] = None
     horas_semanales: Optional[int] = Field(None, ge=1, le=20)
+    bloques_por_sesion: Optional[int] = Field(None, ge=1, le=20)
+    sesiones_semana: Optional[int] = Field(None, ge=1, le=20)
     prioridad: Optional[int] = Field(None, ge=0, le=10)
     activo: Optional[bool] = None
     sede_forzada_id: Optional[int] = None

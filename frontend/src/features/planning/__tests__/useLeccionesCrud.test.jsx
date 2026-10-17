@@ -55,7 +55,7 @@ describe('useLeccionesCrud — modo real', () => {
     expect(ok).toBe(true);
     expect(setup.servicios.grupos.createGrupo).toHaveBeenCalledWith(expect.objectContaining({ trayecto_id: 1, cantidad_alumnos: 30 }));
     expect(setup.onInvalidateGrupos).toHaveBeenCalledTimes(1);
-    expect(setup.showToast).toHaveBeenCalledWith("Grupo registrado exitosamente");
+    expect(setup.showToast).toHaveBeenCalledWith("Sección registrada exitosamente");
   });
 
   it('save grupo en edición llama updateGrupo con el id del editing', async () => {
@@ -80,7 +80,7 @@ describe('useLeccionesCrud — modo real', () => {
     });
 
     expect(ok).toBe(false);
-    expect(setup.showToast).toHaveBeenCalledWith("Error al guardar grupo en el servidor", "error");
+    expect(setup.showToast).toHaveBeenCalledWith("Error al guardar sección en el servidor", "error");
   });
 
   it('delete leccion exitoso invalida y avisa', async () => {
@@ -95,7 +95,7 @@ describe('useLeccionesCrud — modo real', () => {
     expect(ok).toBe(true);
     expect(setup.servicios.lecciones.deleteLeccion).toHaveBeenCalledWith(7);
     expect(setup.onInvalidateLecciones).toHaveBeenCalledTimes(1);
-    expect(setup.showToast).toHaveBeenCalledWith("Lección académica eliminada exitosamente", "info");
+    expect(setup.showToast).toHaveBeenCalledWith("Clase eliminada exitosamente", "info");
   });
 });
 
@@ -111,7 +111,7 @@ describe('useLeccionesCrud — guards', () => {
 
     expect(ok).toBe(false);
     expect(setup.servicios.lecciones.createLeccion).not.toHaveBeenCalled();
-    expect(setup.showToast).toHaveBeenCalledWith("No tienes permisos para crear o editar lecciones.", "error");
+    expect(setup.showToast).toHaveBeenCalledWith("No tienes permisos para crear o editar clases.", "error");
   });
 
   it('no elimina un grupo con lecciones vinculadas', async () => {
@@ -128,7 +128,7 @@ describe('useLeccionesCrud — guards', () => {
     expect(ok).toBe(false);
     expect(setup.servicios.grupos.deleteGrupo).not.toHaveBeenCalled();
     expect(setup.showToast).toHaveBeenCalledWith(
-      "No es posible eliminar el grupo: tiene 2 lección(es) académica(s) vinculada(s).",
+      "No es posible eliminar la sección: tiene 2 clase(s) vinculada(s).",
       "error"
     );
   });
@@ -194,6 +194,6 @@ describe('useLeccionesCrud — Modo Demo', () => {
 
     const updater = setup.setDemoGrupos.mock.calls[0][0];
     expect(updater([{ id: 1 }, { id: 3 }])).toEqual([{ id: 3 }]);
-    expect(setup.showToast).toHaveBeenCalledWith("Grupo eliminado con éxito (Modo Demo)", "info");
+    expect(setup.showToast).toHaveBeenCalledWith("Sección eliminada con éxito (Modo Demo)", "info");
   });
 });

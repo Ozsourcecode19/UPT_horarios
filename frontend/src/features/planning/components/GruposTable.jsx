@@ -3,6 +3,7 @@
 // Presentacional: recibes los items ya filtrados + callbacks de edicion/borrado.
 
 import { MapPin, CheckCircle, XCircle, Layers, Edit2, Trash2 } from 'lucide-react';
+import { TURNOS_LABELS } from '../../../constants';
 
 const GruposTable = ({
   items = [],
@@ -27,19 +28,19 @@ const GruposTable = ({
           <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
             <Layers className="w-8 h-8" />
           </div>
-          <h5 className="text-lg font-bold text-slate-700">No se encontraron grupos</h5>
+          <h5 className="text-lg font-bold text-slate-700">No se encontraron secciones</h5>
           <p className="text-sm text-slate-400 mt-1 max-w-sm">
-            Crea un nuevo grupo de alumnos asignándolo a un trayecto y sede física.
+            Crea una nueva sección asignándola a un trayecto y sede física.
           </p>
         </div>
       ) : (
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-              <th className="py-4 px-6">Grupo de Alumnos</th>
+              <th className="py-4 px-6">Sección</th>
               <th className="py-4 px-6">Trayecto Académico</th>
               <th className="py-4 px-6">Ubicación / Sede</th>
-              <th className="py-4 px-6 text-center">División</th>
+              <th className="py-4 px-6 text-center">Turno</th>
               <th className="py-4 px-6 text-center">Matrícula (Alumnos)</th>
               <th className="py-4 px-6">Período</th>
               <th className="py-4 px-6 text-center">Estado</th>
@@ -82,7 +83,7 @@ const GruposTable = ({
                       'bg-violet-50 text-violet-700'
                     }`}>
                       {grupo.division === 'MATUTINO' ? '🌅' : grupo.division === 'VESPERTINO' ? '🌤️' : '🌙'}
-                      <span>{grupo.division}</span>
+                      <span>{TURNOS_LABELS[grupo.division] ?? grupo.division}</span>
                     </span>
                   </td>
                   <td className="py-4 px-6 text-center font-bold text-slate-700">
@@ -109,14 +110,14 @@ const GruposTable = ({
                       <button
                         onClick={() => onEdit(grupo)}
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Editar grupo"
+                        title="Editar sección"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(grupo)}
                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="Eliminar grupo"
+                        title="Eliminar sección"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

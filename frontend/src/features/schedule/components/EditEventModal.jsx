@@ -6,7 +6,7 @@
 import { X, Clock, Trash2 } from 'lucide-react';
 import { bloqueDentroVentana } from '../utils/schedule';
 import { formatHora12 } from '../../../utils/timeFormat';
-import ModalPortal from '../../../components/ui/ModalPortal';
+import ModalShell from '../../../components/ui/ModalShell';
 
 const DIAS_NOMBRES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -16,9 +16,7 @@ const EditEventModal = ({
   bloques = [],
   sedeMap = {},
   ventanaDivision = null, // ventana del turno del evento (null = jornada global, sin filtro extra)
-  abarca = 1,                    // 1 | 2 bloques (controlado desde la página)
-  onAbarcaChange,                // (valor) => void
-  puedeAbarcarDos = false,       // existe banda consecutiva válida en la sede/ventana
+  abarca = 1,                    // N de bloques por sesión de la CLASE (solo lectura: ver nota)
   previewRango = '',             // texto del rango resultante según "abarca"
   editAulaId,
   onChangeAulaId,
@@ -30,9 +28,14 @@ const EditEventModal = ({
 }) => {
   if (!evento) return null;
 
+  // N de la clase: NO se edita aquí (R3). El tamaño de la sesión se define en
+  // Planificación → Clases; en este modal solo se reubica (aula/día-hora) y el
+  // run de N se rearma en el destino.
+  const nSesion = Math.max(1, Number(abarca) || 1);
+
   const enviar = (e) => {
     e.preventDefault();
-    onSave(editAulaId, editBloqueId, abarca === 2 && puedeAbarcarDos ? 2 : 1);
+    onSave(editAulaId, editBloqueId, nSesion);
   };
 
   // Bloques de la sede del aula elegida y dentro de la ventana del turno
@@ -43,11 +46,10 @@ const EditEventModal = ({
   );
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
-
-        {/* Cabecera del modal */}
+    <ModalShell
+      onSubmit={enviar}
+      space="space-y-6"
+      header={(
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg uppercase tracking-wider">
@@ -62,9 +64,37 @@ const EditEventModal = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+      )}
+      footer={(
+        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors"
+            title="Dar de baja esta clase del calendario"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Eliminar Asignación</span>
+          </button>
 
-        {/* Formulario/Detalle */}
-        <form onSubmit={enviar} className="p-6 space-y-6">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-xl font-semibold text-xs transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-xs shadow-md shadow-blue-500/10 transition-all hover:-translate-y-0.5"
+            >
+              Guardar Cambios
+            </button>
+          </div>
+        </div>
+      )}
+    >
 
           {/* Información General */}
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-sm">
@@ -73,7 +103,7 @@ const EditEventModal = ({
               <span className="font-semibold text-slate-700">{evento.docente}</span>
             </div>
             <div>
-              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grupo</span>
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sección</span>
               <span className="font-semibold text-slate-700">{evento.grupo}</span>
             </div>
             <div className="mt-2">
@@ -123,65 +153,23 @@ const EditEventModal = ({
             </select>
           </div>
 
-          {/* Extensión: cuántos bloques abarca la sesión */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Abarca</label>
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-max">
-              {[1, 2].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={n === 2 && !puedeAbarcarDos}
-                  onClick={() => onAbarcaChange?.(n)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                    abarca === n
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  } ${n === 2 && !puedeAbarcarDos ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  title={n === 2 && !puedeAbarcarDos ? 'No hay un bloque consecutivo disponible' : undefined}
-                >
-                  {n === 1 ? '1 bloque' : '2 bloques'}
-                </button>
-              ))}
+          {/* Sesión multibloque (N de la clase, solo lectura aquí) */}
+          {nSesion > 1 && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Sesión</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
+                <span className="text-xs font-bold text-indigo-700">×{nSesion} bloques por sesión</span>
+                <span className="text-[10px] text-indigo-500">
+                  (el tamaño lo define la clase; para cambiarlo ve a Planificación → Clases)
+                </span>
+              </div>
+              {previewRango && (
+                <p className="text-[11px] text-slate-500">Rango resultante: <strong>{previewRango}</strong></p>
+              )}
             </div>
-            {previewRango && (
-              <p className="text-[11px] text-slate-500">Rango resultante: <strong>{previewRango}</strong></p>
-            )}
-          </div>
+          )}
 
-          {/* Botones de acción */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onDelete}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors"
-              title="Dar de baja esta clase del calendario"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Eliminar Asignación</span>
-            </button>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-xl font-semibold text-xs transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-xs shadow-md shadow-blue-500/10 transition-all hover:-translate-y-0.5"
-              >
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-
-        </form>
-      </div>
-    </div>
-    </ModalPortal>
+    </ModalShell>
   );
 };
 

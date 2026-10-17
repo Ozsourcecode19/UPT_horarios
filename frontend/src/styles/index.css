@@ -784,6 +784,8 @@ table.grilla-bloques {
 .dark .border-indigo-200 { border-color: rgb(99 102 241 / .35); }
 .dark .text-indigo-600 { color: #a5b4fc; }
 .dark .text-indigo-700 { color: #a5b4fc; }
+.dark .text-indigo-500 { color: #a5b4fc; }
+.dark .bg-indigo-50\/60 { background-color: rgb(99 102 241 / .16); }
 /* purple */
 .dark .bg-purple-50 { background-color: rgb(168 85 247 / .12); }
 .dark .hover\:bg-purple-50:hover { background-color: rgb(168 85 247 / .18); }

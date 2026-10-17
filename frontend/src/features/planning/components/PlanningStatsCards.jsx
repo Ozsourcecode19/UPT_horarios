@@ -19,9 +19,9 @@ export function LeccionesStats({ totalLecciones, totalHoras, leccionesActivas })
   const promedio = totalLecciones > 0 ? (totalHoras / totalLecciones).toFixed(1) : 0;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard title="Lecciones Académicas" value={totalLecciones} icon={GraduationCap} color="bg-blue-50 text-blue-600" />
+      <StatCard title="Clases" value={totalLecciones} icon={GraduationCap} color="bg-blue-50 text-blue-600" />
       <StatCard title="Horas Planificadas" value={totalHoras} icon={Clock} color="bg-indigo-50 text-indigo-600" suffix="h" />
-      <StatCard title="Lecciones Activas" value={leccionesActivas} icon={CheckCircle} color="bg-emerald-50 text-emerald-600" />
+      <StatCard title="Clases Activas" value={leccionesActivas} icon={CheckCircle} color="bg-emerald-50 text-emerald-600" />
       <StatCard title="Carga Horaria Promedio" value={promedio} icon={Hourglass} color="bg-purple-50 text-purple-600" suffix="h" />
     </div>
   );
@@ -31,10 +31,10 @@ export function GruposStats({ totalGrupos, totalAlumnos, gruposActivos }) {
   const promedio = totalGrupos > 0 ? Math.round(totalAlumnos / totalGrupos) : 0;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard title="Grupos Activos" value={totalGrupos} icon={Layers} color="bg-blue-50 text-blue-600" />
+      <StatCard title="Secciones Activas" value={totalGrupos} icon={Layers} color="bg-blue-50 text-blue-600" />
       <StatCard title="Alumnos Matriculados" value={totalAlumnos} icon={Users} color="bg-indigo-50 text-indigo-600" />
-      <StatCard title="Grupos Operativos" value={gruposActivos} icon={CheckCircle} color="bg-emerald-50 text-emerald-600" />
-      <StatCard title="Promedio por Grupo" value={promedio} icon={UserCheck} color="bg-purple-50 text-purple-600" />
+      <StatCard title="Secciones Operativas" value={gruposActivos} icon={CheckCircle} color="bg-emerald-50 text-emerald-600" />
+      <StatCard title="Promedio por Sección" value={promedio} icon={UserCheck} color="bg-purple-50 text-purple-600" />
     </div>
   );
 }

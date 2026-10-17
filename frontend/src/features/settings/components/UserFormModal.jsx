@@ -2,7 +2,7 @@
 // Modal de crear/editar usuario con formulario inline.
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import ModalPortal from '../../../components/ui/ModalPortal';
+import ModalShell from '../../../components/ui/ModalShell';
 
 export default function UserFormModal({ isOpen, editingUser, onSave, onClose }) {
   const [form, setForm] = useState({
@@ -36,18 +36,30 @@ export default function UserFormModal({ isOpen, editingUser, onSave, onClose }) 
   const inputClass = "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium placeholder-slate-400 dark:placeholder-slate-500";
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-              {editingUser ? 'Editar Usuario' : 'Añadir Nuevo Usuario'}
-            </h3>
-            <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <ModalShell
+      onSubmit={handleSubmit}
+      panelExtra="dark:bg-slate-900 dark:border-slate-700"
+      header={(
+        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+            {editingUser ? 'Editar Usuario' : 'Añadir Nuevo Usuario'}
+          </h3>
+          <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+      footer={(
+        <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700 px-6 py-4">
+          <button type="button" onClick={onClose} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-sm transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">
+            {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
+          </button>
+        </div>
+      )}
+    >
             {errorMsg && (
               <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-800/40 rounded-xl text-sm text-red-700 dark:text-red-400 font-medium">{errorMsg}</div>
             )}
@@ -84,17 +96,6 @@ export default function UserFormModal({ isOpen, editingUser, onSave, onClose }) 
                 Usuario activo
               </label>
             )}
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-              <button type="button" onClick={onClose} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold text-sm transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">
-                {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </ModalPortal>
+    </ModalShell>
   );
 }

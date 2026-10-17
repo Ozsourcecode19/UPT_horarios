@@ -33,12 +33,12 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
 
       <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Lecciones activas', value: preCheck.lecciones_activas, critico: preCheck.lecciones_activas === 0 },
+          { label: 'Clases activas', value: preCheck.lecciones_activas, critico: preCheck.lecciones_activas === 0 },
           { label: 'Aulas activas', value: preCheck.aulas, critico: preCheck.aulas === 0 },
           { label: 'Bloques activos', value: preCheck.bloques, critico: preCheck.bloques === 0 },
           { label: 'Docentes con habilitación', value: preCheck.docentes_con_habilitacion, critico: preCheck.docentes_con_habilitacion === 0 },
           { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false },
-          { label: 'Lecciones sin candidatos', value: preCheck.lecciones_sin_candidatos, critico: false }
+          { label: 'Clases sin candidatos', value: preCheck.lecciones_sin_candidatos, critico: false }
         ].map(item => (
           <div key={item.label} className={`rounded-2xl p-3 border ${
             item.value === 0
@@ -60,14 +60,14 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
         <div className="mt-4 flex items-start gap-2 text-xs text-amber-800">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            {preCheck.lecciones_activas === 0 && <p>· No hay lecciones activas para este periodo. Crea lecciones antes de generar.</p>}
+            {preCheck.lecciones_activas === 0 && <p>· No hay clases activas para este periodo. Crea clases antes de generar.</p>}
             {preCheck.aulas === 0 && <p>· No hay aulas activas en el sistema.</p>}
             {preCheck.bloques === 0 && <p>· No hay bloques horarios activos.</p>}
             {preCheck.docentes_con_habilitacion === 0 && <p>· Ningún docente tiene habilitaciones registradas; el solver no puede asignar clases.</p>}
             {preCheck.docentes_con_disponibilidad === 0 && <p>· Advertencia: ningún docente tiene disponibilidad definida. El solver asumirá disponibilidad total por defecto.</p>}
-            {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} lección(es) sin habilitación para su docente y materia.</p>}
-            {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} lección(es) cuyo docente no define disponibilidad.</p>}
-            {preCheck.lecciones_sin_candidatos > 0 && <p>· {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede (no podrán asignarse; crea aulas/bloques en esa sede).</p>}
+            {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} clase(s) sin habilitación para su docente y unidad curricular.</p>}
+            {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} clase(s) cuyo docente no define disponibilidad.</p>}
+            {preCheck.lecciones_sin_candidatos > 0 && <p>· {preCheck.lecciones_sin_candidatos} clase(s) sin aula ni bloque activo en su sede (no podrán asignarse; crea aulas/bloques en esa sede).</p>}
           </div>
         </div>
       )}
@@ -83,7 +83,7 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
         <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-xl p-3">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
-            Advertencia: {preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede no podrán asignarse. El solver generará el resto del horario.
+            Advertencia: {preCheck.lecciones_sin_candidatos} clase(s) sin aula ni bloque activo en su sede no podrán asignarse. El solver generará el resto del horario.
           </p>
         </div>
       )}

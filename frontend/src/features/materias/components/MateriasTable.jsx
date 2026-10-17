@@ -21,9 +21,9 @@ function EmptyState() {
       <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
         <BookOpen className="w-8 h-8" />
       </div>
-      <h5 className="text-lg font-bold text-slate-700">No se encontraron materias</h5>
+      <h5 className="text-lg font-bold text-slate-700">No se encontraron unidades curriculares</h5>
       <p className="text-sm text-slate-400 mt-1 max-w-sm">
-        Añade una nueva materia con colores hexadecimales vibrantes para comenzar.
+        Añade una nueva unidad curricular con colores hexadecimales vibrantes para comenzar.
       </p>
     </div>
   );
@@ -48,7 +48,7 @@ export default function MateriasTable({ materias, isLoading, onEdit, onDelete })
         <thead>
           <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
             <th className="py-4 px-6">Identificación Visual</th>
-            <th className="py-4 px-6">Código de Materia</th>
+            <th className="py-4 px-6">Código de Unidad Curricular</th>
             <th className="py-4 px-6">Carga Académica Semanal</th>
             <th className="py-4 px-6 text-center">Estado en Horario</th>
             <th className="py-4 px-6 text-right">Acciones</th>
@@ -99,14 +99,14 @@ export default function MateriasTable({ materias, isLoading, onEdit, onDelete })
                   <button
                     onClick={() => onEdit(materia)}
                     className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                    title="Editar materia"
+                    title="Editar unidad curricular"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDelete(materia)}
                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                    title="Eliminar materia"
+                    title="Eliminar unidad curricular"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

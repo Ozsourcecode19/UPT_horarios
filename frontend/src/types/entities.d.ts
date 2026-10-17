@@ -321,6 +321,8 @@ export interface Leccion {
   grupo_id: number
   materia_id: number
   horas_semanales: number
+  bloques_por_sesion: number
+  sesiones_semana: number
   prioridad: number
   activo: boolean
   sede_forzada_id?: number | null
@@ -334,6 +336,8 @@ export interface LeccionCreate {
   grupo_id: number
   materia_id: number
   horas_semanales?: number
+  bloques_por_sesion?: number
+  sesiones_semana?: number
   prioridad?: number
   activo?: boolean
   sede_forzada_id?: number | null
@@ -345,6 +349,8 @@ export interface LeccionUpdate {
   grupo_id?: number
   materia_id?: number
   horas_semanales?: number
+  bloques_por_sesion?: number
+  sesiones_semana?: number
   prioridad?: number
   activo?: boolean
   sede_forzada_id?: number | null

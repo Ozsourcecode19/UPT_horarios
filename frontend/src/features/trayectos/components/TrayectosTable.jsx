@@ -108,7 +108,7 @@ const TrayectosTable = ({
                 <td className="py-4 px-6 text-right">
                   <div className="flex justify-end gap-2">
                     {gruposDelTrayecto > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-400 rounded-lg text-[10px] font-semibold" title="Grupos vinculados a este trayecto">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-400 rounded-lg text-[10px] font-semibold" title="Secciones vinculadas a este trayecto">
                         <Users className="w-3 h-3" />
                         {gruposDelTrayecto}
                       </span>

@@ -85,27 +85,27 @@ export function useMateriasCrud() {
 
   const handleSave = async (data) => {
     if (!puedeEscribir) {
-      showToast(MSG_SIN_PERMISO_CREAR('materias'), "error");
+      showToast(MSG_SIN_PERMISO_CREAR('unidades curriculares'), "error");
       return;
     }
     if (demoMode) {
       if (editingMateria) {
         setDemoMaterias(prev => prev.map(m => m.id === editingMateria.id ? { ...m, ...data, updated_at: new Date().toISOString() } : m));
-        showToast("Materia actualizada exitosamente en Modo Demo");
+        showToast("Unidad curricular actualizada exitosamente en Modo Demo");
       } else {
         const nueva = { id: Math.max(...demoMaterias.map(m => m.id), 0) + 1, ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
         setDemoMaterias(prev => [nueva, ...prev]);
-        showToast("Materia registrada exitosamente en Modo Demo");
+        showToast("Unidad curricular registrada exitosamente en Modo Demo");
       }
       closeModal();
     } else {
       try {
         if (editingMateria) {
           await SubjectsService.updateSubject(editingMateria.id, data);
-          showToast("Materia actualizada exitosamente");
+          showToast("Unidad curricular actualizada exitosamente");
         } else {
           await SubjectsService.createSubject(data);
-          showToast("Materia registrada exitosamente");
+          showToast("Unidad curricular registrada exitosamente");
         }
         queryClient.invalidateQueries({ queryKey: ['subjects'] });
         closeModal();
@@ -118,19 +118,19 @@ export function useMateriasCrud() {
   const handleDelete = async () => {
     if (!deleteConfirmMateria) return;
     if (!puedeEscribir) {
-      showToast(MSG_SIN_PERMISO_ELIMINAR('materias'), "error");
+      showToast(MSG_SIN_PERMISO_ELIMINAR('unidades curriculares'), "error");
       setDeleteConfirmMateria(null);
       return;
     }
     if (demoMode) {
       setDemoMaterias(prev => prev.filter(m => m.id !== deleteConfirmMateria.id));
-      showToast("Materia eliminada exitosamente en Modo Demo", "info");
+      showToast("Unidad curricular eliminada exitosamente en Modo Demo", "info");
       setDeleteConfirmMateria(null);
     } else {
       try {
         await SubjectsService.deleteSubject(deleteConfirmMateria.id);
         queryClient.invalidateQueries({ queryKey: ['subjects'] });
-        showToast("Materia eliminada exitosamente", "info");
+        showToast("Unidad curricular eliminada exitosamente", "info");
         setDeleteConfirmMateria(null);
       } catch {
         showToast(MSG_ELIMINADO_ERROR, "error");

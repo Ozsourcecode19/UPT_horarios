@@ -37,7 +37,7 @@ const TrayectosStatsCards = ({ total, activos, carrerasCubiertas, gruposVinculad
 
     <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex items-center justify-between">
       <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Grupos Vinculados</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Secciones Vinculadas</p>
         <h4 className="text-3xl font-extrabold text-slate-800">{gruposVinculados}</h4>
       </div>
       <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600">

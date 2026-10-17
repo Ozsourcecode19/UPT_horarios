@@ -29,11 +29,11 @@ const LeccionesTable = ({
           <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
             <GraduationCap className="w-8 h-8" />
           </div>
-          <h5 className="text-lg font-bold text-slate-700">No se encontraron lecciones</h5>
+          <h5 className="text-lg font-bold text-slate-700">No se encontraron clases</h5>
           <p className="text-sm text-slate-400 mt-1 max-w-sm">
             {sinGrupos
-              ? "Primero necesitas registrar grupos de alumnos para poder estructurar lecciones."
-              : "Crea una lección académica vinculando docentes y materias a grupos específicos."}
+              ? "Primero necesitas registrar secciones para poder estructurar clases."
+              : "Crea una clase vinculando docentes y unidades curriculares a secciones específicas."}
           </p>
         </div>
       ) : (
@@ -41,8 +41,8 @@ const LeccionesTable = ({
           <thead>
             <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
               <th className="py-4 px-6">Docente</th>
-              <th className="py-4 px-6">Materia</th>
-              <th className="py-4 px-6">Grupo</th>
+              <th className="py-4 px-6">Unidad Curricular</th>
+              <th className="py-4 px-6">Sección</th>
               <th className="py-4 px-6">Horas Semanales</th>
               <th className="py-4 px-6 text-center">Prioridad</th>
               <th className="py-4 px-6">Sede Especial</th>
@@ -101,6 +101,9 @@ const LeccionesTable = ({
                       <Clock className="w-4 h-4 text-slate-400" />
                       <span>{leccion.horas_semanales} horas</span>
                     </div>
+                    <span className="mt-1 inline-flex px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-100">
+                      {leccion.sesiones_semana ?? 1} sesión(es) × {leccion.bloques_por_sesion ?? 1} bloque(s)
+                    </span>
                   </td>
                   <td className="py-4 px-6 text-center">
                     <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -142,14 +145,14 @@ const LeccionesTable = ({
                       <button
                         onClick={() => onEdit(leccion)}
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Editar lección"
+                        title="Editar clase"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(leccion)}
                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="Eliminar lección"
+                        title="Eliminar clase"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

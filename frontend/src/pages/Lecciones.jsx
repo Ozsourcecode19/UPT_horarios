@@ -57,7 +57,7 @@ const Lecciones = () => {
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
 
       {demoMode && (
-        <DemoBanner onReconnect={() => { setDemoMode(false); refetchGrupos(); refetchLecciones(); showToast("Intentando reconectar con API real...", "info"); }} title="Modo Demo de Planificación Activado" description="Operando localmente en el navegador. Ideal para simulaciones de carga académica y configuraciones de grupos." />
+        <DemoBanner onReconnect={() => { setDemoMode(false); refetchGrupos(); refetchLecciones(); showToast("Intentando reconectar con API real...", "info"); }} title="Modo Demo de Planificación Activado" description="Operando localmente en el navegador. Ideal para simulaciones de carga académica y configuraciones de secciones." />
       )}
 
       <Toast toast={toast} />
@@ -65,16 +65,16 @@ const Lecciones = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión Académica</h2>
-          <p className="text-slate-500">Planifica la carga horaria estructurando la relación entre Docentes, Materias, Grupos y Sedes.</p>
+          <p className="text-slate-500">Planifica la carga horaria estructurando la relación entre Docentes, Unidades Curriculares, Secciones y Sedes.</p>
         </div>
         <div className="flex gap-3">
           {activeTab === 'lecciones' ? (
-            <button onClick={() => openLeccionModal()} disabled={listadoGrupos.length === 0} className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:bg-slate-200 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:-translate-y-0" title={listadoGrupos.length === 0 ? "Primero registre un grupo" : ""}>
-              <Plus className="w-5 h-5" /><span>Añadir Lección</span>
+            <button onClick={() => openLeccionModal()} disabled={listadoGrupos.length === 0} className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:bg-slate-200 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:-translate-y-0" title={listadoGrupos.length === 0 ? "Primero registre una sección" : ""}>
+              <Plus className="w-5 h-5" /><span>Añadir Clase</span>
             </button>
           ) : (
             <button onClick={() => openGrupoModal()} className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5">
-              <Plus className="w-5 h-5" /><span>Añadir Grupo</span>
+              <Plus className="w-5 h-5" /><span>Añadir Sección</span>
             </button>
           )}
         </div>
@@ -96,8 +96,8 @@ const Lecciones = () => {
 
       {isGrupoModalOpen && <GrupoFormModal editing={editingGrupo} trayectos={trayectos} sedes={sedes} periodos={periodos} onSubmit={guardarGrupo} onClose={() => setIsGrupoModalOpen(false)} />}
       {isLeccionModalOpen && <LeccionFormModal editing={editingLeccion} docentes={docentes} grupos={listadoGrupos} materias={materias} periodos={periodos} sedes={sedes} onSubmit={guardarLeccion} onClose={() => setIsLeccionModalOpen(false)} />}
-      {deleteConfirmGrupo && <DeleteConfirmModal titulo="¿Eliminar este grupo de alumnos?" mensaje={<>Estás a punto de eliminar permanentemente al grupo <span className="font-semibold text-slate-700">{deleteConfirmGrupo.nombre}</span>. Esta acción no se puede deshacer y fallará si tiene lecciones asociadas.</>} onCancel={() => setDeleteConfirmGrupo(null)} onConfirm={eliminarGrupo} />}
-      {deleteConfirmLeccion && <DeleteConfirmModal titulo="¿Eliminar esta lección académica?" mensaje="Estás a punto de desvincular esta lección académica de la base de datos de planificación. Esta acción no se puede deshacer." onCancel={() => setDeleteConfirmLeccion(null)} onConfirm={eliminarLeccion} />}
+      {deleteConfirmGrupo && <DeleteConfirmModal titulo="¿Eliminar esta sección?" mensaje={<>Estás a punto de eliminar permanentemente la sección <span className="font-semibold text-slate-700">{deleteConfirmGrupo.nombre}</span>. Esta acción no se puede deshacer y fallará si tiene clases asociadas.</>} onCancel={() => setDeleteConfirmGrupo(null)} onConfirm={eliminarGrupo} />}
+      {deleteConfirmLeccion && <DeleteConfirmModal titulo="¿Eliminar esta clase?" mensaje="Estás a punto de desvincular esta clase de la base de datos de planificación. Esta acción no se puede deshacer." onCancel={() => setDeleteConfirmLeccion(null)} onConfirm={eliminarLeccion} />}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 // src/features/horarios/utils/editHelpers.js
-// Cálculos auxiliares para el modal de edición de eventos (E20: extensión 1-2 bloques).
+// Cálculos auxiliares para el modal de edición de eventos (sesiones de N bloques).
 import { useMemo } from 'react';
 import { horaAMinutos } from '../../schedule';
+import { agruparSesiones, resolverRun } from '../../schedule/utils/sesiones';
 import { formatHora12 } from '../../../utils/timeFormat';
 
 /**
@@ -25,8 +26,20 @@ export function useSedeAulaEdicion(aulas, editAulaId) {
 }
 
 /**
- * Bloque consecutivo (misma sede, día, hora siguiente) para extensión x2.
+ * Run de N bloques consecutivos (misma sede/día) que arranca en el bloque
+ * seleccionado. Devuelve null si no cabe la sesión completa.
  */
+export function useRunSesion(bloques, bloqueSeleccionado, sedeAulaEdicion, nSesion) {
+  return useMemo(() => {
+    if (!bloqueSeleccionado) return null;
+    const n = Math.max(1, Number(nSesion) || 1);
+    if (n === 1) return [bloqueSeleccionado];
+    const run = resolverRun(bloqueSeleccionado, n, bloques, Number(sedeAulaEdicion));
+    return run?.bloques ?? null;
+  }, [bloques, bloqueSeleccionado, sedeAulaEdicion, nSesion]);
+}
+
+/** @deprecated Usar useRunSesion; se mantiene para 1 bloque consecutivo (preview x2). */
 export function useBloqueConsecutivo(bloques, bloqueSeleccionado, sedeAulaEdicion) {
   return useMemo(() => {
     if (!bloqueSeleccionado) return null;
@@ -42,27 +55,38 @@ export function useBloqueConsecutivo(bloques, bloqueSeleccionado, sedeAulaEdicio
 }
 
 /**
- * Preview del rango horario seleccionado ("8:00 - 9:30").
+ * Preview del rango horario resultante ("8:00 - 9:30") para N bloques.
+ * `run` es el array de bloques de la sesión (useRunSesion); si es null se usa
+ * solo el bloque seleccionado.
  */
-export function usePreviewRango(bloqueSeleccionado, bloqueConsecutivo, editAbarca) {
+export function usePreviewRango(bloqueSeleccionado, nSesion, run) {
   return useMemo(() => {
     if (!bloqueSeleccionado) return '';
-    const ini = horaAMinutos(bloqueSeleccionado.hora_inicio);
-    let fin = ini + (Number(bloqueSeleccionado.duracion_minutos) || 0);
-    if (editAbarca === 2 && bloqueConsecutivo) {
-      fin = fin + (Number(bloqueConsecutivo.duracion_minutos) || 0);
+    const bloquesRun = (run && run.length) ? run : [bloqueSeleccionado];
+    const ini = horaAMinutos(bloquesRun[0].hora_inicio);
+    let fin = ini + (Number(bloquesRun[0].duracion_minutos) || 0);
+    for (let i = 1; i < bloquesRun.length; i++) {
+      fin += (Number(bloquesRun[i].duracion_minutos) || 0);
     }
     const fmt = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
     return `${formatHora12(fmt(ini))} - ${formatHora12(fmt(fin))}`;
-  }, [bloqueSeleccionado, bloqueConsecutivo, editAbarca]);
+  }, [bloqueSeleccionado, nSesion, run]);
 }
 
 /**
- * Determina si el evento abierto en el modal ya abarca 2 bloques (span detectado).
+ * Tamaño N de la sesión (run contiguo) del evento abierto en el modal.
+ * Devuelve 1 si no hay leccion_id o solo hay una fila.
  */
-export function detectarSpanExistente(selectedEvent, listadoHorarios) {
-  if (!selectedEvent) return false;
-  const lid = selectedEvent.leccion_id;
-  return lid != null && listadoHorarios.filter(h =>
-    Number(h.extendedProps?.leccion_id) === Number(lid)).length === 2;
+export function detectarNSesion(selectedEvent, listadoHorarios, bloques = []) {
+  if (!selectedEvent) return 1;
+  const lid = selectedEvent.leccion_id ?? selectedEvent.extendedProps?.leccion_id;
+  if (lid == null) return 1;
+  const mismaLeccion = (listadoHorarios || []).filter(h =>
+    Number(h.extendedProps?.leccion_id ?? h.leccion_id) === Number(lid));
+  if (mismaLeccion.length <= 1) return 1;
+  const idEvento = selectedEvent.id;
+  const info = agruparSesiones(mismaLeccion, bloques).get(idEvento);
+  if (info?.total) return info.total;
+  // Fallback sin bloques: nº de filas de la lección
+  return mismaLeccion.length;
 }
