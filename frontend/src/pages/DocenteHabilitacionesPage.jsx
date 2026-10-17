@@ -112,7 +112,7 @@ const DocenteHabilitacionesPage = () => {
             <GraduationCap className="w-8 h-8 text-purple-600" />
             <span>Habilitaciones Académicas</span>
           </h2>
-          <p className="text-slate-500">Define qué materias puede dictar cada docente y su nivel de dominio.</p>
+          <p className="text-slate-500">Define qué unidades curriculares puede dictar cada docente y su nivel de dominio.</p>
         </div>
         <DocenteTabs />
       </div>

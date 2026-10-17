@@ -11,7 +11,7 @@ export default function PlanningTabs({ activeTab, onChange }) {
         }`}
       >
         <GraduationCap className="w-4 h-4" />
-        <span>Lecciones Académicas</span>
+        <span>Clases</span>
       </button>
       <button
         onClick={() => onChange('grupos')}
@@ -20,7 +20,7 @@ export default function PlanningTabs({ activeTab, onChange }) {
         }`}
       >
         <Layers className="w-4 h-4" />
-        <span>Grupos de Alumnos</span>
+        <span>Secciones</span>
       </button>
     </div>
   );

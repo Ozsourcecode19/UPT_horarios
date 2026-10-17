@@ -50,6 +50,8 @@ def test_asignar_simple_reemplaza_fila_previa(data, db_session):
 
 
 def test_asignar_span_dos_bloques_consecutivos(data, db_session):
+    data.leccion.bloques_por_sesion = 2
+    db_session.commit()
     b1 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 0))
     b2 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 45))
 
@@ -65,7 +67,41 @@ def test_asignar_span_dos_bloques_consecutivos(data, db_session):
     assert data.horario.estado == "ELIMINADO"
 
 
+def test_extension_distinta_de_n_422(data, db_session):
+    """R11: la sesión debe ocupar EXACTAMENTE N bloques (aquí N=1)."""
+    b1 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 0))
+    b2 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 45))
+
+    with pytest.raises(HTTPException) as exc:
+        asignar_horario_manual(db_session, leccion_id=data.leccion.id,
+                               aula_id=data.aula.id,
+                               bloque_ids=[b1.id, b2.id],
+                               periodo_id=data.periodo.id)
+    assert exc.value.status_code == 422
+    assert exc.value.detail["error_code"] == "EXTENSION_INVALIDA"
+    db_session.refresh(data.horario)
+    assert data.horario.estado == "ACTIVO"
+
+
+def test_bloques_en_dias_distintos_422(data, db_session):
+    """R: la cadena del run debe ser de un mismo día."""
+    data.leccion.bloques_por_sesion = 2
+    db_session.commit()
+    b1 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 0))
+    b2 = _bloque(db_session, data.sede.id, dia=3, hora=time(7, 45))
+
+    with pytest.raises(HTTPException) as exc:
+        asignar_horario_manual(db_session, leccion_id=data.leccion.id,
+                               aula_id=data.aula.id,
+                               bloque_ids=[b1.id, b2.id],
+                               periodo_id=data.periodo.id)
+    assert exc.value.status_code == 422
+    assert exc.value.detail["error_code"] == "NO_MISMO_DIA"
+
+
 def test_no_consecutivos_422_y_rollback(data, db_session):
+    data.leccion.bloques_por_sesion = 2
+    db_session.commit()
     b1 = _bloque(db_session, data.sede.id, dia=2, hora=time(7, 0))
     b_lejos = _bloque(db_session, data.sede.id, dia=2, hora=time(9, 0))
 

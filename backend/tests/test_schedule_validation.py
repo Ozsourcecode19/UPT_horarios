@@ -239,7 +239,7 @@ def test_fuera_ventana_division_bloque_nocturno(data, db_session):
     res = validate_move(db_session, horario_id=data.horario.id, nuevo_bloque_id=bloque_nocturno.id)
     assert res.valido is False
     assert res.error_code == "FUERA_VENTANA_DIVISION"
-    assert "MATUTINO" in res.mensaje
+    assert "Mañana" in res.mensaje
 
 
 def test_fuera_ventana_division_bloque_cabe_incompleto(data, db_session):

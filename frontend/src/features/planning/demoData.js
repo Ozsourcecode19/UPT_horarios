@@ -21,9 +21,9 @@ export const MOCK_GRUPOS = [
 ];
 
 export const MOCK_LECCIONES = [
-  { id: 1, docente_id: 101, grupo_id: 1, materia_id: 201, horas_semanales: 4, prioridad: 5, activo: true, sede_forzada_id: null, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 2, docente_id: 102, grupo_id: 2, materia_id: 202, horas_semanales: 6, prioridad: 8, activo: true, sede_forzada_id: 1, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 3, docente_id: 104, grupo_id: 3, materia_id: 203, horas_semanales: 4, prioridad: 3, activo: true, sede_forzada_id: null, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 1, docente_id: 101, grupo_id: 1, materia_id: 201, horas_semanales: 4, bloques_por_sesion: 1, sesiones_semana: 1, prioridad: 5, activo: true, sede_forzada_id: null, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 2, docente_id: 102, grupo_id: 2, materia_id: 202, horas_semanales: 6, bloques_por_sesion: 2, sesiones_semana: 1, prioridad: 8, activo: true, sede_forzada_id: 1, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 3, docente_id: 104, grupo_id: 3, materia_id: 203, horas_semanales: 4, bloques_por_sesion: 1, sesiones_semana: 2, prioridad: 3, activo: true, sede_forzada_id: null, periodo_id: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 // Reutilizar mock data para dependencias si el servidor falla

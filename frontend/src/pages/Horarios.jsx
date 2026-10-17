@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, Sparkles, Clock, Users, Download, Printer, FileText } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
 import { formatHora12 } from '../utils/timeFormat';
+import { TURNOS_LABELS } from '../constants';
 import { DeleteConfirmModal } from '../features/planning';
 import {
   filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje, horaAMinutos,
@@ -14,13 +15,12 @@ import {
   useHorariosData, useHorariosExport,
   createDropHandler,
   useBloqueSeleccionado, useSedeAulaEdicion,
-  useBloqueConsecutivo, usePreviewRango, detectarSpanExistente,
+  useRunSesion, usePreviewRango, detectarNSesion,
   Toast, DemoBanner, GeneratingOverlay, EventRenderer, PrintHeader,
   usePrintMultiEntity, PrintMultiSection,
 } from '../features/horarios';
 
 const Horarios = () => {
-  const TURNOS_LABELS = { MATUTINO: 'Matutino', VESPERTINO: 'Vespertino', NOCTURNO: 'Nocturno' };
   const [turnoActivo, setTurnoActivo] = useState('TODOS');
   const {
     canRestore,
@@ -210,15 +210,14 @@ const Horarios = () => {
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
-    const esSpan = detectarSpanExistente(selectedEvent, listadoHorarios);
-    setEditAbarca(esSpan ? 2 : 1);
-  }, [isEditModalOpen, selectedEvent, listadoHorarios]);
+    setEditAbarca(detectarNSesion(selectedEvent, listadoHorarios, bloques));
+  }, [isEditModalOpen, selectedEvent, listadoHorarios, bloques]);
 
   const bloqueSeleccionado = useBloqueSeleccionado(bloques, editBloqueId);
   const sedeAulaEdicion = useSedeAulaEdicion(aulas, editAulaId);
-  const bloqueConsecutivo = useBloqueConsecutivo(bloques, bloqueSeleccionado, sedeAulaEdicion);
-  const puedeAbarcarDos = !!bloqueConsecutivo;
-  const previewRango = usePreviewRango(bloqueSeleccionado, bloqueConsecutivo, editAbarca);
+  // N fijo de la clase (se inicializa al abrir el modal; no lo edita el usuario)
+  const runSesion = useRunSesion(bloques, bloqueSeleccionado, sedeAulaEdicion, editAbarca);
+  const previewRango = usePreviewRango(bloqueSeleccionado, editAbarca, runSesion);
 
   // Hook para impresión multi-entidad
   const { secciones: seccionesPrint, descripcionTipo } = usePrintMultiEntity({
@@ -300,7 +299,7 @@ const Horarios = () => {
                 <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 min-w-[180px]">
                   <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('grupo'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
                     <Users className="w-4 h-4 text-blue-500" />
-                    <span>Todos los Grupos</span>
+                    <span>Todas las Secciones</span>
                   </button>
                   <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('docente'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-green-500" />
@@ -353,17 +352,17 @@ const Horarios = () => {
           </div>
           <div className="space-y-1.5 flex-1 animate-in slide-in-from-left-4 duration-300">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-              {filterType === 'grupo' ? 'Seleccionar Grupo' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
+              {filterType === 'grupo' ? 'Seleccionar Sección' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
             </label>
             <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
-              {filterType === 'grupo' && grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${g.division}` : ''}</option>)}
+              {filterType === 'grupo' && grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${TURNOS_LABELS[g.division] ?? g.division}` : ''}</option>)}
               {filterType === 'docente' && docentes.map(d => <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>)}
               {filterType === 'aula' && aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}{sedeMap[a.sede_id] ? ` — ${sedeMap[a.sede_id]}` : ''}</option>)}
             </select>
             {filterType === 'grupo' && itemSeleccionado?.division && (
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                Turno {itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
+                Turno {TURNOS_LABELS[itemSeleccionado.division] ?? itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
               </p>
             )}
           </div>
@@ -433,7 +432,7 @@ const Horarios = () => {
               bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
               demoMode={demoMode} contextoVista={filterType}
               onEventoClick={handleEventClick}
-              onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
+              onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
               onDropEnCelda={onDropEnCelda}
               renderEventContent={EventRenderer}
             />
@@ -450,7 +449,7 @@ const Horarios = () => {
             bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
             demoMode={demoMode} contextoVista={filterType}
             onEventoClick={handleEventClick}
-            onDeleteEvento={({ horario, esSpan }) => setConfirmEliminar({ horario, esSpan })}
+            onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
             onDropEnCelda={onDropEnCelda}
             renderEventContent={EventRenderer}
           />
@@ -461,8 +460,7 @@ const Horarios = () => {
         <EditEventModal
           evento={selectedEvent} aulas={aulas} bloques={bloques} sedeMap={sedeMap}
           ventanaDivision={ventanaDivisionModal}
-          abarca={editAbarca} onAbarcaChange={setEditAbarca}
-          puedeAbarcarDos={puedeAbarcarDos} previewRango={previewRango}
+          abarca={editAbarca} previewRango={previewRango}
           editAulaId={editAulaId} onChangeAulaId={setEditAulaId}
           editBloqueId={editBloqueId} onChangeBloqueId={setEditBloqueId}
           onSave={(aulaId, bloqueId, abarca) => { setEditAulaId(aulaId); setEditBloqueId(bloqueId); handleSaveChangesModal(abarca, aulaId, bloqueId); }}
@@ -474,7 +472,9 @@ const Horarios = () => {
       {confirmEliminar && (
         <DeleteConfirmModal
           titulo="¿Eliminar esta clase del horario?"
-          mensaje={confirmEliminar.esSpan ? <>La clase abarca <span className="font-semibold text-slate-700">2 bloques</span>: se eliminarán ambas filas. Esta acción no se puede deshacer.</> : "Estás a punto de eliminar esta asignación del horario. Esta acción no se puede deshacer."}
+          mensaje={confirmEliminar.esSpan
+            ? <>La sesión abarca <span className="font-semibold text-slate-700">{confirmEliminar.sesionTotal || 2} bloques</span>: se eliminarán todas sus filas. Esta acción no se puede deshacer.</>
+            : "Estás a punto de eliminar esta asignación del horario. Esta acción no se puede deshacer."}
           onCancel={() => setConfirmEliminar(null)}
           onConfirm={async () => { const ok = await eliminarHorario({ horario: confirmEliminar.horario }); if (ok) setConfirmEliminar(null); }}
         />

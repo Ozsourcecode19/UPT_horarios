@@ -8,8 +8,10 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
 import { recalcularEventoDemo, resolveVentanaTurno, bloqueDentroVentana, resolverDivisionEvento, horaAMinutos } from '../utils/schedule';
+import { agruparSesiones, resolverRun } from '../utils/sesiones';
 import { formatHora12 } from '../../../utils/timeFormat';
 import { MSG_SIN_PERMISO_MODIFICAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_HORARIOS, MSG_SIN_PERMISO_ELIMINAR_CLASES } from '../../../constants/messages';
+import { TURNOS_LABELS } from '../../../constants';
 import { validateMoveMock } from '../utils/scheduleValidation';
 
 /**
@@ -114,7 +116,7 @@ export const useDragDropValidation = ({
     const ventanaTurno = resolveVentanaTurno(divisionEvento, configuraciones);
     if (ventanaTurno && targetBlockVentana && !bloqueDentroVentana(targetBlockVentana, ventanaTurno)) {
       showToast(
-        `El turno ${divisionEvento} solo admite bloques entre ${formatHora12(ventanaTurno.inicio.slice(0, 5))} y ${formatHora12(ventanaTurno.fin.slice(0, 5))}.`,
+        `El turno ${TURNOS_LABELS[divisionEvento] ?? divisionEvento} solo admite bloques entre ${formatHora12(ventanaTurno.inicio.slice(0, 5))} y ${formatHora12(ventanaTurno.fin.slice(0, 5))}.`,
         "error"
       );
       revert?.();
@@ -170,26 +172,22 @@ export const useDragDropValidation = ({
     });
   };
 
-  // --- E20: asignación manual (mover / extender 1-2 bloques) y borrado con pares ---
+  // --- E20: asignación manual (sesión de N bloques) y borrado por sesión ---
 
-  const _hermanoDe = (horario, fuente) => {
-    const lid = horario?.extendedProps?.leccion_id;
-    if (lid == null) return null;
-    return fuente.find(h => String(h.id) !== String(horario.id)
-      && Number(h.extendedProps?.leccion_id) === Number(lid)) || null;
-  };
-
-  const _siguienteConsecutivo = (bloque, sedeId) => {
-    if (!bloque) return null;
-    const finMin = horaAMinutos(bloque.hora_inicio) + (Number(bloque.duracion_minutos) || 0);
-    const fmt = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-    return bloques.find(b => b.activo !== false && b.sede_id === sedeId
-      && b.dia_semana === bloque.dia_semana && b.hora_inicio.startsWith(fmt(finMin))) || null;
+  // Filas (eventos) de la MISMA sesión (run contiguo) que el evento clickeado.
+  const _filasDeSesion = (horario, fuente) => {
+    const lid = horario?.extendedProps?.leccion_id ?? horario?.leccion_id;
+    if (lid == null) return [horario];
+    const mismaLeccion = fuente.filter(h =>
+      Number(h.extendedProps?.leccion_id ?? h.leccion_id) === Number(lid));
+    if (mismaLeccion.length <= 1) return [horario];
+    const info = agruparSesiones(mismaLeccion, bloques).get(horario.id);
+    return info?.filas?.length ? info.filas : [horario];
   };
 
   // Guardar desde el modal o drop: reemplazo atómico vía asignar-manual (real)
-  // o simulación local (Demo, crea/elimina el clon del segundo bloque).
-  const guardarAsignacionManual = async ({ horario, aulaId, bloqueDestinos }) => {
+  // o simulación local (Demo, crea N-1 clones de la sesión).
+  const guardarAsignacionManual = async ({ horario, aulaId, bloqueDestinos, bloquesPrevios }) => {
     if (!horario || !bloqueDestinos?.length) return false;
 
     if (!puedeEscribir) {
@@ -202,14 +200,14 @@ export const useDragDropValidation = ({
     const ventana = resolveVentanaTurno(divisionEvento, configuraciones);
     for (const destino of bloqueDestinos) {
       if (ventana && !bloqueDentroVentana(destino, ventana)) {
-        showToast(`El turno ${divisionEvento} solo admite bloques entre ${formatHora12(ventana.inicio.slice(0, 5))} y ${formatHora12(ventana.fin.slice(0, 5))}.`, "error");
+        showToast(`El turno ${TURNOS_LABELS[divisionEvento] ?? divisionEvento} solo admite bloques entre ${formatHora12(ventana.inicio.slice(0, 5))} y ${formatHora12(ventana.fin.slice(0, 5))}.`, "error");
         return false;
       }
     }
 
     const leccionId = horario.leccion_id ?? horario.extendedProps?.leccion_id;
     if (!leccionId) {
-      showToast("No se pudo identificar la lección de esta clase.", "error");
+      showToast("No se pudo identificar la clase de este evento.", "error");
       return false;
     }
 
@@ -225,16 +223,21 @@ export const useDragDropValidation = ({
       if (!res.valido) { showToast(res.mensaje, "error"); return false; }
 
       const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
+      const lid = Number(principal.extendedProps?.leccion_id);
       let nuevos = [...demoHorarios];
-      // quitar clon previo del span (misma lección, otro id)
-      nuevos = nuevos.filter(e => !(String(e.id) !== String(principal.id)
-        && Number(e.extendedProps?.leccion_id) === Number(principal.extendedProps?.leccion_id)));
+      // quitar clones previos de la MISMA SESIÓN (misma lección, día y contigüidad)
+      const infoSesion = agruparSesiones(
+        demoHorarios.filter(e => Number(e.extendedProps?.leccion_id) === lid), bloques
+      ).get(principal.id);
+      const idsQuitar = new Set((infoSesion?.filas ?? [principal]).map(e => String(e.id)));
+      nuevos = nuevos.filter(e => !idsQuitar.has(String(e.id)));
       const movido = { ...recalcularEventoDemo(principal, bloqueDestinos[0], aulaId, fechaBase, aulas) };
-      nuevos = nuevos.map(e => String(e.id) === String(principal.id) ? movido : e);
-      if (bloqueDestinos[1]) {
+      nuevos.push(movido);
+      // N-1 clones para el resto de la sesión (R8: misma lógica real/demo)
+      for (let i = 1; i < bloqueDestinos.length; i++) {
         const maxId = Math.max(...nuevos.map(e => e.id), 0) + 1;
         const clon = { ...movido, id: maxId };
-        nuevos.push(recalcularEventoDemo(clon, bloqueDestinos[1], aulaId, fechaBase, aulas));
+        nuevos.push(recalcularEventoDemo(clon, bloqueDestinos[i], aulaId, fechaBase, aulas));
       }
       setDemoHorarios(nuevos);
       showToast("Asignación simulada con éxito en Modo Demo");
@@ -247,6 +250,8 @@ export const useDragDropValidation = ({
         aula_id: Number(aulaId),
         bloque_ids: bloqueDestinos.map(b => b.id),
         periodo_id: selectedPeriodoId,
+        // R8/R4: reemplazar solo las filas de la sesión clickeada si se conocen
+        ...(bloquesPrevios?.length ? { bloques_previos: bloquesPrevios } : {}),
       });
       showToast("Clase reasignada y sincronizada correctamente");
       onInvalidate();
@@ -268,7 +273,7 @@ export const useDragDropValidation = ({
           const ce = conflictivo.extendedProps;
           mensaje = `Conflicto: El docente ${ce.docente || ''} ya tiene ${ce.materia || ''} (${ce.grupo || ''}) en este bloque.`;
         }
-      } else if (errorCode === 'CONFLICT_GROUP' || mensaje?.includes('Grupo ya tiene')) {
+      } else if (errorCode === 'CONFLICT_GROUP' || mensaje?.includes('La sección ya tiene') || mensaje?.includes('Grupo ya tiene')) {
         const ep = horario.extendedProps ?? horario;
         const gid = Number(ep.grupo_id);
         const conflictivo = todosLosHorarios.find(ev =>
@@ -278,7 +283,7 @@ export const useDragDropValidation = ({
         );
         if (conflictivo) {
           const ce = conflictivo.extendedProps;
-          mensaje = `Conflicto: El grupo ${ce.grupo || ''} ya tiene ${ce.materia || ''} (${ce.docente || ''}) en este bloque.`;
+          mensaje = `Conflicto: La sección ${ce.grupo || ''} ya tiene ${ce.materia || ''} (${ce.docente || ''}) en este bloque.`;
         }
       } else if (errorCode === 'CONFLICT_ROOM' || mensaje?.includes('Aula ya')) {
         const conflictivo = todosLosHorarios.find(ev =>
@@ -297,7 +302,7 @@ export const useDragDropValidation = ({
     }
   };
 
-  // Eliminar una clase (y su par si es extensión x2)
+  // Eliminar una clase (y TODAS las filas de su sesión, no de otras sesiones)
   const eliminarHorario = async ({ horario }) => {
     if (!horario) return false;
     if (!puedeEscribir) {
@@ -305,19 +310,20 @@ export const useDragDropValidation = ({
       return false;
     }
     const fuente = demoMode ? demoHorarios : listadoHorarios;
-    const hermano = _hermanoDe({ id: String(horario.id), extendedProps: horario.extendedProps }, fuente);
+    const filas = _filasDeSesion({ id: String(horario.id), extendedProps: horario.extendedProps }, fuente);
+    const ids = filas.map(f => String(f.id));
 
     if (demoMode) {
-      const ids = [String(horario.id), ...(hermano ? [String(hermano.id)] : [])];
       setDemoHorarios(prev => prev.filter(e => !ids.includes(String(e.id))));
-      showToast(ids.length > 1 ? 'Clase extendida eliminada del horario local (Modo Demo)' : 'Clase eliminada del horario local (Modo Demo)', 'info');
+      showToast(ids.length > 1 ? 'Sesión eliminada del horario local (Modo Demo)' : 'Clase eliminada del horario local (Modo Demo)', 'info');
       return true;
     }
     try {
-      await scheduleService.deleteSchedule(Number(horario.id));
-      if (hermano) await scheduleService.deleteSchedule(Number(hermano.id));
+      for (const id of ids) {
+        await scheduleService.deleteSchedule(Number(id));
+      }
       onInvalidate();
-      showToast(hermano ? 'Clase extendida eliminada exitosamente' : 'Clase eliminada del horario exitosamente', 'info');
+      showToast(ids.length > 1 ? 'Sesión eliminada exitosamente' : 'Clase eliminada del horario exitosamente', 'info');
       return true;
     } catch (err) {
       showToast('No se pudo eliminar la clase del servidor', 'error');
@@ -367,13 +373,13 @@ export const useDragDropValidation = ({
     setIsEditModalOpen(true);
   };
 
-  // Guardar cambios desde el modal. `abarca` llega como número (1|2); los tests
-  // legados pasan un evento de form → se trata como 1.
+  // Guardar cambios desde el modal. `abarca` es el N de la sesión (1..20); los
+  // tests legados pasan un evento de form → se trata como 1.
   // aulaIdParam/bloqueIdParam: valores frescos del modal (evitan el stale state
   // causado por React batch en el onSave del padre).
   const handleSaveChangesModal = async (abarcaArg, aulaIdParam, bloqueIdParam) => {
     if (!selectedEvent) return;
-    const abarca = abarcaArg === 2 ? 2 : 1;
+    const nSesion = Math.max(1, Number(abarcaArg) || 1);
     const roomId = Number(aulaIdParam ?? editAulaId);
     const targetBlock = bloques.find(b => b.id === Number(bloqueIdParam ?? editBloqueId));
 
@@ -382,28 +388,36 @@ export const useDragDropValidation = ({
       return;
     }
 
-    if (abarca === 2) {
-      const segundo = _siguienteConsecutivo(targetBlock, aulas.find(a => a.id === Number(roomId))?.sede_id);
-      if (!segundo) {
-        showToast("No hay un bloque consecutivo disponible para extender la clase.", "error");
+    let destinos = [targetBlock];
+    if (nSesion > 1) {
+      const sedeAula = aulas.find(a => a.id === Number(roomId))?.sede_id;
+      const run = resolverRun(targetBlock, nSesion, bloques, sedeAula);
+      if (!run) {
+        showToast(`No hay ${nSesion} bloques consecutivos disponibles para la sesión.`, "error");
         return;
       }
-      const aplicado = await guardarAsignacionManual({
-        horario: selectedEvent,
-        aulaId: roomId,
-        bloqueDestinos: [targetBlock, segundo],
-      });
-      if (aplicado) {
-        setIsEditModalOpen(false);
-        setSelectedEvent(null);
+      destinos = run.bloques;
+      if (run.inicioAjustado) {
+        showToast(`Sesión ajustada desde ${destinos[0].hora_inicio.slice(0, 5)} (la casilla pedida no cabía hacia abajo).`, "info");
       }
-      return;
     }
+
+    // Filas previas de la sesión clickeada (para reemplazar solo esa sesión)
+    const fuente = demoMode ? demoHorarios : listadoHorarios;
+    const filasSesion = _filasDeSesion(
+      { id: selectedEvent.id, extendedProps: { ...selectedEvent, leccion_id: selectedEvent.leccion_id ?? selectedEvent.extendedProps?.leccion_id } },
+      fuente
+    );
+    const bloquesPrevios = filasSesion
+      .map(f => f.extendedProps?.bloque_id)
+      .filter(b => b != null)
+      .map(Number);
 
     const aplicado = await guardarAsignacionManual({
       horario: selectedEvent,
       aulaId: roomId,
-      bloqueDestinos: [targetBlock],   // un solo bloque: reducir de x2 a x1
+      bloqueDestinos: destinos,
+      bloquesPrevios: bloquesPrevios.length ? bloquesPrevios : undefined,
     });
 
     if (aplicado) {
@@ -412,7 +426,7 @@ export const useDragDropValidation = ({
     }
   };
 
-  // Dar de baja/eliminar clase
+  // Dar de baja/eliminar clase (R4: TODAS las filas de la sesión, no solo 1)
   const handleDeleteSchedule = async () => {
     if (!selectedEvent) return;
 
@@ -421,15 +435,22 @@ export const useDragDropValidation = ({
       return;
     }
 
+    const fuente = demoMode ? demoHorarios : listadoHorarios;
+    const evConProps = { id: selectedEvent.id, extendedProps: { ...selectedEvent, leccion_id: selectedEvent.leccion_id ?? selectedEvent.extendedProps?.leccion_id } };
+    const filas = _filasDeSesion(evConProps, fuente);
+    const ids = filas.map(f => String(f.id));
+
     if (demoMode) {
-      setDemoHorarios(prev => prev.filter(e => e.id !== selectedEvent.id));
-      showToast("Clase eliminada del horario local (Demo)", "info");
+      setDemoHorarios(prev => prev.filter(e => !ids.includes(String(e.id))));
+      showToast(ids.length > 1 ? "Sesión eliminada del horario local (Demo)" : "Clase eliminada del horario local (Demo)", "info");
       setIsEditModalOpen(false);
       setSelectedEvent(null);
     } else {
       try {
-        await scheduleService.deleteSchedule(selectedEvent.id);
-        showToast("Clase eliminada del horario exitosamente", "info");
+        for (const id of ids) {
+          await scheduleService.deleteSchedule(Number(id));
+        }
+        showToast(ids.length > 1 ? "Sesión eliminada del horario exitosamente" : "Clase eliminada del horario exitosamente", "info");
         onInvalidate();
         setIsEditModalOpen(false);
         setSelectedEvent(null);

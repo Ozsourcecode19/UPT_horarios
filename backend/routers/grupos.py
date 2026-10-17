@@ -25,7 +25,7 @@ def read_grupo(grupo_id: int, db: Session = Depends(get_db)):
     """
     db_grupo = crud.get_grupo(db, grupo_id=grupo_id)
     if db_grupo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sección no encontrada")
     return db_grupo
 
 @router.get("/", response_model=PaginatedResponse[schemas.Grupo], dependencies=[Depends(get_current_active_user)])
@@ -43,7 +43,7 @@ def update_grupo(grupo_id: int, grupo_update: schemas.GrupoUpdate, db: Session =
     """
     db_grupo = crud.update_grupo(db, grupo_id=grupo_id, grupo_update=grupo_update)
     if db_grupo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sección no encontrada")
     return db_grupo
 
 @router.delete("/{grupo_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
@@ -53,5 +53,5 @@ def delete_grupo(grupo_id: int, db: Session = Depends(get_db)):
     """
     deleted = crud.delete_grupo(db, grupo_id=grupo_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo no encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sección no encontrada")
     return

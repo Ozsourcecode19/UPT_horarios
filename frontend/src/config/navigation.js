@@ -42,10 +42,10 @@ export const NAVIGATION = [
           { label: 'Habilitaciones Académicas', path: '/docentes/habilitaciones', icon: GraduationCap, roles: '*' },
         ],
       },
-      { label: 'Materias', path: '/materias', icon: BookOpen, roles: '*' },
+      { label: 'Unidades Curriculares', path: '/materias', icon: BookOpen, roles: '*' },
       { label: 'Carreras', path: '/carreras', icon: School, roles: ['ADMIN', 'JEFE-PNF'] },
       { label: 'Trayectos Académicos', path: '/trayectos', icon: Layers, roles: ['ADMIN'] },
-      { label: 'Grupos y Lecciones', path: '/lecciones', icon: Layers, roles: '*' },
+      { label: 'Secciones y Clases', path: '/lecciones', icon: Layers, roles: '*' },
     ],
   },
   {

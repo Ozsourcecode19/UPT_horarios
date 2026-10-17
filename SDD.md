@@ -1,13 +1,14 @@
 # Software Design Document (SDD) — Sistema de Gestión de Horarios UPT Bolívar
 
-**Versión del documento:** 1.0
+**Versión del documento:** 1.1
 **Versión del sistema:** 2.1.1
-**Fecha:** 2026-09-04
+**Fecha:** 2026-10-16
 **Estado:** Aprobado para revisión
 
 | Fecha | Versión | Autor | Descripción |
 |---|---|---|---|
-| 2026-08-01 | 1.0 | Equipo de Desarrollo | Versión inicial del SDD basada en el estado actual del código |
+| 2026-08-01 | 1.0 | Equipo de Desarrollo | Versión inicial del SDD basado en el estado actual del código |
+| 2026-10-16 | 1.1 | Equipo de Desarrollo | Terminología de UI: Unidad Curricular / Clase / Sección / turnos Mañana-Tarde-Noche (glosario §11; identificadores sin cambios) |
 | 2026-09-04 | 1.1 | Equipo de Desarrollo | Actualización E12–E21: grilla nativa, dark mode, paginación, features, tests |
 
 **Referencias técnicas:**
@@ -311,7 +312,7 @@ erDiagram
 | `aulas` | Espacios físicos/virtuales | Tipos: AULA, LABORATORIO, AUDITORIO, TALLER, VIRTUAL. |
 | `bloques_horarios` | Franjas temporales por sede y día | `dia_semana` 1=Lunes..7=Domingo, duración 30/45/60/90/120 min. |
 | `grupos` | Secciones de estudiantes | Vinculados a trayecto, sede, periodo y división (turno). `division` (MATUTINO/VESPERTINO/NOCTURNO) restringe la ventana de bloques asignables. |
-| `lecciones` | Demanda de clase (docente+grupo+materia) | Filtrada por `periodo_id` y `activo` durante la generación. |
+| `lecciones` | Demanda de clase (docente+grupo+materia) | Filtrada por `periodo_id` y `activo` durante la generación. **`bloques_por_sesion`** (N, 1–20, default 1): tamaño de la sesión en bloques contiguos; **`sesiones_semana`** (M, 1–20, default 1): sesiones/semana; **`horas_semanales`** informativo (badge "Carga estimada" = M × N ≈ horas). R0: `grupo.periodo_id` debe coincidir con `periodo_id` (422 si no). Cambiar N/M con filas `horario_generado` ACTIVO ⇒ esas filas se archivan (ACTIVO→HISTORICO) en la misma transacción y el cambio se aplica (se colocará al regenerar). |
 | `disponibilidad_docentes` | Franjas de disponibilidad del docente | DISPONIBLE / NO_DISPONIBLE / PREFERENCIA. |
 | `habilitaciones_docentes` | Qué materias puede dictar cada docente | Nivel BASICO..ESPECIALISTA, ventana de fechas. |
 | `horario_generado` | Resultado de la asignación | `dia_semana`, `hora_inicio`, `hora_fin` calculados por trigger. |
@@ -400,7 +401,7 @@ sequenceDiagram
 | CRUD | `/usuarios/` | Público (endpoints sin dependencia de rol) | Gestión de usuarios. |
 | CRUD | `/sedes/`, `/carreras/`, `/trayectos-academicos/`, `/periodos-academicos/` | Escritura: ADMIN (algunos ADMIN/JEFE-PNF); Lectura: autenticados | Datos maestros académicos. |
 | CRUD | `/docentes/`, `/materias/`, `/aulas/`, `/grupos/`, `/lecciones/`, `/bloques-horarios/`, `/habilitaciones-docentes/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Datos maestros y restricciones. |
-| POST | `/schedules/asignar-manual` | ADMIN/JEFE-PNF | E20: reemplazo transaccional de las filas ACTIVO de una lección por 1-2 bloques consecutivos (valida ventana división, disponibilidad, habilitación, cruces excluyendo filas propias). |
+| POST | `/schedules/asignar-manual` | ADMIN/JEFE-PNF | E20 + sesiones: reemplazo transaccional de las filas ACTIVO de una sesión (o de la clase completa) por **N = `lecciones.bloques_por_sesion` bloques consecutivos** (valida ventana división, disponibilidad, habilitación, cruces excluyendo filas propias, solape de rango R5-B'; `bloques_previos` acota el reemplazo a una sesión cuando M>1). |
 | POST | `/bloques-horarios/estandar` | ADMIN/JEFE-PNF | Generador dinámico (E19): ventana y días desde `configuracion`; modos `completar` / `reemplazar` (409 BLOQUES_EN_USO si hay clases ACTIVO referenciadas); último tramo recortado para cubrir jornada completa. |
 | POST/PUT/DELETE | `/disponibilidades-docentes/` | ADMIN/JEFE-PNF/**DOCENTE** | Disponibilidad (el docente gestiona la suya). |
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
@@ -429,12 +430,12 @@ sequenceDiagram
 
 #### 5.5.1 Modelo de decisión
 
-- **Variables booleanas:** `x[leccion_id, bloque_id, aula_id]` — es `True` si la lección se asigna al bloque en esa aula. Solo se crean variables donde `aula.sede_id == bloque.sede_id == leccion_sede` (restricción de sede), siendo `leccion_sede = COALESCE(leccion.sede_forzada_id, grupo.sede_id)`.
+- **Variables booleanas:** `y[leccion_id, bloque_inicio, aula_id]` — es `True` si la lección ocupa una **sesión** (corrida de `N = lecciones.bloques_por_sesion` bloques contiguos) cuyo primer bloque es `bloque_inicio`, en esa aula. Solo se crean variables donde `aula.sede_id == bloque.sede_id == leccion_sede` (restricción de sede), siendo `leccion_sede = COALESCE(leccion.sede_forzada_id, grupo.sede_id)`. Las corridas se enumeran linealmente (dos punteros: una cadena de L bloques produce L−N+1 corridas, R2).
 
 #### 5.5.2 Restricciones duras
 
-1. Cada lección activa del periodo se asigna **exactamente una vez**: `AddExactlyOne`.
-2. **Unicidad por recurso** en cada bloque: a lo sumo una clase por docente, por grupo y por aula (`AddAtMostOne`).
+1. Cada lección activa del periodo se asigna **exactamente `M = lecciones.sesiones_semana` sesiones por semana**: `Add(sum(vars_leccion) == M)`. Si no hay corridas suficientes (o la lección no tiene sede/habilitación), se **omite del modelo y se reporta** en `omitidas` (R1: el status de generación incluye "Clases no colocadas: #id (motivo)").
+2. **Unicidad por recurso** en cada **bloque cubierto** por una sesión (la corrida ocupa sus N bloques completos): a lo sumo una clase por docente, por grupo y por aula (`AddAtMostOne` sobre las vars que cubren ese bloque).
 3. **Disponibilidad docente:** se cancelan (`x == 0`) las variables cuyo bloque cae en una franja `NO_DISPONIBLE` o fuera de las franjas `DISPONIBLE` explícitas. Si el docente no tiene franjas explícitas, se asume disponible por defecto.
 4. **Habilitación docente–materia:** si el par `(docente_id, materia_id)` no está en `habilitaciones_docentes`, todas sus variables se fuerzan a 0.
 5. **Sede (consistencia tripartita DB):** solo se crean variables donde `aula.sede_id == bloque.sede_id == leccion_sede`, en línea con `fn_validar_sede_horario()`. La lección hereda la sede de `sede_forzada_id` o de su grupo. (Fix de generación: antes solo se exigía `aula == bloque`, por lo que el solver podía asignar una lección a una sede distinta de la suya y el trigger rechazaba el INSERT, dejando la generación en `FAILED`.)
@@ -568,12 +569,12 @@ const { items, total, totalPages, page, setPage } = usePaginatedQuery(
 - `src/pages/Horarios.jsx` (≈649 líneas): orquestador, estados, queries, handlers (E16)
 - `src/features/schedule/` (E14/E16/E18/E20): grilla, hooks, utils, demoData, componentes
 
-- **Grilla nativa por bandas de bloque** (`GridSemanalBloques`): tabla HTML, sin FullCalendar. Franjas de bloque como bandas horizontales, días como columnas, celdas coloreadas por sede (`bg-[sede.color_hex]`). Spans de extensión x2 para lecciones de 2 horas.
+- **Grilla nativa por bandas de bloque** (`GridSemanalBloques`): tabla HTML, sin FullCalendar. Franjas de bloque como bandas horizontales, días como columnas, celdas coloreadas por sede (`bg-[sede.color_hex]`). **Sesiones de N bloques:** `agruparSesiones` agrupa filas de la misma `leccion_id`+día contiguas (fin_anterior == inicio); la fila principal muestra badge **×N** y las siguientes franja tenue "cont." (click/drag delegan al principal).
 - **Drag & Drop HTML5:** `dragstart`/`dragover`/`drop` nativos. Doble verificación: `resolveBloquePorPosicion` (cliente, 15 min) + `resolveBloqueExacto` (cliente, resolución exacta). Resolución exacta por día+sede. Feedback visual (borde punteado, spinner).
 - **Filtros (2026-08-24/25):** sin opción "todos" ni columnas por aulas; segmented `[Grupos|Docentes|Aulas]` con grupos por defecto. Semana plantilla: sin navegación ni vista día, cabeceras solo LUNES…VIERNES; eje de tiempo con rangos de bloque (`etiquetasRangoBloques`). La grilla adapta su ventana vía `resolveVentanaGrilla` (grupo → `ventana_{division}` de `configuracion`; docente/aula → jornada general).
 - **Movimientos restringidos por división (2026-08-25):** `validate_move` rechaza con `FUERA_VENTANA_DIVISION` cualquier bloque objetivo que no quepa COMPLETO dentro de la ventana del turno del grupo. El frontend replica la regla en cliente antes de llamar a la API (`useDragDropValidation.aplicarMovimiento`, helpers `resolveVentanaTurno`/`bloqueDentroVentana`).
 - **Mapeo de datos:** el backend (`get_horarios_para_calendario`) transforma `HorarioGenerado` + joins en `FullCalendarEvent { id, title, start, end, extendedProps }`. La fecha del evento se calcula como `lunes_base = fecha_inicio_periodo - weekday(fecha_inicio_periodo)` y se desplaza según `dia_semana`, evitando proyectar clases en fines de semana. `extendedProps` incluye `grupo_id`, `docente_id`, `aula_id` y `division` (labels en el query; sin cambios de schema).
-- **Edición rica de eventos (E20):** `EditEventModal` con spans 1-2 bloques (`resolvedSpans`), borrado rápido (`FastDeleteButton`), asignación manual (`AsignarManualButton`). El botón "Eliminar" en `VersionPanel` fue eliminado.
+- **Edición rica de eventos (E20 + sesiones):** `EditEventModal` con **badge de solo lectura** del N de la clase (`×N bloques por sesión` + nota "para cambiarlo ve a Planificación → Clases"; oculto si N=1 — el tamaño no se edita aquí: R11 exige que la asignación manual respete `lecciones.bloques_por_sesion`), borrado rápido (`FastDeleteButton`, elimina TODA la sesión), asignación manual (`AsignarManualButton`). El botón "Eliminar" en `VersionPanel` fue eliminado. `detectarNSesion` precarga N desde las filas agrupadas; `usePreviewRango` muestra el rango del run.
 - **Selector de periodo:** cambia los eventos y navega con `api.gotoDate(fecha_inicio)`.
 - **Generación:** botón "Generación Inteligente" → `POST /api/schedules/generate` → **polling reactivo** (`useGenerationPolling` en `hooks/`) con `onStatus`/`onSettled` callbacks.
 - **Impresión:** `@page margin:0` + clases `no-print` que colapsan todo lo que no es la tabla.
@@ -635,7 +636,7 @@ sequenceDiagram
 
 ### 8.1 Estado actual
 
-- **Backend (E9):** suite `pytest`/`httpx` en `backend/tests/` con **69 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible), cálculo `lunes_base`, smoke de API y validaciones de CRUD. **Sin** BD Postgres ni triggers PL/pgSQL.
+- **Backend (E9 + sesiones):** suite `pytest`/`httpx` en `backend/tests/` con **87 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible, sesiones N/M y omitidas), asignar-manual (N, `bloques_previos`, R5-B'), `update_leccion` (archivado automático al cambiar N/M, R0 coherencia grupo↔periodo), `clases_sin_slots`, cálculo `lunes_base`, smoke de API, validaciones de CRUD y estrés (~100 lecciones). **Sin** BD Postgres ni triggers PL/pgSQL.
 - **Frontend (E22):** suite **vitest** con **198 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `filterEvents`, `resolveVentanaGrilla`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`, `horaCompleta`, `calcularFin`, `generarSimulacionDemo`, `calcularEstadisticas`), hooks (`useGenerationPolling`, `useScheduleGeneration`, `useDragDropValidation`), y utilidades de planning/schedule/bloques/aulas. Tests en `src/utils/__tests__/`, `src/hooks/__tests__/`, `src/features/schedule/__tests__/`, `src/features/bloques/__tests__/` y `src/features/aulas/__tests__/`.
 - La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a la grilla nativa).
 
@@ -732,18 +733,21 @@ npm run dev    # http://localhost:3000
 
 ## 11. Apéndice — Glosario del Dominio
 
+> **Nota de terminología (2026-10-16):** la interfaz y los mensajes en español usan **Unidad Curricular** (antes "Materia"), **Clase** (antes "Lección") y **Sección** (antes "Grupo"); los turnos se muestran como **Mañana/Tarde/Noche**. Los identificadores NO cambian: tablas/columnas `materias`/`materia_id`, `lecciones`/`leccion_id`, `grupos`/`grupo_id`, rutas `/materias`, `/lecciones`, valores `division` `MATUTINO/VESPERTINO/NOCTURNO` y claves `ventana_*` se conservan tal cual.
+
 | Término | Definición |
 |---|---|
 | **PNF** | Programa Nacional de Formación (carrera universitaria). |
 | **Trayecto** | Etapa académica de una carrera (con `anio_academico` y `orden_secuencial`). |
-| **Grupo** | Sección de estudiantes de un trayecto en un periodo. |
-| **Materia** | Asignatura con código único y color de calendario. |
+| **Sección** | Sección de estudiantes de un trayecto en un periodo (entidad `grupos`, "grupo" en código). |
+| **Unidad Curricular** | Asignatura con código único y color de calendario (entidad `materias`, "materia" en código). |
 | **Docente** | Profesor con `carga_maxima` y disponibilidad/habilitaciones. |
-| **Lección** | Demanda de clase: docente + grupo + materia en un periodo (`horas_semanales`). |
+| **Clase** | Demanda de clase: docente + sección + unidad curricular en un periodo (`horas_semanales` informativo; **`bloques_por_sesion`** N y **`sesiones_semana`** M definen la sesión: run de N bloques × M sesiones/semana; entidad `lecciones`, "lección" en código). |
 | **Bloque horario** | Franja temporal de una sede (día, hora inicio, duración, orden visual). |
 | **Disponibilidad** | Franjas DISPONIBLE/NO_DISPONIBLE/PREFERENCIA declaradas por el docente. |
-| **Habilitación** | Autorización docente–materia con nivel (BASICO..ESPECIALISTA) y vigencia. |
-| **Horario generado** | Asignación concreta de una lección a un bloque y aula (estado ACTIVO). |
+| **Habilitación** | Autorización docente–unidad curricular con nivel (BASICO..ESPECIALISTA) y vigencia. |
+| **Horario generado** | Asignación concreta de una clase a un bloque y aula (estado ACTIVO). |
+| **Turno** | División de la jornada: `MATUTINO`/`VESPERTINO`/`NOCTURNO` en BD, "Mañana/Tarde/Noche" en UI (`TURNOS_LABELS` en `frontend/src/constants/index.js`). |
 | **Sede** | Unidad física donde hay aulas y bloques horarios. |
 | **CP-SAT** | Solver de programación con restricciones (Google OR-Tools) usado para la generación. |
 

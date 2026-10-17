@@ -5,7 +5,7 @@ export { default as usePrintMultiEntity } from './hooks/usePrintMultiEntity';
 export { createDropHandler, resolverDestinoDrop } from './utils/dropHandler';
 export {
   useBloqueSeleccionado, useSedeAulaEdicion,
-  useBloqueConsecutivo, usePreviewRango, detectarSpanExistente,
+  useBloqueConsecutivo, useRunSesion, usePreviewRango, detectarNSesion,
 } from './utils/editHelpers';
 export { default as Toast } from './components/Toast';
 export { default as DemoBanner } from '../../components/shared/DemoBanner';

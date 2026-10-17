@@ -88,6 +88,8 @@ export interface PreGenerationCheck {
   lecciones_sin_habilitacion: number
   lecciones_sin_disponibilidad: number
   lecciones_sin_candidatos: number
+  clases_sin_slots?: number
+  clases_periodo_incoherente?: number
   listo: boolean
 }
 

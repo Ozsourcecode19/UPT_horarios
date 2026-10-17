@@ -82,7 +82,7 @@ def create_horario_generado(db: Session, horario: schemas.HorarioGeneradoCreate)
             if 'horario_generado_bloque_id_fkey' in error_msg_lower:
                 raise HTTPException(status_code=422, detail=f"El bloque horario con ID {horario.bloque_id} no existe (verificación FK estándar).")
             elif 'horario_generado_leccion_id_fkey' in error_msg_lower:
-                raise HTTPException(status_code=422, detail=f"La lección con ID {horario.leccion_id} no existe.")
+                raise HTTPException(status_code=422, detail=f"La clase con ID {horario.leccion_id} no existe.")
             elif 'horario_generado_aula_id_fkey' in error_msg_lower:
                 raise HTTPException(status_code=422, detail=f"El aula con ID {horario.aula_id} no existe.")
             elif 'horario_generado_periodo_id_fkey' in error_msg_lower:
@@ -231,6 +231,9 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
     models.Docente.apellido.label('docente_apellido'),
     models.Leccion.docente_id.label('docente_id'),
     models.Leccion.grupo_id.label('grupo_id'),
+    models.Leccion.bloques_por_sesion.label('bloques_por_sesion'),
+    models.Leccion.sesiones_semana.label('sesiones_semana'),
+    models.Leccion.horas_semanales.label('horas_semanales'),
     models.Grupo.nombre.label('grupo_nombre'),
     models.Grupo.division.label('grupo_division'),
     models.Aula.nombre.label('aula_nombre'),
@@ -334,6 +337,9 @@ def get_horarios_para_calendario(db: Session, periodo_id: int) -> List[schemas.F
                     "aula": aula_nombre,
                     "aula_id": horario_gen.aula_id,
                     "bloque_id": horario_gen.bloque_id,
+                    "bloques_por_sesion": getattr(row, 'bloques_por_sesion', 1),
+                    "sesiones_semana": getattr(row, 'sesiones_semana', 1),
+                    "horas_semanales": getattr(row, 'horas_semanales', None),
                     "sede": sede_nombre,
                 }
             )
@@ -454,6 +460,57 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         if leccion_sede not in sedes_con_aula or leccion_sede not in sedes_con_bloque:
             lecciones_sin_candidatos += 1
 
+    # R0: clases cuya Sección pertenece a otro periodo (dato incoherente).
+    # El solver descarta esas lecciones (no puede resolver su sede porque
+    # filtra grupos por periodo), así que conviene verlo antes de generar.
+    grupo_periodo = {g.id: g.periodo_id for g in db.query(models.Grupo).all()}
+    clases_periodo_incoherente = sum(
+        1 for leccion in lecciones_activas
+        if grupo_periodo.get(leccion.grupo_id) != leccion.periodo_id
+    )
+
+    # R1-C: clases con menos corridas (runs) disponibles que sesiones_semana.
+    # Tope grueso: solo bloque+jornada (sin disponibilidad/habilitación),
+    # agrupando bloques por sede/día y contando ventanas de N contiguos.
+    bloques_por_sede_dia = {}
+    for bloque in db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True):  # noqa: E712
+        if bloque.dia_semana not in dias_laborables:
+            continue
+        if bloque.hora_inicio < hora_inicio_jornada:
+            continue
+        bloque_fin = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
+        if bloque_fin > hora_fin_jornada:
+            continue
+        bloques_por_sede_dia.setdefault((bloque.sede_id, bloque.dia_semana), []).append(bloque)
+
+    corridas_por_sede = {}
+    for (sede_id, _dia), lista in bloques_por_sede_dia.items():
+        lista.sort(key=lambda b: b.hora_inicio)
+        cadena = []
+        # Cuenta las longitudes de cadenas contiguas; luego se filtran por N
+        largos_cadena = []
+        for b in lista:
+            if cadena:
+                fin_previo = (datetime.combine(date.min, cadena[-1].hora_inicio)
+                              + timedelta(minutes=cadena[-1].duracion_minutos)).time()
+                if b.hora_inicio != fin_previo:
+                    largos_cadena.append(len(cadena))
+                    cadena = []
+            cadena.append(b)
+        if cadena:
+            largos_cadena.append(len(cadena))
+        corridas_por_sede.setdefault(sede_id, []).extend(largos_cadena)
+
+    clases_sin_slots = 0
+    for leccion in lecciones_activas:
+        leccion_sede = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
+        n = leccion.bloques_por_sesion or 1
+        m = leccion.sesiones_semana or 1
+        largos = corridas_por_sede.get(leccion_sede, [])
+        corridas_posibles = sum(max(0, largo - n + 1) for largo in largos)
+        if corridas_posibles < m:
+            clases_sin_slots += 1
+
     aulas = db.query(models.Aula).filter(models.Aula.activa == True).count()  # noqa: E712
     bloques = db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True).count()  # noqa: E712
 
@@ -473,6 +530,8 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         lecciones_sin_habilitacion=lecciones_sin_habilitacion,
         lecciones_sin_disponibilidad=lecciones_sin_disponibilidad,
         lecciones_sin_candidatos=lecciones_sin_candidatos,
+        clases_sin_slots=clases_sin_slots,
+        clases_periodo_incoherente=clases_periodo_incoherente,
         listo=listo,
     )
 
@@ -573,32 +632,41 @@ def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optio
         total_activos=total_activos,
     )
 def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
-                           bloque_ids: List[int], periodo_id: int) -> List[models.HorarioGenerado]:
+                           bloque_ids: List[int], periodo_id: int,
+                           bloques_previos: Optional[List[int]] = None
+                           ) -> List[models.HorarioGenerado]:
     """
     E20 — Asignación manual desde la grilla: reemplaza (transaccionalmente) las
-    filas ACTIVO de una lección en el periodo por una nueva asignación de 1 o 2
-    bloques CONSECUTIVOS en el aula indicada.
+    filas ACTIVO de una SESIÓN de la lección por una nueva asignación de
+    N = leccion.bloques_por_sesion bloques CONSECUTIVOS (mismo día) en el
+    aula indicada.
 
     - Valida cada bloque con validar_asignacion excluyendo las filas previas de
       la propia lección (ventana de división, disponibilidad, habilitación,
-      cruces docente/grupo/aula, consistencia de sede).
-    - Las filas previas pasan a estado 'ELIMINADO' (soft-delete, mismo criterio
-      que DELETE /{id}); las nuevas heredan su version_horario.
+      cruces docente/grupo/aula, consistencia de sede) MÁS un chequeo de
+      solape de RANGO completo del run (R5-B'): detecta solapes con bloques
+      de duración distinta que la igualdad exacta de bloque_id no ve.
+    - Las filas previas (todas, o solo las de `bloques_previos` cuando la
+      lección tiene M>1 sesiones) pasan a estado 'ELIMINADO' (soft-delete);
+      las nuevas heredan su version_horario.
     """
     from services.validation.schedule_validation import validar_asignacion
 
     leccion = db.query(models.Leccion).filter(models.Leccion.id == leccion_id).first()
     if not leccion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clase no encontrada.")
     aula = db.query(models.Aula).filter(models.Aula.id == aula_id).first()
     if not aula:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aula no encontrada.")
 
+    n_bloques = leccion.bloques_por_sesion or 1
+
     ids_unicos = list(dict.fromkeys(bloque_ids))
-    if not (1 <= len(ids_unicos) <= 2):
+    # R11: la sesión ocupa exactamente N bloques (no más, no menos)
+    if len(ids_unicos) != n_bloques:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail={"error_code": "EXTENSION_INVALIDA",
-                                    "mensaje": "La lección puede abarcar 1 o 2 bloques."})
+                                    "mensaje": f"Esta clase abarca {n_bloques} bloque(s) por sesión."})
 
     from models.bloque_horario import BloqueHorario
     bloques = db.query(BloqueHorario).filter(BloqueHorario.id.in_(ids_unicos)).all()
@@ -613,20 +681,50 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
                             detail={"error_code": "SITE_MISMATCH",
                                     "mensaje": "Los bloques seleccionados pertenecen a otra sede que el aula."})
 
-    # Consecutividad exacta para extensión de 2 bloques
-    if len(ordenados) == 2:
-        fin_primero = (datetime.combine(date.min, ordenados[0].hora_inicio)
-                       + timedelta(minutes=ordenados[0].duracion_minutos)).time()
-        if ordenados[1].hora_inicio != fin_primero:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                detail={"error_code": "NO_CONSECUTIVOS",
-                                        "mensaje": "Los dos bloques deben ser consecutivos (el segundo inicia donde termina el primero)."})
+    # Consecutividad exacta de la cadena + mismo día (fix: antes solo se
+    # comparaba el par y sin verificar dia_semana)
+    if any(b.dia_semana != ordenados[0].dia_semana for b in ordenados):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail={"error_code": "NO_MISMO_DIA",
+                                    "mensaje": "Los bloques de la sesión deben ser del mismo día."})
+    if len(ordenados) > 1:
+        for i in range(1, len(ordenados)):
+            fin_previo = (datetime.combine(date.min, ordenados[i - 1].hora_inicio)
+                          + timedelta(minutes=ordenados[i - 1].duracion_minutos)).time()
+            if ordenados[i].hora_inicio != fin_previo:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail={"error_code": "NO_CONSECUTIVOS",
+                                            "mensaje": "Los bloques de la sesión deben ser consecutivos (cada uno inicia donde termina el anterior)."})
 
     filas_previas = db.query(models.HorarioGenerado).filter(
         models.HorarioGenerado.leccion_id == leccion_id,
         models.HorarioGenerado.periodo_id == periodo_id,
         models.HorarioGenerado.estado == 'ACTIVO',
     ).all()
+
+    # Alcance del reemplazo: solo la sesión apuntada por bloques_previos
+    # (M > 1 sesiones/semana) o todas las filas (backward-compatible).
+    ids_previos_set = set(bloques_previos) if bloques_previos is not None else None
+    if ids_previos_set is not None:
+        ids_existentes = {f.bloque_id for f in filas_previas}
+        if not ids_previos_set.issubset(ids_existentes):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail={"error_code": "PREVIAS_INVALIDAS",
+                                        "mensaje": "Las filas previas indicadas no pertenecen a esta clase."})
+        filas_a_reemplazar = [f for f in filas_previas if f.bloque_id in ids_previos_set]
+        # Las previas deben formar una sesión contigua (run) coherente
+        previas_ordenadas = sorted(filas_a_reemplazar, key=lambda f: f.hora_inicio)
+        if any(f.dia_semana != previas_ordenadas[0].dia_semana for f in previas_ordenadas):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail={"error_code": "PREVIAS_INVALIDAS",
+                                        "mensaje": "Las filas previas deben ser del mismo día."})
+        for i in range(1, len(previas_ordenadas)):
+            if previas_ordenadas[i].hora_inicio != previas_ordenadas[i - 1].hora_fin:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail={"error_code": "PREVIAS_INVALIDAS",
+                                            "mensaje": "Las filas previas deben ser bloques consecutivos."})
+    else:
+        filas_a_reemplazar = filas_previas
 
     # Validaciones completas excluyendo las filas previas de ESTA lección
     for bloque in ordenados:
@@ -638,11 +736,46 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
                                 detail={"error_code": res.error_code or "ASIGNACION_INVALIDA",
                                         "mensaje": res.mensaje})
 
-    version = filas_previas[0].version_horario if filas_previas else (
+    # R5-B': solape de RANGO completo del run (inicio de la 1ª fila → fin de
+    # la última) contra las demás filas ACTIVO del periodo. Cubre solapes con
+    # bloques de duración distinta que la igualdad exacta de bloque_id no ve.
+    rango_ini = ordenados[0].hora_inicio
+    fin_ultimo = (datetime.combine(date.min, ordenados[-1].hora_inicio)
+                  + timedelta(minutes=ordenados[-1].duracion_minutos)).time()
+    rango_fin = fin_ultimo
+    ids_reemplazadas = {f.id for f in filas_a_reemplazar}
+    q_rango = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO',
+        models.HorarioGenerado.dia_semana == ordenados[0].dia_semana,
+        models.HorarioGenerado.hora_inicio < rango_fin,
+        models.HorarioGenerado.hora_fin > rango_ini,
+    )
+    if ids_reemplazadas:
+        q_rango = q_rango.filter(~models.HorarioGenerado.id.in_(ids_reemplazadas))
+    for fila in q_rango.all():
+        if fila.aula_id == aula_id:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail={"error_code": "CONFLICT_ROOM",
+                                        "mensaje": "El rango seleccionado ya está ocupado en esa aula."})
+        lec_fila = db.query(models.Leccion).filter(models.Leccion.id == fila.leccion_id).first()
+        if lec_fila and lec_fila.docente_id == leccion.docente_id:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail={"error_code": "CONFLICT_TEACHER",
+                                        "mensaje": "El docente ya tiene una clase en ese rango."})
+        if lec_fila and lec_fila.grupo_id == leccion.grupo_id:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail={"error_code": "CONFLICT_GROUP",
+                                        "mensaje": "La sección ya tiene una clase en ese rango."})
+
+    version = filas_a_reemplazar[0].version_horario if filas_a_reemplazar else (
         (db.query(func.max(models.HorarioGenerado.version_horario))
            .filter(models.HorarioGenerado.periodo_id == periodo_id).scalar() or 0) + 1)
 
-    for fila in filas_previas:
+    for fila in filas_a_reemplazar:
         fila.estado = 'ELIMINADO'
 
     creadas = []

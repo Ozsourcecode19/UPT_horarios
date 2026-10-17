@@ -83,6 +83,10 @@ class PreGenerationCheck(BaseModel):
     lecciones_sin_habilitacion: int = 0
     lecciones_sin_disponibilidad: int = 0
     lecciones_sin_candidatos: int = 0
+    # R1-C: clases con menos corridas disponibles que sesiones_semana (tope grueso)
+    clases_sin_slots: int = 0
+    # R0: clases cuya Sección pertenece a otro periodo (el solver las descarta)
+    clases_periodo_incoherente: int = 0
     listo: bool = False
     class Config:
         from_attributes = True
@@ -111,9 +115,12 @@ class RestoreResult(BaseModel):
 
 # --- E20: asignación manual desde la grilla (mover/extender/crear) ---
 class AsignarManualRequest(BaseModel):
-    """Crea/reemplaza las filas ACTIVO de una lección en el periodo:
-    1 bloque (sesión simple) o 2 bloques CONSECUTIVOS (extensión)."""
+    """Crea/reemplaza las filas ACTIVO de una sesión de la lección: los
+    bloques consecutivos que componen la sesión (1..N = bloques_por_sesion)."""
     leccion_id: int
     aula_id: int
     periodo_id: int
-    bloque_ids: List[int] = Field(min_length=1, max_length=2)
+    bloque_ids: List[int] = Field(min_length=1, max_length=20)
+    # Filas previas (por bloque_id) de la sesión a reemplazar. Si se omite se
+    # reemplazan todas las filas ACTIVO de la lección (backward-compatible).
+    bloques_previos: Optional[List[int]] = None

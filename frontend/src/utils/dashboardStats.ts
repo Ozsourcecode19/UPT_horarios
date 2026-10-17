@@ -45,7 +45,7 @@ export const distribucionPorMateria = (eventos: FullCalendarEvent[]): Distribuci
   const acum: Record<string, DistribucionMateria> = {};
 
   (eventos || []).forEach(ev => {
-    const materia = ev?.extendedProps?.materia || 'Materia no asignada';
+    const materia = ev?.extendedProps?.materia || 'Unidad curricular no asignada';
     const color = ev?.extendedProps?.backgroundColor || COLOR_FALLBACK;
     if (!acum[materia]) acum[materia] = { materia, count: 0, color };
     acum[materia].count += 1;
@@ -76,7 +76,7 @@ export const resumenConflictos = (
 
   if (preCheck) {
     const causas: string[] = [];
-    if (preCheck.lecciones_activas === 0) causas.push('no hay lecciones activas');
+    if (preCheck.lecciones_activas === 0) causas.push('no hay clases activas');
     if (preCheck.aulas === 0) causas.push('no hay aulas activas');
     if (preCheck.bloques === 0) causas.push('no hay bloques activos');
     if (preCheck.docentes_con_habilitacion === 0) causas.push('ningún docente habilitado');
@@ -88,13 +88,19 @@ export const resumenConflictos = (
     }
 
     if (preCheck.lecciones_sin_habilitacion > 0) {
-      add('warn', 'Lecciones sin habilitación', `${preCheck.lecciones_sin_habilitacion} lección(es) no podrán asignarse: el docente no está habilitado para la materia.`);
+      add('warn', 'Clases sin habilitación', `${preCheck.lecciones_sin_habilitacion} clase(s) no podrán asignarse: el docente no está habilitado para la unidad curricular.`);
     }
     if (preCheck.lecciones_sin_disponibilidad > 0) {
-      add('warn', 'Lecciones sin disponibilidad', `${preCheck.lecciones_sin_disponibilidad} lección(es) cuyo docente no define disponibilidad (el solver asumirá disponibilidad total).`);
+      add('warn', 'Clases sin disponibilidad', `${preCheck.lecciones_sin_disponibilidad} clase(s) cuyo docente no define disponibilidad (el solver asumirá disponibilidad total).`);
     }
     if (preCheck.lecciones_sin_candidatos > 0) {
-      add('warn', 'Lecciones sin candidatos', `${preCheck.lecciones_sin_candidatos} lección(es) sin aula ni bloque activo en su sede no podrán asignarse.`);
+      add('warn', 'Clases sin candidatos', `${preCheck.lecciones_sin_candidatos} clase(s) sin aula ni bloque activo en su sede no podrán asignarse.`);
+    }
+    if (preCheck.clases_sin_slots) {
+      add('warn', 'Clases sin espacios de sesión', `${preCheck.clases_sin_slots} clase(s) no tienen corridas de bloques contiguos suficientes para sus sesiones/semana.`);
+    }
+    if (preCheck.clases_periodo_incoherente) {
+      add('warn', 'Clases con periodo incoherente', `${preCheck.clases_periodo_incoherente} clase(s) cuya Sección pertenece a otro periodo; el algoritmo las descarta. Corrige el periodo en Planificación → Clases.`);
     }
   }
 

@@ -34,7 +34,7 @@ const Materias = () => {
                 Modo Demo Activado <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
               </p>
               <p className="text-xs text-amber-600/90">
-                Operando en almacenamiento local. Configura tus materias y paleta de colores cromática de prueba.
+                Operando en almacenamiento local. Configura tus unidades curriculares y paleta de colores cromática de prueba.
               </p>
             </div>
           </div>
@@ -55,7 +55,7 @@ const Materias = () => {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión de Materias</h2>
+          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Gestión de Unidades Curriculares</h2>
           <p className="text-slate-500">Administra el pensum y asigna colores únicos para el organizador visual.</p>
         </div>
         <div className="flex gap-3">
@@ -64,7 +64,7 @@ const Materias = () => {
             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-0.5"
           >
             <Plus className="w-5 h-5" />
-            <span>Añadir Materia</span>
+            <span>Añadir Unidad Curricular</span>
           </button>
         </div>
       </div>

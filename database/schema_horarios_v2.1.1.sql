@@ -219,6 +219,11 @@ CREATE TABLE lecciones (
     grupo_id INT NOT NULL REFERENCES grupos(id) ON DELETE CASCADE,
     materia_id INT NOT NULL REFERENCES materias(id) ON DELETE CASCADE,
     horas_semanales INT NOT NULL DEFAULT 2 CHECK (horas_semanales > 0 AND horas_semanales <= 20),
+    -- Sesión: corrida de bloques consecutivos (mismo día, contiguos) que ocupa
+    -- la clase en cada aparición semanal. Informativo frente a horas_semanales.
+    bloques_por_sesion INT NOT NULL DEFAULT 1 CHECK (bloques_por_sesion BETWEEN 1 AND 20),
+    -- Nº de sesiones que la clase debe tener en la semana (sessions per week).
+    sesiones_semana INT NOT NULL DEFAULT 1 CHECK (sesiones_semana BETWEEN 1 AND 20),
     prioridad INT DEFAULT 0 CHECK (prioridad BETWEEN 0 AND 10),
     activo BOOLEAN DEFAULT TRUE,
     sede_forzada_id INT REFERENCES sedes(id) ON DELETE SET NULL,

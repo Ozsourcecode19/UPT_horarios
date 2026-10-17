@@ -1,9 +1,10 @@
 // src/features/schedule/components/GridSemanalBloques.jsx
-// Grilla semanal por BANDAS DE BLOQUE (E18) + spans de extensión y borrado rápido (E20).
+// Grilla semanal por BANDAS DE BLOQUE (E18) + sesiones de N bloques y borrado rápido (E20).
 // - Una fila por BloqueHorario real; filas "Descanso" en huecos
-// - Eventos que abarcan 2 bloques: tarjeta principal (badge x2) + franja tenue
-//   de continuación en la banda siguiente (click/drag delegan al principal)
-// - Icono de eliminación en la tarjeta (la página confirma y resuelve pares)
+// - Sesiones (runs contiguos de N bloques): tarjeta principal (badge ×N) +
+//   franja tenue de continuación en las bandas siguientes (click/drag delegan
+//   al principal)
+// - Icono de eliminación en la tarjeta (la página confirma y resuelve la sesión)
 // - DnD HTML5 nativo; la página resuelve celda→bloque EXACTO y valida
 
 import { useMemo, useState } from 'react';
@@ -11,6 +12,7 @@ import { Trash2 } from 'lucide-react';
 import { horaAMinutos } from '../utils/schedule';
 import { formatHora12 } from '../../../utils/timeFormat';
 import { COLOR_FALLBACK } from '../../../constants';
+import { agruparSesiones } from '../utils/sesiones';
 
 const DIAS = [
   { dia: 1, nombre: 'LUNES' },
@@ -37,37 +39,8 @@ const GridSemanalBloques = ({
   const [drag, setDrag] = useState(null); // {id, esSpan}
   const [celdaHover, setCeldaHover] = useState(null);
 
-  // minuto de inicio del bloque real de un evento (para ordenar pares)
-  const minutoDe = useMemo(() => {
-    const idx = new Map(bloques.map(b => [Number(b.id), b]));
-    return (ev) => {
-      const bid = ev.extendedProps?.bloque_id;
-      if (bid != null && idx.has(Number(bid))) return horaAMinutos(idx.get(Number(bid)).hora_inicio);
-      const d = new Date(ev.start || '');
-      return Number.isNaN(d.getTime()) ? null : d.getHours() * 60 + d.getMinutes();
-    };
-  }, [bloques]);
-
-  // Detección de spans: misma leccion_id con exactamente 2 filas en bandas distintas
-  const infoSpanPorId = useMemo(() => {
-    const porLeccion = new Map();
-    eventos.forEach(ev => {
-      const lid = ev.extendedProps?.leccion_id;
-      if (lid == null) return;
-      if (!porLeccion.has(Number(lid))) porLeccion.set(Number(lid), []);
-      porLeccion.get(Number(lid)).push(ev);
-    });
-    const map = new Map(); // ev.id -> {esSpan, esContinuacion, principal}
-    porLeccion.forEach(lista => {
-      if (lista.length !== 2) return;
-      const conMin = lista.map(ev => ({ ev, min: minutoDe(ev) })).filter(x => x.min != null);
-      if (conMin.length !== 2 || conMin[0].min === conMin[1].min) return;
-      conMin.sort((a, b) => a.min - b.min);
-      map.set(conMin[0].ev.id, { esSpan: true, esContinuacion: false });
-      map.set(conMin[1].ev.id, { esSpan: true, esContinuacion: true, principal: conMin[0].ev });
-    });
-    return map;
-  }, [eventos, minutoDe]);
+  // Detección de sesiones: runs contiguos por lección+día (genérico a N bloques)
+  const infoSpanPorId = useMemo(() => agruparSesiones(eventos, bloques), [eventos, bloques]);
 
   // Mapa de celdas ocupadas por docente_id, grupo_id, aula_id (para detectar conflictos al hover)
   const ocupadasPorEntidad = useMemo(() => {
@@ -111,7 +84,7 @@ const GridSemanalBloques = ({
       return { tipo: 'docente', etiqueta: 'Docente ocupado' };
     }
     if (gid != null && ocupadasPorEntidad.porGrupo.get(gid)?.has(celdaHover)) {
-      return { tipo: 'grupo', etiqueta: 'Grupo ocupado' };
+      return { tipo: 'grupo', etiqueta: 'Sección ocupada' };
     }
     if (aid != null && ocupadasPorEntidad.porAula.get(aid)?.has(celdaHover)) {
       return { tipo: 'aula', etiqueta: 'Aula ocupada' };
@@ -176,7 +149,7 @@ const GridSemanalBloques = ({
     };
     setDrag(null);
     if (!meta?.id || !onDropEnCelda) return;
-    onDropEnCelda({ horarioId: String(meta.id), esSpan: !!meta.esSpan, dia, iniMin: banda.iniMin });
+    onDropEnCelda({ horarioId: String(meta.id), esSpan: !!meta.esSpan, sesionTotal: meta.sesionTotal || 1, dia, iniMin: banda.iniMin });
   };
 
   return (
@@ -260,7 +233,7 @@ const GridSemanalBloques = ({
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));
                               e.dataTransfer.effectAllowed = 'move';
-                              setDrag({ id: String(objetivo.id), esSpan: !!info?.esSpan });
+                              setDrag({ id: String(objetivo.id), esSpan: !!info?.esSesion, sesionTotal: info?.total || 1 });
                             }}
                             onDragEnd={() => { setDrag(null); setCeldaHover(null); }}
                             onClick={() => onEventoClick?.({
@@ -277,7 +250,7 @@ const GridSemanalBloques = ({
                                 title="Eliminar clase"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteEvento({ horario: ev, esSpan: !!info?.esSpan });
+                                  onDeleteEvento({ horario: ev, esSpan: !!info?.esSesion, sesionTotal: info?.total || 1 });
                                 }}
                               >
                                 <Trash2 size={11} />
@@ -285,7 +258,7 @@ const GridSemanalBloques = ({
                             )}
                             <span className="ev-materia">
                               {ev.extendedProps?.materia || ev.title}
-                              {info?.esSpan && !esContinuacion ? <em className="ev-x2"> · x2</em> : null}
+                              {info?.esSesion && !esContinuacion ? <em className="ev-x2"> · ×{info?.total || 1}</em> : null}
                               {esContinuacion ? <em className="ev-x2"> · cont.</em> : null}
                             </span>
                             {!esContinuacion && (

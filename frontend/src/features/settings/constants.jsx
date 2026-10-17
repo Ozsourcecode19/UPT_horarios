@@ -17,7 +17,7 @@ export const WIDGETS = {
 
 export const GRUPOS = [
   { id: 'jornada', label: 'Jornada y calendario', descripcion: 'Define cuándo puede haber clases: días laborables y ventana horaria global de la jornada académica.', icon: CalendarDays },
-  { id: 'turnos', label: 'Turnos / Divisiones', descripcion: 'Ventanas horarias por turno (matutino/vespertino/nocturno) que restringen la generación de horarios por grupo.', icon: Layers },
+  { id: 'turnos', label: 'Turnos / Divisiones', descripcion: 'Ventanas horarias por turno (mañana/tarde/noche) que restringen la generación de horarios por sección.', icon: Layers },
   { id: 'bloques', label: 'Estructura de bloques', descripcion: 'Parámetros sobre la forma de las franjas horarias que componen el calendario.', icon: Timer },
   { id: 'solver', label: 'Optimización del solver', descripcion: 'Preferencias de calidad del horario que el optimizador equilibra al buscar la solución.', icon: Gauge },
 ];
@@ -43,7 +43,7 @@ export const GRUPO_NOTAS = {
   ),
   turnos: (
     <>
-      Cada turno define una <span className="font-semibold">ventana horaria</span> (<span className="font-semibold">hora_inicio</span>–<span className="font-semibold">hora_fin</span>) que el solver respeta al asignar bloques a grupos de esa división. La ventana efectiva es la intersección con la jornada global: un grupo MATUTINO (7:00 AM–12:00 PM) solo recibirá bloques de mañana aunque la jornada global llegue a 3:00 PM. Ajusta las ventanas según los horarios reales de cada turno.
+      Cada turno define una <span className="font-semibold">ventana horaria</span> (<span className="font-semibold">hora_inicio</span>–<span className="font-semibold">hora_fin</span>) que el solver respeta al asignar bloques a secciones de ese turno. La ventana efectiva es la intersección con la jornada global: una sección del turno Mañana (7:00 AM–12:00 PM) solo recibirá bloques de mañana aunque la jornada global llegue a 3:00 PM. Ajusta las ventanas según los horarios reales de cada turno.
     </>
   ),
   bloques: (

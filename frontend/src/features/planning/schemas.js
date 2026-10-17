@@ -6,13 +6,13 @@ import { z } from 'zod';
 
 export const grupoSchema = z.object({
   nombre: z.string()
-    .min(2, "El nombre del grupo debe tener al menos 2 caracteres")
+    .min(2, "El nombre de la sección debe tener al menos 2 caracteres")
     .max(50, "El nombre no puede exceder los 50 caracteres"),
   trayecto_id: z.number({ invalid_type_error: "Debe seleccionar un trayecto académico" }),
   sede_id: z.number({ invalid_type_error: "Debe seleccionar una sede física" }),
   cantidad_alumnos: z.number({ invalid_type_error: "Debe ingresar un número" })
     .min(0, "La cantidad de alumnos no puede ser negativa")
-    .max(200, "La cantidad recomendada por grupo es máximo 200"),
+    .max(200, "La cantidad recomendada por sección es máximo 200"),
   periodo_id: z.number({ invalid_type_error: "Debe seleccionar un periodo académico" }),
   division: z.enum(['MATUTINO', 'VESPERTINO', 'NOCTURNO']).default('MATUTINO'),
   activo: z.boolean().default(true),
@@ -20,11 +20,17 @@ export const grupoSchema = z.object({
 
 export const leccionSchema = z.object({
   docente_id: z.number({ invalid_type_error: "Debe seleccionar un docente" }),
-  grupo_id: z.number({ invalid_type_error: "Debe seleccionar un grupo" }),
-  materia_id: z.number({ invalid_type_error: "Debe seleccionar una materia" }),
+  grupo_id: z.number({ invalid_type_error: "Debe seleccionar una sección" }),
+  materia_id: z.number({ invalid_type_error: "Debe seleccionar una unidad curricular" }),
   horas_semanales: z.number({ invalid_type_error: "Debe ingresar las horas semanales" })
     .min(1, "Mínimo 1 hora semanal")
-    .max(20, "Máximo 20 horas semanales por lección"),
+    .max(20, "Máximo 20 horas semanales por clase"),
+  bloques_por_sesion: z.number({ invalid_type_error: "Debe ingresar los bloques por sesión" })
+    .min(1, "Mínimo 1 bloque por sesión")
+    .max(20, "Máximo 20 bloques por sesión"),
+  sesiones_semana: z.number({ invalid_type_error: "Debe ingresar las sesiones por semana" })
+    .min(1, "Mínimo 1 sesión semanal")
+    .max(20, "Máximo 20 sesiones semanales"),
   prioridad: z.number({ invalid_type_error: "Debe ingresar una prioridad" })
     .min(0, "Prioridad mínima es 0")
     .max(10, "Prioridad máxima es 10"),
@@ -49,6 +55,8 @@ export const buildLeccionDefaults = ({ docenteId = '', grupoId = '', materiaId =
   grupo_id: grupoId ? Number(grupoId) : '',
   materia_id: materiaId ? Number(materiaId) : '',
   horas_semanales: 4,
+  bloques_por_sesion: 1,
+  sesiones_semana: 1,
   prioridad: 5,
   sede_forzada_id: null,
   periodo_id: periodoId ? Number(periodoId) : '',
@@ -71,6 +79,8 @@ export const toPayloadLeccion = (data) => ({
   grupo_id: Number(data.grupo_id),
   materia_id: Number(data.materia_id),
   horas_semanales: Number(data.horas_semanales),
+  bloques_por_sesion: Number(data.bloques_por_sesion || 1),
+  sesiones_semana: Number(data.sesiones_semana || 1),
   prioridad: Number(data.prioridad),
   sede_forzada_id: data.sede_forzada_id ? Number(data.sede_forzada_id) : null,
   periodo_id: Number(data.periodo_id),

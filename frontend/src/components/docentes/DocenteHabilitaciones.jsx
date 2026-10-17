@@ -14,8 +14,8 @@ import { FETCH_ALL_LIMIT } from '../../constants';
 
 // Esquema de validación para añadir habilitación
 const habilitacionSchema = z.object({
-  materia_id: z.coerce.number({ invalid_type_error: "Debe seleccionar una materia" })
-    .min(1, "Debe seleccionar una materia"),
+  materia_id: z.coerce.number({ invalid_type_error: "Debe seleccionar una unidad curricular" })
+    .min(1, "Debe seleccionar una unidad curricular"),
   nivel_habilitacion: z.string().min(1, "Seleccione un nivel"),
   fecha_desde: z.string().min(1, "La fecha de inicio es requerida"),
   fecha_hasta: z.string().or(z.literal('')).optional()
@@ -115,7 +115,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
     mutationFn: HabilitacionesService.createHabilitacion,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habilitaciones', selectedDocenteId] });
-      showToast("Materia habilitada exitosamente");
+      showToast("Unidad curricular habilitada exitosamente");
       reset({
         materia_id: '',
         nivel_habilitacion: 'BASICO',
@@ -124,7 +124,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
       });
     },
     onError: (err) => {
-      showToast(err.response?.data?.detail || "Error al habilitar materia", "error");
+      showToast(err.response?.data?.detail || "Error al habilitar la unidad curricular", "error");
     }
   });
 
@@ -168,7 +168,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
       // Simular en localStorage
       // Verificar si ya existe (por seguridad)
       if (demoHabs.some(h => h.docente_id === formattedData.docente_id && h.materia_id === formattedData.materia_id)) {
-        showToast("La materia ya está habilitada para este docente", "error");
+        showToast("La unidad curricular ya está habilitada para este docente", "error");
         return;
       }
 
@@ -179,7 +179,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
         updated_at: new Date().toISOString()
       };
       setDemoHabs(prev => [...prev, nuevo]);
-      showToast("Materia habilitada exitosamente en Modo Demo");
+      showToast("Unidad curricular habilitada exitosamente en Modo Demo");
       reset({
         materia_id: '',
         nivel_habilitacion: 'BASICO',
@@ -295,7 +295,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
               <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Plus className="w-5 h-5" />
               </div>
-              <h4 className="text-base font-bold text-slate-800">Habilitar Materia</h4>
+              <h4 className="text-base font-bold text-slate-800">Habilitar Unidad Curricular</h4>
             </div>
 
             {availableMaterias.length === 0 ? (
@@ -306,12 +306,12 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
               <form onSubmit={handleSubmit(onAddHabilitacion)} className="space-y-4">
                 {/* Selector de Materia */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Materia *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Unidad Curricular *</label>
                   <select
                     {...register('materia_id')}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-medium"
                   >
-                    <option value="">Seleccione materia...</option>
+                    <option value="">Seleccione una unidad curricular...</option>
                     {availableMaterias.map(m => (
                       <option key={m.id} value={m.id}>[{m.codigo}] {m.nombre}</option>
                     ))}
@@ -365,7 +365,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                   ) : (
                     <ShieldCheck className="w-4 h-4" />
                   )}
-                  <span>Habilitar Materia</span>
+                  <span>Habilitar Unidad Curricular</span>
                 </button>
               </form>
             )}
@@ -378,7 +378,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                 <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   <GraduationCap className="w-5 h-5" />
                 </div>
-                <h4 className="text-base font-bold text-slate-800">Materias Habilitadas</h4>
+                <h4 className="text-base font-bold text-slate-800">Unidades Curriculares Habilitadas</h4>
               </div>
               <span className="text-xs text-slate-400 font-medium">
                 {habs.length} habilitadas
@@ -395,7 +395,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                 <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
                   <BookOpen className="w-6 h-6" />
                 </div>
-                <h5 className="text-sm font-bold text-slate-700">Sin materias habilitadas</h5>
+                <h5 className="text-sm font-bold text-slate-700">Sin unidades curriculares habilitadas</h5>
                 <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
                   Este docente no tiene materias asignadas. Habilite materias en el panel lateral para permitir su planificación en los horarios.
                 </p>
@@ -405,7 +405,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-                      <th className="py-3 px-4">Materia</th>
+                      <th className="py-3 px-4">Unidad Curricular</th>
                       <th className="py-3 px-4 text-center">Nivel</th>
                       <th className="py-3 px-4">Periodo de Validez</th>
                       <th className="py-3 px-4 text-right">Acciones</th>
@@ -561,10 +561,10 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                       </p>
                       {deleteModalState.validationData.affected_lessons?.length > 0 && (
                         <div className="text-left bg-slate-50 p-3 rounded-2xl text-[11px] text-slate-500">
-                          <span className="font-bold text-slate-700 block mb-1">Lecciones vinculadas afectadas:</span>
+                          <span className="font-bold text-slate-700 block mb-1">Clases vinculadas afectadas:</span>
                           <ul className="list-disc list-inside space-y-0.5">
                             {deleteModalState.validationData.affected_lessons.map((l, idx) => (
-                              <li key={idx}>Lección #{l.leccion_id} — {l.materia_nombre} (Período #{l.periodo_id})</li>
+                              <li key={idx}>Clase #{l.leccion_id} — {l.materia_nombre} (Período #{l.periodo_id})</li>
                             ))}
                           </ul>
                         </div>
@@ -611,7 +611,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                           className="py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
                         >
                           {deleteMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          <span>Confirmar y Desactivar Lecciones</span>
+                          <span>Confirmar y Desactivar Clases</span>
                         </button>
                       </div>
                     </div>
@@ -622,7 +622,7 @@ const DocenteHabilitaciones = ({ docentes = [], initialDocenteId = null, demoMod
                       </div>
                       <h4 className="text-lg font-bold text-slate-900">Confirmar Eliminación</h4>
                       <p className="text-xs text-slate-600">
-                        {deleteModalState.validationData?.message || "¿Está seguro de que desea retirar la habilitación para esta materia?"}
+                        {deleteModalState.validationData?.message || "¿Está seguro de que desea retirar la habilitación para esta unidad curricular?"}
                       </p>
                       <div className="pt-2 flex justify-end gap-2">
                         <button

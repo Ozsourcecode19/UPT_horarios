@@ -46,7 +46,7 @@ export const useLeccionesCrud = ({
   // GUARDAR GRUPO (crear o editar segun `editing`)
   const handleSaveGrupo = async (data, editing = null) => {
     if (!puedeEscribir) {
-      showToast("No tienes permisos para crear o editar grupos.", "error");
+      showToast("No tienes permisos para crear o editar secciones.", "error");
       return false;
     }
     const formattedData = toPayloadGrupo(data);
@@ -58,7 +58,7 @@ export const useLeccionesCrud = ({
           ...formattedData,
           updated_at: new Date().toISOString()
         } : g));
-        showToast("Grupo de alumnos actualizado con éxito (Modo Demo)");
+        showToast("Sección actualizada con éxito (Modo Demo)");
       } else {
         const nuevoGrupo = {
           id: Math.max(...demoGrupos.map(g => g.id), 0) + 1,
@@ -67,7 +67,7 @@ export const useLeccionesCrud = ({
           updated_at: new Date().toISOString()
         };
         setDemoGrupos(prev => [nuevoGrupo, ...prev]);
-        showToast("Grupo registrado de manera local (Modo Demo)");
+        showToast("Sección registrada de manera local (Modo Demo)");
       }
       return true;
     }
@@ -75,16 +75,16 @@ export const useLeccionesCrud = ({
     try {
       if (editing) {
         await servicios.grupos.updateGrupo(editing.id, formattedData);
-        showToast("Grupo de alumnos actualizado exitosamente");
+        showToast("Sección actualizada exitosamente");
       } else {
         await servicios.grupos.createGrupo(formattedData);
-        showToast("Grupo registrado exitosamente");
+        showToast("Sección registrada exitosamente");
       }
       onInvalidateGrupos();
       return true;
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar grupo en el servidor", "error");
+      showToast("Error al guardar sección en el servidor", "error");
       return false;
     }
   };
@@ -92,10 +92,15 @@ export const useLeccionesCrud = ({
   // GUARDAR LECCIÓN (crear o editar segun `editing`)
   const handleSaveLeccion = async (data, editing = null) => {
     if (!puedeEscribir) {
-      showToast("No tienes permisos para crear o editar lecciones.", "error");
+      showToast("No tienes permisos para crear o editar clases.", "error");
       return false;
     }
     const formattedData = toPayloadLeccion(data);
+    // R3: cambiar N/M archiva las sesiones ACTIVO de la clase (backend).
+    const cambioEstructura = !!editing && (
+      Number(formattedData.bloques_por_sesion) !== Number(editing.bloques_por_sesion ?? 1) ||
+      Number(formattedData.sesiones_semana) !== Number(editing.sesiones_semana ?? 1)
+    );
 
     if (demoMode) {
       if (editing) {
@@ -104,7 +109,9 @@ export const useLeccionesCrud = ({
           ...formattedData,
           updated_at: new Date().toISOString()
         } : l));
-        showToast("Lección académica actualizada con éxito (Modo Demo)");
+        showToast(cambioEstructura
+          ? "Clase actualizada. El nuevo tamaño se aplicará al regenerar el horario (Modo Demo)"
+          : "Clase actualizada con éxito (Modo Demo)");
       } else {
         const nuevaLeccion = {
           id: Math.max(...demoLecciones.map(l => l.id), 0) + 1,
@@ -113,7 +120,7 @@ export const useLeccionesCrud = ({
           updated_at: new Date().toISOString()
         };
         setDemoLecciones(prev => [nuevaLeccion, ...prev]);
-        showToast("Lección registrada de manera local (Modo Demo)");
+        showToast("Clase registrada de manera local (Modo Demo)");
       }
       return true;
     }
@@ -121,16 +128,27 @@ export const useLeccionesCrud = ({
     try {
       if (editing) {
         await servicios.lecciones.updateLeccion(editing.id, formattedData);
-        showToast("Lección académica actualizada exitosamente");
+        showToast(cambioEstructura
+          ? "Clase actualizada. Las sesiones anteriores quedaron archivadas; el nuevo tamaño se aplicará al regenerar el horario"
+          : "Clase actualizada exitosamente");
       } else {
         await servicios.lecciones.createLeccion(formattedData);
-        showToast("Lección registrada exitosamente");
+        showToast("Clase registrada exitosamente");
       }
       onInvalidateLecciones();
       return true;
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar lección en el servidor", "error");
+      // R0: periodo incoherente con la Sección → 422 con mensaje propio.
+      if (err?.response?.status === 422) {
+        const detalle = err.response.data?.detail;
+        const mensaje = typeof detalle === 'string'
+          ? detalle
+          : (detalle?.mensaje || 'Datos inválidos al guardar la clase.');
+        showToast(mensaje, "error");
+        return false;
+      }
+      showToast("Error al guardar clase en el servidor", "error");
       return false;
     }
   };
@@ -140,31 +158,31 @@ export const useLeccionesCrud = ({
     if (!grupo) return false;
 
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar grupos.", "error");
+      showToast("No tienes permisos para eliminar secciones.", "error");
       return false;
     }
 
     // Verificar si el grupo tiene lecciones asociadas en el listado activo
     const leccionesVinculadas = listadoLecciones.filter(l => l.grupo_id === grupo.id);
     if (leccionesVinculadas.length > 0) {
-      showToast(`No es posible eliminar el grupo: tiene ${leccionesVinculadas.length} lección(es) académica(s) vinculada(s).`, "error");
+      showToast(`No es posible eliminar la sección: tiene ${leccionesVinculadas.length} clase(s) vinculada(s).`, "error");
       return false;
     }
 
     if (demoMode) {
       setDemoGrupos(prev => prev.filter(g => g.id !== grupo.id));
-      showToast("Grupo eliminado con éxito (Modo Demo)", "info");
+      showToast("Sección eliminada con éxito (Modo Demo)", "info");
       return true;
     }
 
     try {
       await servicios.grupos.deleteGrupo(grupo.id);
       onInvalidateGrupos();
-      showToast("Grupo de alumnos eliminado exitosamente", "info");
+      showToast("Sección eliminada exitosamente", "info");
       return true;
     } catch (err) {
       console.error(err);
-      showToast("Error al eliminar grupo del servidor", "error");
+      showToast("Error al eliminar sección del servidor", "error");
       return false;
     }
   };
@@ -174,24 +192,24 @@ export const useLeccionesCrud = ({
     if (!leccion) return false;
 
     if (!puedeEscribir) {
-      showToast("No tienes permisos para eliminar lecciones.", "error");
+      showToast("No tienes permisos para eliminar clases.", "error");
       return false;
     }
 
     if (demoMode) {
       setDemoLecciones(prev => prev.filter(l => l.id !== leccion.id));
-      showToast("Lección académica eliminada con éxito (Modo Demo)", "info");
+      showToast("Clase eliminada con éxito (Modo Demo)", "info");
       return true;
     }
 
     try {
       await servicios.lecciones.deleteLeccion(leccion.id);
       onInvalidateLecciones();
-      showToast("Lección académica eliminada exitosamente", "info");
+      showToast("Clase eliminada exitosamente", "info");
       return true;
     } catch (err) {
       console.error(err);
-      showToast("Error al eliminar lección del servidor", "error");
+      showToast("Error al eliminar clase del servidor", "error");
       return false;
     }
   };

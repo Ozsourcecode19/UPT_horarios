@@ -1,13 +1,15 @@
 // src/features/horarios/__tests__/horarios.test.js
 import { describe, it, expect, vi } from 'vitest';
 import { resolverDestinoDrop, createDropHandler } from '../utils/dropHandler';
-import { detectarSpanExistente } from '../utils/editHelpers';
+import { detectarNSesion } from '../utils/editHelpers';
 
 const bloques = [
   { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 45, activo: true },
   { id: 2, sede_id: 1, dia_semana: 1, hora_inicio: '07:45:00', duracion_minutos: 45, activo: true },
   { id: 3, sede_id: 1, dia_semana: 1, hora_inicio: '08:30:00', duracion_minutos: 45, activo: true },
   { id: 4, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 45, activo: false },
+  { id: 5, sede_id: 1, dia_semana: 3, hora_inicio: '07:00:00', duracion_minutos: 45, activo: true },
+  { id: 6, sede_id: 1, dia_semana: 3, hora_inicio: '07:45:00', duracion_minutos: 45, activo: true },
 ];
 
 const aulas = [
@@ -42,26 +44,44 @@ describe('resolverDestinoDrop', () => {
     expect(showToast).toHaveBeenCalled();
   });
 
-  it('añade bloque consecutivo cuando esSpan es true', () => {
+  it('añade el run completo cuando esSpan con sesionN', () => {
     const showToast = vi.fn();
-    const result = resolverDestinoDrop({ bloques, aulaId: 10, aulas, dia: 1, iniMin: 420, esSpan: true, showToast });
+    const result = resolverDestinoDrop({ bloques, aulaId: 10, aulas, dia: 1, iniMin: 420, esSpan: true, sesionN: 2, showToast });
     expect(result).toBeTruthy();
     expect(result.destinos).toHaveLength(2);
     expect(result.destinos[0].id).toBe(1);
     expect(result.destinos[1].id).toBe(2);
   });
 
-  it('retorna null si esSpan y no hay consecutivo', () => {
+  it('ajusta el inicio hacia arriba si no cabe hacia abajo (R7)', () => {
+    const showToast = vi.fn();
+    // destino = bloque 3 (08:30); N=2 no cabe hacia abajo → ajusta a bloque 2 (07:45)
+    const result = resolverDestinoDrop({ bloques, aulaId: 10, aulas, dia: 1, iniMin: 510, esSpan: true, sesionN: 2, showToast });
+    expect(result).toBeTruthy();
+    expect(result.destinos.map(b => b.id)).toEqual([2, 3]);
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Sesión colocada desde'), 'info');
+  });
+
+  it('retorna null si esSpan y no hay run de N', () => {
     const showToast = vi.fn();
     const bloquesSinConsecutivo = [
       { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '14:00:00', duracion_minutos: 45, activo: true },
     ];
-    const result = resolverDestinoDrop({ bloques: bloquesSinConsecutivo, aulaId: 10, aulas, dia: 1, iniMin: 840, esSpan: true, showToast });
+    const result = resolverDestinoDrop({ bloques: bloquesSinConsecutivo, aulaId: 10, aulas, dia: 1, iniMin: 840, esSpan: true, sesionN: 2, showToast });
     expect(result).toBeNull();
     expect(showToast).toHaveBeenCalledWith(
-      expect.stringContaining('consecutivo'),
+      expect.stringContaining('consecutivos'),
       'error'
     );
+  });
+
+  it('arma el run de N aunque esSpan sea false (fallback del grid)', () => {
+    const showToast = vi.fn();
+    const result = resolverDestinoDrop({ bloques, aulaId: 10, aulas, dia: 1, iniMin: 420, esSpan: false, sesionN: 2, showToast });
+    expect(result).toBeTruthy();
+    expect(result.destinos).toHaveLength(2);
+    expect(result.destinos.map(b => b.id)).toEqual([1, 2]);
+    expect(showToast).not.toHaveBeenCalled();
   });
 });
 
@@ -98,40 +118,76 @@ describe('createDropHandler', () => {
     handler({ horarioId: '6', esSpan: false, dia: 1, iniMin: 420 });
     expect(guardar).toHaveBeenCalledWith(expect.objectContaining({ aulaId: 10 }));
   });
+
+  it('con M>1 envía bloques_previos solo de la sesión del día origen', () => {
+    const guardar = vi.fn();
+    // Lección 7 con N=2 y M=2: sesión lunes (bloques 1,2) + sesión miércoles (bloques 5,6)
+    const listadoHorarios = [
+      { id: '10', extendedProps: { aula_id: 10, leccion_id: 7, bloques_por_sesion: 2, bloque_id: 1 } },
+      { id: '11', extendedProps: { aula_id: 10, leccion_id: 7, bloques_por_sesion: 2, bloque_id: 2 } },
+      { id: '12', extendedProps: { aula_id: 10, leccion_id: 7, bloques_por_sesion: 2, bloque_id: 5 } },
+      { id: '13', extendedProps: { aula_id: 10, leccion_id: 7, bloques_por_sesion: 2, bloque_id: 6 } },
+    ];
+    const handler = createDropHandler({ bloques, aulas, showToast: vi.fn(), guardarAsignacionManual: guardar, listadoHorarios });
+    handler({ horarioId: '10', esSpan: false, sesionTotal: 2, dia: 1, iniMin: 510 });
+    expect(guardar).toHaveBeenCalledTimes(1);
+    const arg = guardar.mock.calls[0][0];
+    // Solo las filas de la sesión del lunes (el backend exige mismo día y contiguas)
+    expect(arg.bloquesPrevios).toEqual([1, 2]);
+    // Sesión de N=2 reubicada: 08:30 no cabía hacia abajo → ajusta a [07:45, 08:30]
+    expect(arg.bloqueDestinos.map(b => b.id)).toEqual([2, 3]);
+    expect(arg.horario).toBe(listadoHorarios[0]);
+  });
+
+  it('omite bloques_previos cuando la lección no tiene leccion_id', () => {
+    const guardar = vi.fn();
+    const listadoHorarios = [{ id: '7', extendedProps: { aula_id: 10, bloque_id: 1 }, resourceId: 'aula_10' }];
+    const handler = createDropHandler({ bloques, aulas, showToast: vi.fn(), guardarAsignacionManual: guardar, listadoHorarios });
+    handler({ horarioId: '7', esSpan: false, dia: 1, iniMin: 420 });
+    expect(guardar).toHaveBeenCalledWith(expect.objectContaining({ bloquesPrevios: undefined }));
+  });
 });
 
-describe('detectarSpanExistente', () => {
-  it('retorna false si no hay selectedEvent', () => {
-    expect(detectarSpanExistente(null, [])).toBe(false);
+describe('detectarNSesion', () => {
+  it('retorna 1 si no hay selectedEvent', () => {
+    expect(detectarNSesion(null, [], [])).toBe(1);
   });
 
-  it('retorna false si leccion_id es null', () => {
+  it('retorna 1 si leccion_id es null', () => {
     const event = { leccion_id: null };
-    expect(detectarSpanExistente(event, [])).toBe(false);
+    expect(detectarNSesion(event, [], [])).toBe(1);
   });
 
-  it('retorna false si solo hay 1 evento con esa leccion_id', () => {
+  it('retorna 1 si solo hay 1 evento con esa leccion_id', () => {
     const event = { leccion_id: 42 };
     const horarios = [{ id: 1, extendedProps: { leccion_id: 42 } }];
-    expect(detectarSpanExistente(event, horarios)).toBe(false);
+    expect(detectarNSesion(event, horarios, [])).toBe(1);
   });
 
-  it('retorna true si hay exactamente 2 eventos con esa leccion_id', () => {
-    const event = { leccion_id: 42 };
+  it('retorna el total del run cuando hay 2 filas contiguas (fallback sin bloques)', () => {
+    const event = { id: 1, leccion_id: 42 };
     const horarios = [
       { id: 1, extendedProps: { leccion_id: 42 } },
       { id: 2, extendedProps: { leccion_id: 42 } },
     ];
-    expect(detectarSpanExistente(event, horarios)).toBe(true);
+    expect(detectarNSesion(event, horarios, [])).toBe(2);
   });
 
-  it('retorna false si hay más de 2 eventos con esa leccion_id', () => {
-    const event = { leccion_id: 42 };
+  it('agrupa runs por día: 3 filas de la misma lección en 2 días', () => {
+    const event = { id: 1, leccion_id: 42 };
     const horarios = [
-      { id: 1, extendedProps: { leccion_id: 42 } },
-      { id: 2, extendedProps: { leccion_id: 42 } },
-      { id: 3, extendedProps: { leccion_id: 42 } },
+      // Lunes: run contiguo de 2 (bloques 1 y 2)
+      { id: 1, extendedProps: { leccion_id: 42, bloque_id: 1 } },
+      { id: 2, extendedProps: { leccion_id: 42, bloque_id: 2 } },
+      // Martes: sesión aparte de 1
+      { id: 3, extendedProps: { leccion_id: 42, bloque_id: 5 } },
     ];
-    expect(detectarSpanExistente(event, horarios)).toBe(false);
+    const bloques = [
+      { id: 1, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 45, activo: true },
+      { id: 2, sede_id: 1, dia_semana: 1, hora_inicio: '07:45:00', duracion_minutos: 45, activo: true },
+      { id: 5, sede_id: 1, dia_semana: 2, hora_inicio: '07:00:00', duracion_minutos: 45, activo: true },
+    ];
+    expect(detectarNSesion(event, horarios, bloques)).toBe(2);
+    expect(detectarNSesion({ id: 3, leccion_id: 42 }, horarios, bloques)).toBe(1);
   });
 });
