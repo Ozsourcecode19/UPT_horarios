@@ -6,6 +6,7 @@ import {
   ventanaDinamicaDeEventos, agruparBandasPorTurno,
   calcularAltoBandaPrint, contarDescansosVisibles,
 } from '../../schedule/utils/schedule';
+import { TURNOS_LABELS } from '../../../constants';
 
 /**
  * Prepara datos para impresión multi-entidad: una sección por cada entidad del tipo seleccionado.
@@ -63,8 +64,8 @@ export default function usePrintMultiEntity({
       // Generar descripción del filtro para esta entidad
       let descripcionBase = '';
       if (tipoEntidad === 'grupo') {
-        descripcionBase = `Grupo: ${entidad.nombre}`;
-        if (entidad.division) descripcionBase += ` (${entidad.division})`;
+        descripcionBase = `Sección: ${entidad.nombre}`;
+        if (entidad.division) descripcionBase += ` (${TURNOS_LABELS[entidad.division] ?? entidad.division})`;
       } else if (tipoEntidad === 'docente') {
         descripcionBase = `Docente: ${entidad.apellido}, ${entidad.nombre}`;
       } else if (tipoEntidad === 'aula') {
@@ -124,7 +125,7 @@ export default function usePrintMultiEntity({
             return ini >= Number(turno.ventana.inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0))
               && ini < Number(turno.ventana.fin?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0));
           });
-          const turnoLabel = turno.nombre.charAt(0) + turno.nombre.slice(1).toLowerCase();
+          const turnoLabel = TURNOS_LABELS[turno.nombre] ?? (turno.nombre.charAt(0) + turno.nombre.slice(1).toLowerCase());
           return {
             id: `${entidad.id}-${turno.nombre}`,
             entidad,
@@ -151,7 +152,7 @@ export default function usePrintMultiEntity({
   }, [tipoEntidad, todosLosHorarios, grupos, docentes, aulas, bloques, configuraciones]);
 
   const descripcionTipo = useMemo(() => {
-    if (tipoEntidad === 'grupo') return 'Todos los Grupos';
+    if (tipoEntidad === 'grupo') return 'Todas las Secciones';
     if (tipoEntidad === 'docente') return 'Todos los Docentes';
     if (tipoEntidad === 'aula') return 'Todas las Aulas';
     return '';

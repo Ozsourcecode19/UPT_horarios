@@ -25,7 +25,7 @@ def read_materia(materia_id: int, db: Session = Depends(get_db)):
     """
     db_materia = crud.get_materia(db, materia_id=materia_id)
     if db_materia is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidad curricular no encontrada")
     return db_materia
 
 @router.get("/", response_model=PaginatedResponse[schemas.Materia], dependencies=[Depends(get_current_active_user)])
@@ -43,7 +43,7 @@ def update_materia(materia_id: int, materia_update: schemas.MateriaUpdate, db: S
     """
     db_materia = crud.update_materia(db, materia_id=materia_id, materia_update=materia_update)
     if db_materia is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidad curricular no encontrada")
     return db_materia
 
 @router.delete("/{materia_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
@@ -53,5 +53,5 @@ def delete_materia(materia_id: int, db: Session = Depends(get_db)):
     """
     deleted = crud.delete_materia(db, materia_id=materia_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidad curricular no encontrada")
     return

@@ -20,7 +20,7 @@ import { Users, GraduationCap, MapPin } from 'lucide-react';
 import { TOAST_DURATION, TOAST_DURATION_ERROR } from '../../../constants';
 
 const TIPOS_VISTA = [
-  { valor: 'grupo', etiqueta: 'Grupos', Icono: Users },
+  { valor: 'grupo', etiqueta: 'Secciones', Icono: Users },
   { valor: 'docente', etiqueta: 'Docentes', Icono: GraduationCap },
   { valor: 'aula', etiqueta: 'Aulas', Icono: MapPin },
 ];

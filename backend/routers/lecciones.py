@@ -25,7 +25,7 @@ def read_leccion(leccion_id: int, db: Session = Depends(get_db)):
     """
     db_leccion = crud.get_leccion(db, leccion_id=leccion_id)
     if db_leccion is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clase no encontrada")
     return db_leccion
 
 @router.get("/", response_model=PaginatedResponse[schemas.Leccion], dependencies=[Depends(get_current_active_user)])
@@ -43,7 +43,7 @@ def update_leccion(leccion_id: int, leccion_update: schemas.LeccionUpdate, db: S
     """
     db_leccion = crud.update_leccion(db, leccion_id=leccion_id, leccion_update=leccion_update)
     if db_leccion is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clase no encontrada")
     return db_leccion
 
 @router.delete("/{leccion_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
@@ -53,5 +53,5 @@ def delete_leccion(leccion_id: int, db: Session = Depends(get_db)):
     """
     deleted = crud.delete_leccion(db, leccion_id=leccion_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lección no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clase no encontrada")
     return

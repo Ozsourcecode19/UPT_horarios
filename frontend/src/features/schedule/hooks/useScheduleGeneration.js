@@ -62,7 +62,7 @@ export const useScheduleGeneration = ({
         if (status.count > 0) {
           showToast(`¡Horarios generados exitosamente (${status.count}) y reflejados en el calendario!`, "success");
         } else {
-          showToast(status.message || "El solver no encontró una combinación factible. Revisa lecciones, disponibilidades y habilitaciones.", "warning");
+          showToast(status.message || "El solver no encontró una combinación factible. Revisa clases, disponibilidades y habilitaciones.", "warning");
         }
       } else if (tipo === 'FAILED') {
         showToast(status.message || "Error al generar el horario en el servidor.", "error");

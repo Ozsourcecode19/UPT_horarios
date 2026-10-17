@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import crud
-import schemas 
+import schemas
+import models
 from config.database import get_db, SessionLocal
 from core.security import get_current_active_user, require_role
 from services.scheduler import or_tools_adapter
@@ -24,10 +25,21 @@ def run_generation_in_background(periodo_id: int):
     db = SessionLocal()
     try:
         status_tracker.set_pending(periodo_id)
-        or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id)
+        omitidas = or_tools_adapter.start_generation(db_session=db, periodo_academico_id=periodo_id) or []
         count = crud.get_horarios_generados_count_activos(db, periodo_id=periodo_id)
-        message = f"Solución guardada: {count} horarios." if count > 0 \
-            else "El solver no encontró una solución factible para el periodo."
+        if count > 0:
+            message = f"Solución guardada: {count} horarios."
+        else:
+            message = "El solver no encontró una solución factible para el periodo."
+        # R1: las clases omitidas del modelo (sin candidatos, sin habilitación,
+        # sin corridas suficientes, etc.) se elevan al estado para que un
+        # "DONE count=0" jamás sea silencioso.
+        if omitidas:
+            detalle = "; ".join(
+                f"#{o['leccion_id']} ({o['motivo']})" for o in omitidas[:10]
+            )
+            extra = f" y más ({len(omitidas) - 10})" if len(omitidas) > 10 else ""
+            message += f" Clases no colocadas: {detalle}{extra}."
         status_tracker.set_done(periodo_id, count=count, message=message)
     except Exception as e:
         status_tracker.set_failed(periodo_id, message=str(e))
@@ -118,13 +130,14 @@ def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
 
 
 # Endpoint para validar un movimiento manual (drag & drop) 
-@router.post("/asignar-manual", response_model=List[schemas.HorarioGenerado], summary="Asignación manual desde la grilla (1-2 bloques)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+@router.post("/asignar-manual", response_model=List[schemas.HorarioGenerado], summary="Asignación manual desde la grilla (sesión de N bloques)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def asignar_manual(req: schemas.AsignarManualRequest, db: Session = Depends(get_db)):
     """
-    E20 — Crea/reemplaza (transaccional) las filas ACTIVO de una lección en el
-    periodo: 1 bloque simple o 2 bloques consecutivos en el aula indicada.
-    Valida ventana del turno, disponibilidad, habilitación y cruces por bloque,
-    excluyendo las filas previas de la propia lección.
+    E20 — Crea/reemplaza (transaccional) las filas ACTIVO de una SESIÓN de la
+    lección en el periodo: los N bloques consecutivos (N = bloques_por_sesion)
+    que componen la sesión, en el aula indicada. Valida ventana del turno,
+    disponibilidad, habilitación, cruces por bloque y solape de rango,
+    excluyendo las filas previas reemplazadas de la propia lección.
     """
     return crud.asignar_horario_manual(
         db,
@@ -132,6 +145,7 @@ def asignar_manual(req: schemas.AsignarManualRequest, db: Session = Depends(get_
         aula_id=req.aula_id,
         bloque_ids=req.bloque_ids,
         periodo_id=req.periodo_id,
+        bloques_previos=req.bloques_previos,
     )
 
 @router.post("/validate-move", summary="Validar movimiento de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
@@ -164,7 +178,21 @@ def update_schedule_manual(horario_id: int, update_request: schemas.HorarioGener
     """
     Actualiza manualmente un horario generado (por ejemplo, cambiar aula o bloque).
     Idealmente, este endpoint debería ser precedido por una llamada a /validate-move.
+    R4: si la lección abarca más de un bloque por sesión, reubicar una fila suelta
+    rompería la corrida; se debe usar /asignar-manual sobre toda la sesión.
     """
+    if update_request.bloque_id is not None:
+        horario = crud.get_horario_generado(db, horario_id=horario_id)
+        if horario is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Horario no encontrado")
+        leccion = db.query(models.Leccion).filter(models.Leccion.id == horario.leccion_id).first()
+        if leccion is not None and (leccion.bloques_por_sesion or 1) > 1 and \
+                update_request.bloque_id != horario.bloque_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error_code": "CAMBIO_VIA_ASIGNAR_MANUAL",
+                        "mensaje": "Usa la asignación manual para reubicar esta sesión (abarca varios bloques)."},
+            )
     # Llama a la función CRUD para actualizar el horario
     updated_horario = crud.update_horario_generado(db, horario_id=horario_id, horario_update=update_request)
     if not updated_horario:

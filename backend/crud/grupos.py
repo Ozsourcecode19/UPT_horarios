@@ -44,15 +44,15 @@ def create_grupo(db: Session, grupo: GrupoCreate):
         # Verificar si el error es específicamente por clave foránea de trayecto
         # El mensaje puede variar ligeramente entre drivers, pero 'grupos_trayecto_id_fkey' es el patrón clave.
         if 'grupos_trayecto_id_fkey' in str(e.orig): # Acceder al mensaje original del driver psycopg2
-            raise HTTPException(status_code=422, detail=f"El trayecto académico con ID {grupo.trayecto_id} no existe. No se puede crear el grupo.")
+            raise HTTPException(status_code=422, detail=f"El trayecto académico con ID {grupo.trayecto_id} no existe. No se puede crear la sección.")
         # Opcional: También puedes manejar otras FK si fallan
         elif 'grupos_sede_id_fkey' in str(e.orig):
-            raise HTTPException(status_code=422, detail=f"La sede con ID {grupo.sede_id} no existe. No se puede crear el grupo.")
+            raise HTTPException(status_code=422, detail=f"La sede con ID {grupo.sede_id} no existe. No se puede crear la sección.")
         elif 'grupos_periodo_id_fkey' in str(e.orig):
-            raise HTTPException(status_code=422, detail=f"El periodo académico con ID {grupo.periodo_id} no existe. No se puede crear el grupo.")
+            raise HTTPException(status_code=422, detail=f"El periodo académico con ID {grupo.periodo_id} no existe. No se puede crear la sección.")
         else:
             # Si es otro tipo de error de integridad (por ejemplo, violación de unicidad), relanzarlo
-            raise HTTPException(status_code=500, detail="Error de integridad de base de datos al crear el grupo.")
+            raise HTTPException(status_code=500, detail="Error de integridad de base de datos al crear la sección.")
 
 def update_grupo(db: Session, grupo_id: int, grupo_update: schemas.GrupoUpdate) -> Optional[models.Grupo]:
     """

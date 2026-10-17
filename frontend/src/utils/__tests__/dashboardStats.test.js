@@ -63,9 +63,9 @@ describe('distribucionPorMateria', () => {
     expect(distribucionPorMateria(eventos)[0].color).toBe('#6366f1');
   });
 
-  it('usa "Materia no asignada" cuando falta extendedProps.materia', () => {
+  it('usa "Unidad curricular no asignada" cuando falta extendedProps.materia', () => {
     const eventos = [{ extendedProps: {} }];
-    expect(distribucionPorMateria(eventos)).toEqual([{ materia: 'Materia no asignada', count: 1, color: '#6366f1' }]);
+    expect(distribucionPorMateria(eventos)).toEqual([{ materia: 'Unidad curricular no asignada', count: 1, color: '#6366f1' }]);
   });
 
   it('respeta listas vacias o indefinidas', () => {
@@ -109,7 +109,24 @@ describe('resumenConflictos', () => {
     };
     const res = resumenConflictos(preCheck, null);
     expect(res.nivel).toBe('warn');
-    expect(res.items.some(i => i.label === 'Lecciones sin candidatos')).toBe(true);
+    expect(res.items.some(i => i.label === 'Clases sin candidatos')).toBe(true);
+  });
+
+  it('warn por clases_sin_slots (sesiones sin corridas suficientes)', () => {
+    const preCheck = { ...preCheckListo, clases_sin_slots: 2 };
+    const res = resumenConflictos(preCheck, null);
+    expect(res.nivel).toBe('warn');
+    const item = res.items.find(i => i.label === 'Clases sin espacios de sesión');
+    expect(item.mensaje).toContain('2 clase(s)');
+  });
+
+  it('warn por clases_periodo_incoherente (Sección de otro periodo)', () => {
+    const preCheck = { ...preCheckListo, clases_periodo_incoherente: 1 };
+    const res = resumenConflictos(preCheck, null);
+    expect(res.nivel).toBe('warn');
+    const item = res.items.find(i => i.label === 'Clases con periodo incoherente');
+    expect(item.mensaje).toContain('1 clase(s)');
+    expect(item.mensaje).toContain('otro periodo');
   });
 
   it('nivel "error" si el periodo no esta listo por falta de requisitos criticos', () => {
@@ -117,7 +134,7 @@ describe('resumenConflictos', () => {
     const res = resumenConflictos(preCheck, null);
     expect(res.nivel).toBe('error');
     const item = res.items.find(i => i.label === 'Periodo no listo para generar');
-    expect(item.mensaje).toContain('no hay lecciones activas');
+    expect(item.mensaje).toContain('no hay clases activas');
   });
 
   it('nivel "error" si la ultima generacion fallo', () => {

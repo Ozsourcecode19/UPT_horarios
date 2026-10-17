@@ -10,7 +10,7 @@ export default function useHorariosExport({ listadoHorarios, filterType, filterV
   }, [sedes]);
 
   const descripcionFiltro = useMemo(() => {
-    const etiqueta = { aula: 'Aula', docente: 'Docente', grupo: 'Grupo' }[filterType] || filterType;
+    const etiqueta = { aula: 'Aula', docente: 'Docente', grupo: 'Sección' }[filterType] || filterType;
     let valor = filterValue;
     if (filterType === 'aula') {
       const aula = aulas.find(a => String(a.id) === String(filterValue));

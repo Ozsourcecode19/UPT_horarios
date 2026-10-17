@@ -15,9 +15,9 @@ export default function ConfirmDeleteModal({ materia, onConfirm, onCancel }) {
           </div>
 
           <div>
-            <h3 className="text-lg font-bold text-slate-800">¿Eliminar esta materia?</h3>
+            <h3 className="text-lg font-bold text-slate-800">¿Eliminar esta unidad curricular?</h3>
             <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-              Estás a punto de eliminar la materia <span className="font-semibold text-slate-700">{materia.nombre} ({materia.codigo})</span>. Cualquier relación de lección o disponibilidad asociada a esta materia podría quedar desvinculada. Esta acción no se puede deshacer.
+              Estás a punto de eliminar la unidad curricular <span className="font-semibold text-slate-700">{materia.nombre} ({materia.codigo})</span>. Cualquier relación de clase o disponibilidad asociada a esta unidad curricular podría quedar desvinculada. Esta acción no se puede deshacer.
             </p>
           </div>
 

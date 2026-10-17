@@ -12,6 +12,10 @@ from datetime import datetime, date, timedelta # Si se necesita comparar horas
 
 logger = logging.getLogger(__name__)
 
+# Etiquetas de presentación de turnos (los valores almacenados en BD/API
+# siguen siendo MATUTINO/VESPERTINO/NOCTURNO; solo cambian en mensajes al usuario).
+TURNOS_LABELS = {"MATUTINO": "Mañana", "VESPERTINO": "Tarde", "NOCTURNO": "Noche"}
+
 class ValidationResult(NamedTuple):
     """
     Resultado de la validación de un movimiento.
@@ -70,7 +74,7 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
             if bloque_ini < ven_ini or bloque_fin > ven_fin:
                 return ValidationResult(
                     False,
-                    f"El turno {grupo_mov.division} solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}.",
+                    f"El turno {TURNOS_LABELS.get(str(grupo_mov.division).upper(), grupo_mov.division)} solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}.",
                     "FUERA_VENTANA_DIVISION"
                 )
 
@@ -103,7 +107,7 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
         models.HabilitacionDocente.materia_id == materia_id
     ).first()
     if not habilitacion:
-        return ValidationResult(False, f"Docente no habilitado para la materia '{materia_id}'.", "UNQUALIFIED_TEACHER")
+        return ValidationResult(False, f"Docente no habilitado para la unidad curricular '{materia_id}'.", "UNQUALIFIED_TEACHER")
 
     # 4. Cruces de recursos (Docente, Grupo, Aula) en el bloque objetivo.
     # Exclusiones: fila propia (move) y/o todas las filas de la lección (manual).
@@ -122,7 +126,7 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
         return ValidationResult(False, "Conflicto: Docente ya tiene clase asignada en este bloque.", "CONFLICT_TEACHER")
 
     if q_base.filter(models.Leccion.grupo_id == grupo_id).first():
-        return ValidationResult(False, "Conflicto: Grupo ya tiene clase asignada en este bloque.", "CONFLICT_GROUP")
+        return ValidationResult(False, "Conflicto: La sección ya tiene clase asignada en este bloque.", "CONFLICT_GROUP")
 
     conflicto_aula = db_session.query(models.HorarioGenerado).filter(
         models.HorarioGenerado.estado == 'ACTIVO',
@@ -166,7 +170,7 @@ def validate_move(db_session: Session, horario_id: int, nuevo_bloque_id: Optiona
 
     leccion = db_session.query(models.Leccion).filter(models.Leccion.id == horario_actual.leccion_id).first()
     if not leccion:
-        return ValidationResult(False, "Lección asociada al horario no encontrada.", "LESSON_NOT_FOUND")
+        return ValidationResult(False, "Clase asociada al horario no encontrada.", "LESSON_NOT_FOUND")
 
     bloque_objetivo_id = nuevo_bloque_id if nuevo_bloque_id is not None else horario_actual.bloque_id
     aula_objetivo_id = nueva_aula_id if nueva_aula_id is not None else horario_actual.aula_id

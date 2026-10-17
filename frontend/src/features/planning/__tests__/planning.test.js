@@ -116,6 +116,8 @@ describe('defaults y payloads', () => {
       prioridad: 5,
       sede_forzada_id: null,
       activo: true,
+      bloques_por_sesion: 1,
+      sesiones_semana: 1,
     });
   });
 
@@ -139,6 +141,24 @@ describe('defaults y payloads', () => {
     const l = leccionSchema.parse(toPayloadLeccion({ docente_id: 1, grupo_id: 2, materia_id: 3, horas_semanales: 6, prioridad: 8, sede_forzada_id: null, periodo_id: 1 }));
     expect(l.activo).toBe(true);
     expect(() => leccionSchema.parse({ ...l, horas_semanales: 99 })).toThrow();
+  });
+
+  it('toPayloadLeccion convierte N y M a número con default 1', () => {
+    const p = toPayloadLeccion({ docente_id: 1, grupo_id: 2, materia_id: 3, horas_semanales: 4, prioridad: 5, sede_forzada_id: null, periodo_id: 1, bloques_por_sesion: '2', sesiones_semana: '3' });
+    expect(p.bloques_por_sesion).toBe(2);
+    expect(p.sesiones_semana).toBe(3);
+    const sinCampos = toPayloadLeccion({ docente_id: 1, grupo_id: 2, materia_id: 3, horas_semanales: 4, prioridad: 5, sede_forzada_id: null, periodo_id: 1 });
+    expect(sinCampos.bloques_por_sesion).toBe(1);
+    expect(sinCampos.sesiones_semana).toBe(1);
+  });
+
+  it('leccionSchema acepta N/M en 1..20 y rechaza fuera de rango', () => {
+    const base = toPayloadLeccion({ docente_id: 1, grupo_id: 2, materia_id: 3, horas_semanales: 4, prioridad: 5, sede_forzada_id: null, periodo_id: 1, bloques_por_sesion: 2, sesiones_semana: 4 });
+    const l = leccionSchema.parse(base);
+    expect(l.bloques_por_sesion).toBe(2);
+    expect(l.sesiones_semana).toBe(4);
+    expect(() => leccionSchema.parse({ ...l, bloques_por_sesion: 0 })).toThrow();
+    expect(() => leccionSchema.parse({ ...l, sesiones_semana: 21 })).toThrow();
   });
 });
 

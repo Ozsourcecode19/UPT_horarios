@@ -30,10 +30,10 @@ export default function AnalyticsPanels({ cargaPorDocente, distribucionMaterias,
       </div>
 
       <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <h3 className="text-xl font-bold text-slate-800 mb-1">Distribución por Materia</h3>
+        <h3 className="text-xl font-bold text-slate-800 mb-1">Distribución por Unidad Curricular</h3>
         <p className="text-sm text-slate-400 mb-6">Clases asignadas en el periodo vigente.</p>
         {distribucionMaterias.length === 0 ? (
-          <p className="text-sm text-slate-400 py-8 text-center">Sin materias asignadas todavía.</p>
+          <p className="text-sm text-slate-400 py-8 text-center">Sin unidades curriculares asignadas todavía.</p>
         ) : (
           <ul className="space-y-3">
             {distribucionMaterias.map(({ materia, count, color }) => (

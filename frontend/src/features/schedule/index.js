@@ -11,6 +11,7 @@ export {
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
 } from './utils/schedule';
 export { validateMoveMock } from './utils/scheduleValidation';
+export { agruparSesiones, resolverRun } from './utils/sesiones';
 
 // Hooks
 export { default as useScheduleGeneration } from './hooks/useScheduleGeneration';

@@ -40,6 +40,13 @@ class ScheduleGenerator:
         # CORREGIDO: Declarar y tipar assignment_vars explícitamente en __init__
         # Usar Any para el valor si BoolVar da problemas con el IDE
         self.assignment_vars: Dict[tuple, Any] = {}
+        # Sesiones candidatas: (leccion_id, bloque_inicio) -> [bloque_ids] de la
+        # corrida (run) de bloques contiguos que compone esa sesión.
+        self.run_blocks: Dict[tuple, list] = {}
+        # Clases omitidas del modelo (sin sede, sin candidatos o con menos
+        # corridas posibles que sesiones_semana). Se elevan al estado de la
+        # generación para que "DONE count=0" nunca sea silencioso (R1).
+        self.omitidas: list = []
 
         # Parámetros de configuración (cargar desde la tabla configuracion)
         self.config = self._load_config_from_db()
@@ -83,11 +90,77 @@ class ScheduleGenerator:
         except (ValueError, TypeError):
             return default
 
+    # --- Utilidades de sesiones (corridas de N bloques) --------------------
+
+    @staticmethod
+    def _fin_bloque(bloque) -> time:
+        """Hora de fin (start + duración) de un bloque."""
+        return (datetime.combine(date.min, bloque.hora_inicio)
+                + timedelta(minutes=bloque.duracion_minutos)).time()
+
+    @staticmethod
+    def _corridas_de_bloques(bloques_ordenados, n):
+        """
+        Devuelve [(bloque_inicio, [bloque_ids])] con todas las corridas
+        (runs) de exactamente `n` bloques contiguos (uno tras otro, sin
+        huecos) dentro de una cadena ordenada de un mismo día.
+
+        Enumeración lineal (dos punteros): una cadena de L bloques produce
+        L - n + 1 corridas (R2: sin búsqueda exponencial por N).
+        """
+        corridas = []
+        cadena = []
+
+        def _emitir(cadena_):
+            for i in range(len(cadena_) - n + 1):
+                run = cadena_[i:i + n]
+                corridas.append((run[0], [b.id for b in run]))
+
+        for b in bloques_ordenados:
+            if cadena and ScheduleGenerator._fin_bloque(cadena[-1]) != b.hora_inicio:
+                _emitir(cadena)
+                cadena = []
+            cadena.append(b)
+        if cadena:
+            _emitir(cadena)
+        return corridas
+
+    def _docente_disponible_en_bloque(self, disp_por_docente: Dict[int, list], docente_id: int, bloque) -> bool:
+        """
+        Mismo criterio que el modelo previo (1 bloque = 1 sesión): la ventana
+        NO_DISPONIBLE debe cubrir el bloque completo; si existen ventanas
+        DISPONIBLE explícitas, alguna debe cubrirlo.
+        """
+        doc_disps = disp_por_docente.get(docente_id, [])
+        disponibles_explicit = [d for d in doc_disps if d.tipo_disponibilidad == 'DISPONIBLE']
+        no_disponibles = [d for d in doc_disps if d.tipo_disponibilidad == 'NO_DISPONIBLE']
+
+        disp_bloque_inicio = bloque.hora_inicio
+        disp_bloque_fin = self._fin_bloque(bloque)
+
+        is_blocked = any(
+            d.dia_semana == bloque.dia_semana and
+            d.hora_inicio <= disp_bloque_inicio and
+            d.hora_fin >= disp_bloque_fin
+            for d in no_disponibles
+        )
+        if disponibles_explicit:
+            is_in_available = any(
+                d.dia_semana == bloque.dia_semana and
+                d.hora_inicio <= disp_bloque_inicio and
+                d.hora_fin >= disp_bloque_fin
+                for d in disponibles_explicit
+            )
+        else:
+            is_in_available = True
+        return (not is_blocked) and is_in_available
+
     def start_generation(self, periodo_academico_id: int):
         """
         Inicia la generación de horarios para un periodo académico específico.
         Este método coordina la carga de datos, construcción del modelo,
-        resolución y guardado de resultados.
+        resolución y guardado de resultados. Devuelve la lista de clases
+        omitidas del modelo (R1: se reportan en el estado de generación).
         """
         self.logger.info(f"Iniciando generación de horarios para periodo ID: {periodo_academico_id}") # Usar self.logger
         try:
@@ -95,6 +168,7 @@ class ScheduleGenerator:
             status = self.solver.Solve(self.model) # status es de tipo cp_model.CpSolverStatus
             # CORREGIDO: Pasar status (CpSolverStatus) directamente
             self._save_results_if_feasible(status, periodo_academico_id)
+            return list(self.omitidas)
         except Exception as e:
             self.logger.error(f"Error fatal durante la generación de horarios para periodo {periodo_academico_id}: {e}") # Usar self.logger
             raise # Re-lanzar para que el endpoint lo capture y devuelva un error HTTP 500
@@ -183,139 +257,122 @@ class ScheduleGenerator:
         ).all()
         habil_map = {(h.docente_id, h.materia_id): True for h in habilitaciones}
 
-        # 3. Crear variables de decisión (Booleanas: Leccion-Lugar-Tiempo)
-        # La variable x[l_id][b_id][a_id] es True si la leccion l_id se asigna al bloque b_id en la aula a_id
-        assignment_vars_local = {} # Dict[(leccion_id, bloque_id, aula_id), Any]
+        # 3. Crear variables de decisión: una SESIÓN es una corrida (run) de
+        # N = leccion.bloques_por_sesion bloques contiguos en un mismo día.
+        # La variable y[(leccion_id, bloque_inicio, aula_id)] = 1 significa que
+        # la lección ocupa esa sesión en esa aula.
+        assignment_vars_local: Dict[tuple, Any] = {}
+        # Cobertura (recurso, bloque) -> [vars]: una corrida cubre N bloques,
+        # por lo que los conflictos se evalúan sobre cada bloque cubierto.
+        vars_por_docente_bloque: Dict[tuple, list] = {}
+        vars_por_grupo_bloque: Dict[tuple, list] = {}
+        vars_por_aula_bloque: Dict[tuple, list] = {}
+        self.run_blocks = {}
+        self.omitidas = []
+
+        # Bloques candidatos por día (ya filtrados por jornada/laborables)
+        bloques_por_dia: Dict[int, list] = {}
+        for b in bloques:
+            if b.dia_semana in dias_disponibles:
+                bloques_por_dia.setdefault(b.dia_semana, []).append(b)
+        for dia in bloques_por_dia:
+            bloques_por_dia[dia].sort(key=lambda x: (x.hora_inicio, x.orden_visual))
+
         for leccion in lecciones:
+            n = leccion.bloques_por_sesion or 1
+            m = leccion.sesiones_semana or 1
             leccion_sede = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
             if leccion_sede is None:
                 self.logger.warning(f"Lección {leccion.id}: no se pudo determinar su sede; se omite (no tendrá candidatos).")
+                self.omitidas.append({"leccion_id": leccion.id, "motivo": "sin sede definida"})
                 continue
-            # Determinar la ventana horaria para este grupo (intersección jornada global ∩ ventana turno)
+
+            # Habilitación (constante por lección): sin ella no hay corridas.
+            if not habil_map.get((leccion.docente_id, leccion.materia_id), False):
+                self.logger.warning(
+                    f"Lección {leccion.id} (docente {leccion.docente_id}, materia {leccion.materia_id}): "
+                    f"docente no habilitado; se omite del modelo."
+                )
+                self.omitidas.append({"leccion_id": leccion.id, "motivo": "docente no habilitado"})
+                continue
+
+            # Ventana horaria de la división del grupo
             grupo_div = grupo_division.get(leccion.grupo_id)
             ventana_turno = ventana_por_turno.get(f'ventana_{str(grupo_div).lower()}')
             if ventana_turno is None:
                 self.logger.warning(f"Lección {leccion.id}: ventana de turno {grupo_div} no configurada; usando jornada global.")
+            ven_inicio = ven_fin = None
+            if ventana_turno:
+                ven_inicio = datetime.strptime(ventana_turno['hora_inicio'], '%H:%M:%S').time()
+                ven_fin = datetime.strptime(ventana_turno['hora_fin'], '%H:%M:%S').time()
+
+            # Bloques aptos de la lección: día laborable, sede coherente,
+            # dentro de la ventana del turno y con docente disponible.
+            por_dia: Dict[int, list] = {}
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
-                    continue # Saltar bloques en días no laborables
-                # Verificar si el bloque cae dentro de la ventana del turno
-                if ventana_turno:
-                    bloque_inicio = bloque.hora_inicio
-                    bloque_fin_dt = (datetime.combine(datetime.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
-                    ven_inicio = datetime.strptime(ventana_turno['hora_inicio'], '%H:%M:%S').time()
-                    ven_fin = datetime.strptime(ventana_turno['hora_fin'], '%H:%M:%S').time()
-                    # El bloque debe empezar y terminar dentro de la ventana del turno
-                    if bloque_inicio < ven_inicio or bloque_fin_dt > ven_fin:
-                        continue # Bloque fuera de la ventana de este turno
-
-                # Verificar disponibilidad del docente para este bloque ANTES de
-                # crear la variable. Si no está disponible, no se crea la variable
-                # y AddExactlyOne no la incluirá (evita INFEASIBLE por vars→0).
-                doc_disps = disp_por_docente.get(leccion.docente_id, [])
-                disponibles_explicit = [d for d in doc_disps if d.tipo_disponibilidad == 'DISPONIBLE']
-                no_disponibles = [d for d in doc_disps if d.tipo_disponibilidad == 'NO_DISPONIBLE']
-
-                disp_bloque_inicio = bloque.hora_inicio
-                disp_bloque_fin = (datetime.combine(date.min, bloque.hora_inicio) + timedelta(minutes=bloque.duracion_minutos)).time()
-
-                is_blocked = any(
-                    d.dia_semana == bloque.dia_semana and
-                    d.hora_inicio <= disp_bloque_inicio and
-                    d.hora_fin >= disp_bloque_fin
-                    for d in no_disponibles
-                )
-                if disponibles_explicit:
-                    is_in_available = any(
-                        d.dia_semana == bloque.dia_semana and
-                        d.hora_inicio <= disp_bloque_inicio and
-                        d.hora_fin >= disp_bloque_fin
-                        for d in disponibles_explicit
-                    )
-                else:
-                    is_in_available = True
-                if is_blocked or not is_in_available:
-                    continue # Docente no disponible en este bloque
-
-                # Verificar habilitación docente-materia ANTES de crear la variable
-                if not habil_map.get((leccion.docente_id, leccion.materia_id), False):
-                    continue # Docente no habilitado para esta materia
-
-                for aula in aulas:
-                    # Restricción de consistencia de Sede (requisito estricto del trigger
-                    # PL/pgSQL fn_validar_sede_horario): Aula, Bloque y Lección deben
-                    # pertenecer a la misma sede. Si el solver solo exigiera Aula==Bloque,
-                    # podría asignar una lección a una sede distinta de la suya y el
-                    # trigger rechazaría el INSERT dejando la generación en FAILED.
-                    if aula.sede_id != bloque.sede_id or aula.sede_id != leccion_sede:
+                    continue
+                if bloque.sede_id != leccion_sede:
+                    continue
+                if ven_inicio is not None:
+                    if bloque.hora_inicio < ven_inicio or self._fin_bloque(bloque) > ven_fin:
                         continue
+                if not self._docente_disponible_en_bloque(disp_por_docente, leccion.docente_id, bloque):
+                    continue
+                por_dia.setdefault(bloque.dia_semana, []).append(bloque)
 
-                    var_name = f"x_l{leccion.id}_b{bloque.id}_a{aula.id}"
-                    assignment_vars_local[(leccion.id, bloque.id, aula.id)] = self.model.NewBoolVar(var_name)
+            # Corridas de N bloques contiguos por día (enumeración lineal)
+            corridas = []
+            for dia, lista in por_dia.items():
+                corridas.extend(self._corridas_de_bloques(lista, n))
+
+            # R1: si no alcanza para M sesiones, se omite y se reporta (nunca
+            # fuerza INFEASIBLE global ni un "DONE count=0" silencioso).
+            if len(corridas) < m:
+                motivo = (f"solo {len(corridas)} corrida(s) de {n} bloque(s) "
+                          f"disponible(s) para {m} sesiones/semana")
+                self.logger.warning(f"Lección {leccion.id}: {motivo}; se omite del modelo.")
+                self.omitidas.append({"leccion_id": leccion.id, "motivo": motivo})
+                continue
+
+            aulas_sede = [a for a in aulas if a.sede_id == leccion_sede]
+            vars_leccion = []
+            for (bloque_inicio, bloque_ids) in corridas:
+                vars_corrida = []
+                for aula in aulas_sede:
+                    var = self.model.NewBoolVar(f"y_l{leccion.id}_b{bloque_inicio.id}_a{aula.id}")
+                    assignment_vars_local[(leccion.id, bloque_inicio.id, aula.id)] = var
+                    vars_corrida.append(var)
+                    vars_leccion.append(var)
+                    for bid in bloque_ids:
+                        vars_por_docente_bloque.setdefault((leccion.docente_id, bid), []).append(var)
+                        vars_por_grupo_bloque.setdefault((leccion.grupo_id, bid), []).append(var)
+                        vars_por_aula_bloque.setdefault((aula.id, bid), []).append(var)
+                # Cada corrida se ocupa a lo sumo en un aula
+                if len(vars_corrida) > 1:
+                    self.model.AddAtMostOne(vars_corrida)
+                self.run_blocks[(leccion.id, bloque_inicio.id)] = bloque_ids
+
+            # 4a. Exactamente M sesiones por semana para esta lección
+            if len(vars_leccion) > 1:
+                self.model.Add(sum(vars_leccion) == m)
+            elif vars_leccion:
+                self.model.Add(vars_leccion[0] == 1)
 
         # Asignar el diccionario local al atributo de la instancia
         self.assignment_vars = assignment_vars_local
 
-        # 4. Agregar Restricciones Duras
-        # a. Cada lección debe ser asignada exactamente una vez
-        for leccion in lecciones:
-            vars_for_lesson = [self.assignment_vars[(leccion.id, b.id, a.id)]
-                               for b in bloques if b.dia_semana in dias_disponibles
-                               for a in aulas
-                               if (leccion.id, b.id, a.id) in self.assignment_vars]
-            if vars_for_lesson:
-                self.model.AddExactlyOne(vars_for_lesson)
-            else:
-                self.logger.warning(
-                    f"Lección {leccion.id} (docente {leccion.docente_id}, "
-                    f"grupo {leccion.grupo_id}, materia {leccion.materia_id}): "
-                    f"0 candidatos disponibles (sede/ventana/disponibilidad/habilitación). "
-                    f"Se omite del modelo."
-                )
-
-        # b. Unicidad Docente/Grupo/Aula en (día, bloque)
-        # Docente: un docente puede estar en UN solo lugar (aula) por bloque
-        for docente in docentes:
-            lecciones_docente = [l for l in lecciones if l.docente_id == docente.id]
-            for bloque in bloques:
-                if bloque.dia_semana not in dias_disponibles:
-                    continue
-                vars_for_conflict = [
-                    self.assignment_vars[(l.id, bloque.id, a.id)]
-                    for l in lecciones_docente
-                    for a in aulas
-                    if (l.id, bloque.id, a.id) in self.assignment_vars
-                ]
-                if len(vars_for_conflict) > 1:
-                    self.model.AddAtMostOne(vars_for_conflict)
-
-        # Grupo: un grupo puede estar en UN solo aula por bloque
-        for grupo in grupos:
-            lecciones_grupo = [l for l in lecciones if l.grupo_id == grupo.id]
-            for bloque in bloques:
-                if bloque.dia_semana not in dias_disponibles:
-                    continue
-                vars_for_conflict = [
-                    self.assignment_vars[(l.id, bloque.id, a.id)]
-                    for l in lecciones_grupo
-                    for a in aulas
-                    if (l.id, bloque.id, a.id) in self.assignment_vars
-                ]
-                if len(vars_for_conflict) > 1:
-                    self.model.AddAtMostOne(vars_for_conflict)
-
-        # Aula
-        for aula in aulas:
-            lecciones_posibles_en_aula = [l for l in lecciones] # Todas las lecciones podrían ir aquí
-            for bloque in bloques:
-                if bloque.dia_semana not in dias_disponibles:
-                    continue
-                # CORREGIDO: Usar self.assignment_vars
-                vars_for_conflict = [self.assignment_vars[(l.id, bloque.id, aula.id)] # <-- Ahora usa self.assignment_vars
-                                     for l in lecciones_posibles_en_aula
-                                     if (l.id, bloque.id, aula.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
-                if len(vars_for_conflict) > 1:
-                    self.model.AddAtMostOne(vars_for_conflict)
+        # 4b. Unicidad Docente/Grupo/Aula en cada bloque CUBIERTO por una
+        # sesión (la corrida de N bloques ocupa esos N bloques completos).
+        for vars_conflicto in vars_por_docente_bloque.values():
+            if len(vars_conflicto) > 1:
+                self.model.AddAtMostOne(vars_conflicto)
+        for vars_conflicto in vars_por_grupo_bloque.values():
+            if len(vars_conflicto) > 1:
+                self.model.AddAtMostOne(vars_conflicto)
+        for vars_conflicto in vars_por_aula_bloque.values():
+            if len(vars_conflicto) > 1:
+                self.model.AddAtMostOne(vars_conflicto)
 
         # 5. (Opcional) Agregar Restricciones Blandas (Función Objetivo)
         # a. Penalizar huecos (gaps) para docentes
@@ -331,11 +388,9 @@ class ScheduleGenerator:
                 # Variables para cada bloque de este día para este docente
                 vars_por_dia_bloque = {}
                 for bloque in bloques_del_dia:
-                     # CORREGIDO: Usar self.assignment_vars
-                     vars_list = [self.assignment_vars[(l.id, bloque.id, a.id)] # <-- Ahora usa self.assignment_vars
-                                  for l in lecciones_docente # <-- Usar la lista filtrada
-                                  for a in aulas
-                                  if (l.id, bloque.id, a.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
+                     # Cobertura por corridas: true si alguna sesión del docente
+                     # cubre este bloque
+                     vars_list = vars_por_docente_bloque.get((docente.id, bloque.id), [])
                      # Suma de asignaciones en este bloque para este docente
                      vars_por_dia_bloque[bloque.id] = self.model.NewBoolVar(f"doc_{docente.id}_dia_{dia}_blk_{bloque.id}_assigned")
                      if vars_list:
@@ -360,24 +415,10 @@ class ScheduleGenerator:
                                 self.model.Add(vars_por_dia_bloque[blk_id_intermedio] + gap_var == 1)
                                 self.model.Minimize(gap_var * gap_weight)
 
-        # b. Compactación (preferir bloques consecutivos para la misma lección)
-        compact_weight = self.config.get("soft_constraint_compact_weight", 5)
-        for leccion in lecciones:
-            # Obtener variables de asignación para esta lección
-            # CORREGIDO: Usar self.assignment_vars
-            lesson_assignment_vars = [self.assignment_vars[(leccion.id, b.id, a.id)] # <-- Ahora usa self.assignment_vars
-                                      for b in bloques if b.dia_semana in dias_disponibles
-                                     for a in aulas
-                                     if (leccion.id, b.id, a.id) in self.assignment_vars] # <-- Ahora usa self.assignment_vars
-
-            # Simplificación: penalizar la dispersión general de la lección (no solo consecutividad estricta)
-            # Se puede mejorar esta métrica
-            if len(lesson_assignment_vars) > 1:
-                # Por ejemplo, minimizar la suma de las diferencias de orden_visual de bloques asignados
-                # Esto es complejo. Una aproximación más simple es penalizar tener muchas asignaciones
-                # y favorecer tener pocas asignaciones de bloques largos (si se implementa duración variable por lección).
-                # Por ahora, omitiremos esta penalización específica o la dejamos como mejora futura.
-                pass # Placeholder para lógica de compactación más avanzada
+        # b. Compactación: ya no aplica — cada sesión es una corrida contigua
+        # por diseño (las variables y representan runs de N bloques), así que
+        # no hay dispersión que penalizar para la misma lección.
+        _ = self.config.get("soft_constraint_compact_weight", 5)  # se conserva en config (futuro)
 
 
     def _archive_previous_schedules(self, periodo_id: int):
@@ -432,49 +473,46 @@ class ScheduleGenerator:
             # Calcular la siguiente versión de horario para el periodo
             version_horario = self._next_version_horario(periodo_id)
             self.logger.info(f"Guardando nueva asignación de horarios (versión {version_horario}) en la base de datos...")
-            # CORREGIDO: Obtener los objetos de bloques y aulas, no solo IDs
-            # Cargar instancias completas para facilitar el acceso a atributos
+            # CORREGIDO: Obtener los objetos de bloques, no solo IDs
             bloques_db = {b.id: b for b in self.db.query(models.BloqueHorario).all()}
-            aulas_db = {a.id: a for a in self.db.query(models.Aula).all()}
 
             # CORREGIDO: Iterar sobre self.assignment_vars
-            for (leccion_id, bloque_id, aula_id), var in self.assignment_vars.items(): # <-- Ahora usa self.assignment_vars
+            for (leccion_id, bloque_inicio_id, aula_id), var in self.assignment_vars.items(): # <-- Ahora usa self.assignment_vars
                 # CORREGIDO: Usar self.solver.Value
                 if self.solver.Value(var) == 1: # Si la variable es verdadera, la asignación es parte de la solución
-                    # CORREGIDO: Acceder a los objetos de la base de datos
-                    bloque = bloques_db[bloque_id]
-                    aula = aulas_db[aula_id]
-
-                    # CORREGIDO: Calcular hora_fin usando valores de objeto, no columnas
-                    # Accede a los **valores** del objeto SQLAlchemy
-                    # CORREGIDO: Acceder al valor del objeto SQLAlchemy para combine y timedelta
-                    hora_inicio_valor: time = bloque.hora_inicio
-                    duracion_minutos_valor: int = bloque.duracion_minutos
-
-                    hora_inicio_datetime = datetime.combine(date.min, hora_inicio_valor)
-                    hora_fin_datetime = hora_inicio_datetime + timedelta(minutes=duracion_minutos_valor)
-                    hora_fin_valor: time = hora_fin_datetime.time()
+                    # Una sesión seleccionada inserta UNA FILA POR BLOQUE de su
+                    # corrida (run de N bloques consecutivos).
+                    bloque_ids_run = self.run_blocks.get((leccion_id, bloque_inicio_id), [bloque_inicio_id])
 
                     # CORREGIDO: Usar timezone-aware para created_at y updated_at
                     now_utc = datetime.now(timezone.utc)
 
-                    # Crear entrada en HorarioGenerado
-                    new_horario = models.HorarioGenerado(
-                        leccion_id=leccion_id,
-                        aula_id=aula_id,
-                        bloque_id=bloque_id,
-                        # CORREGIDO: Asignar valores calculados o del objeto, no columnas
-                        dia_semana=bloque.dia_semana,
-                        hora_inicio=hora_inicio_valor,
-                        hora_fin=hora_fin_valor,
-                        estado='ACTIVO',
-                        version_horario=version_horario,
-                        periodo_id=periodo_id,
-                        created_at=now_utc,
-                        updated_at=now_utc,
-                        created_by=None
-                    )
-                    self.db.add(new_horario)
+                    for bloque_id in bloque_ids_run:
+                        bloque = bloques_db[bloque_id]
+
+                        # CORREGIDO: Calcular hora_fin usando valores de objeto, no columnas
+                        hora_inicio_valor: time = bloque.hora_inicio
+                        hora_inicio_datetime = datetime.combine(date.min, hora_inicio_valor)
+                        hora_fin_datetime = hora_inicio_datetime + timedelta(minutes=bloque.duracion_minutos)
+                        hora_fin_valor: time = hora_fin_datetime.time()
+
+                        # Crear entrada en HorarioGenerado
+                        new_horario = models.HorarioGenerado(
+                            leccion_id=leccion_id,
+                            aula_id=aula_id,
+                            bloque_id=bloque_id,
+                            # CORREGIDO: Asignar valores calculados o del objeto, no columnas
+                            dia_semana=bloque.dia_semana,
+                            hora_inicio=hora_inicio_valor,
+                            hora_fin=hora_fin_valor,
+                            estado='ACTIVO',
+                            version_horario=version_horario,
+                            periodo_id=periodo_id,
+                            created_at=now_utc,
+                            updated_at=now_utc,
+                            created_by=None
+                        )
+                        self.db.add(new_horario)
 
             self.db.commit()
             self.logger.info(f"Solución guardada exitosamente para periodo {periodo_id}.") # Usar self.logger
@@ -486,8 +524,9 @@ class ScheduleGenerator:
 def start_generation(db_session: Session, periodo_academico_id: int):
     """
     Función de conveniencia para iniciar el proceso de generación.
+    Devuelve la lista de clases omitidas del modelo (para el estado).
     """
     generator = ScheduleGenerator(db_session=db_session)
-    generator.start_generation(periodo_academico_id=periodo_academico_id)
+    return generator.start_generation(periodo_academico_id=periodo_academico_id)
 
 # --- Fin del servicio OR-Tools ---

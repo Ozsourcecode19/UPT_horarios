@@ -2,6 +2,7 @@
 // Cabecera visible solo al imprimir, identifica la entidad de la vista.
 // Incluye logo institucional, marca de agua de versión y footer.
 import { formatHora12 } from '../../../utils/timeFormat';
+import { TURNOS_LABELS } from '../../../constants';
 
 export default function PrintHeader({ selectedPeriodo, descripcionFiltro, filterType, itemSeleccionado, ventanaGrilla, sedesInfo }) {
   const fecha = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -29,7 +30,7 @@ export default function PrintHeader({ selectedPeriodo, descripcionFiltro, filter
         {/* Subtítulo adaptativo por tipo de filtro */}
         <p className="text-[10px] text-slate-600 mt-0.5">
           {filterType === 'grupo' && itemSeleccionado?.division
-            ? `Turno ${itemSeleccionado.division} · ${formatHora12(ventanaGrilla.inicio.slice(0, 5))}–${formatHora12(ventanaGrilla.fin.slice(0, 5))}`
+            ? `Turno ${TURNOS_LABELS[itemSeleccionado.division] ?? itemSeleccionado.division} · ${formatHora12(ventanaGrilla.inicio.slice(0, 5))}–${formatHora12(ventanaGrilla.fin.slice(0, 5))}`
             : `Jornada general · ${formatHora12(ventanaGrilla.inicio.slice(0, 5))}–${formatHora12(ventanaGrilla.fin.slice(0, 5))}`}
           {' · '}Generado: {fecha}
         </p>

@@ -97,6 +97,8 @@ export const MOCK_HORARIOS_INICIALES = [
       leccion_id: 1,
       aula_id: 1,
       bloque_id: 1,
+      bloques_por_sesion: 1,
+      sesiones_semana: 1,
       periodo_id: 1
     }
   },
@@ -117,6 +119,31 @@ export const MOCK_HORARIOS_INICIALES = [
       leccion_id: 3,
       aula_id: 2,
       bloque_id: 2,
+      bloques_por_sesion: 2,
+      sesiones_semana: 1,
+      periodo_id: 1
+    }
+  },
+  {
+    // Segunda fila de la sesión de 2 bloques de Bases de Datos I (demo de sesiones)
+    id: 21,
+    title: "Bases de Datos I - Rodríguez, María (cont.)",
+    start: "2026-06-29T09:15:00",
+    end: "2026-06-29T10:00:00",
+    resourceId: "aula_2",
+    extendedProps: {
+      grupo: "Sección A - Informática",
+      docente: "Rodríguez, María",
+      materia: "Bases de Datos I",
+      materia_codigo: "BD-103",
+      backgroundColor: "#10B981",
+      aula: "Aula 102",
+      sede: "Sede Principal",
+      leccion_id: 3,
+      aula_id: 2,
+      bloque_id: 3,
+      bloques_por_sesion: 2,
+      sesiones_semana: 1,
       periodo_id: 1
     }
   },
@@ -137,6 +164,8 @@ export const MOCK_HORARIOS_INICIALES = [
       leccion_id: 2,
       aula_id: 1,
       bloque_id: 8,
+      bloques_por_sesion: 1,
+      sesiones_semana: 1,
       periodo_id: 1
     }
   },
@@ -157,6 +186,8 @@ export const MOCK_HORARIOS_INICIALES = [
       leccion_id: 4,
       aula_id: 3,
       bloque_id: 19,
+      bloques_por_sesion: 1,
+      sesiones_semana: 1,
       periodo_id: 1
     }
   }

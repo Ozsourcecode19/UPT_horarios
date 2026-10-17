@@ -12,6 +12,8 @@ class Leccion(Base):
     grupo_id = Column(Integer, ForeignKey("grupos.id"), nullable=False)
     materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
     horas_semanales = Column(Integer, default=2)
+    bloques_por_sesion = Column(Integer, default=1)  # N: bloques consecutivos de cada sesión
+    sesiones_semana = Column(Integer, default=1)     # M: sesiones de la clase por semana
     prioridad = Column(Integer, default=0)
     activo = Column(Boolean, default=True)
     sede_forzada_id = Column(Integer, ForeignKey("sedes.id")) # Puede ser NULL
