@@ -154,4 +154,12 @@ describe('resumenConflictos', () => {
     expect(res.nivel).toBe('warn');
     expect(res.items.some(i => i.label === 'No se ha generado')).toBe(true);
   });
+
+  it('NONE (tracker vacío) se trata como "sin generar", no como estado', () => {
+    // 200 + NONE reemplazó al 404: no debe pintar "Generación en curso" ni nada
+    const conCheck = resumenConflictos(preCheckListo, { status: 'NONE' });
+    expect(conCheck.items.some(i => i.label === 'No se ha generado')).toBe(true);
+    const sinCheck = resumenConflictos(null, { status: 'NONE' });
+    expect(sinCheck.nivel).toBe('sin-datos');
+  });
 });

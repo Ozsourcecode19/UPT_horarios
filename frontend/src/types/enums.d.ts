@@ -38,7 +38,7 @@ export type DuracionBloque = 30 | 45 | 60 | 90 | 120
 export type DiaSemana = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 /** Estado del tracker de generación */
-export type GenerationStatusType = 'PENDING' | 'DONE' | 'FAILED'
+export type GenerationStatusType = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
 
 /** Modo del generador de bloques estándar */
 export type ModoGeneracionBloques = 'completar' | 'reemplazar'

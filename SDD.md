@@ -406,9 +406,9 @@ sequenceDiagram
 | POST/PUT/DELETE | `/disponibilidades-docentes/` | ADMIN/JEFE-PNF/**DOCENTE** | Disponibilidad (el docente gestiona la suya). |
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
 | POST | `/schedules/generate?periodo_id=` | ADMIN/JEFE-PNF | Dispara generación asíncrona (202). |
-| GET | `/schedules/generation-status?periodo_id=` | Autenticado | Estado de generación (PENDING/DONE/FAILED + count). |
+| GET | `/schedules/generation-status?periodo_id=` | Autenticado | Estado de generación (`NONE` si el tracker en memoria está vacío —tras reinicio o antes de la primera generación—, `PENDING/DONE/FAILED` + count). **200 siempre; sin 404.** |
 | GET | `/schedules/pre-generation-check?periodo_id=` | Autenticado | Checklist de prerequisitos para generar (E2). |
-| GET | `/schedules/versions?periodo_id=` | Autenticado | Lista versiones de horario del periodo (E4). |
+| GET | `/schedules/versions?periodo_id=` | Autenticado | Lista versiones de horario del periodo (E4). Lista vacía si no hay; **200, sin 404.** |
 | POST | `/schedules/restore` | ADMIN/JEFE-PNF | Restaura versión de horario (ACTIVO actual→HISTORICO, objetivo→ACTIVO) (E4). |
 | GET | `/schedules/fullcalendar?periodo_id=` | Autenticado | Horarios en formato eventos (backend calcula start/end/día; frontend renderiza en grilla nativa). |
 | POST | `/schedules/validate-move` | ADMIN/JEFE-PNF | Valida movimiento drag & drop. |

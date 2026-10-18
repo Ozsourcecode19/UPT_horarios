@@ -63,8 +63,12 @@ export const useGenerationPolling = ({
       attempts++;
       try {
         const status = await scheduleService.getGenerationStatus(periodoId);
+        // NONE: el tracker aún no registra la tarea (ventana entre el 202 del
+        // POST /generate y el arranque del BackgroundTask, o reinicio del
+        // proceso) → se sigue esperando, como antes con el 404.
+        const etiqueta = status.status === 'NONE' ? 'ESPERANDO' : status.status;
         const countLabel = status.count != null ? ` · ${status.count} horarios` : '';
-        callbacksRef.current.onStatus(`Estado: ${status.status}${countLabel} (intento ${attempts}/${maxAttempts})`, status, attempts);
+        callbacksRef.current.onStatus(`Estado: ${etiqueta}${countLabel} (intento ${attempts}/${maxAttempts})`, status, attempts);
 
         // DONE: la generacion termino
         if (status.status === 'DONE') {
@@ -86,7 +90,8 @@ export const useGenerationPolling = ({
           callbacksRef.current.onSettled({ tipo: 'PENDING_TIMEOUT', status, attempts });
         }
       } catch (err) {
-        // 404 = la tarea aun no registra estado en el tracker: seguir esperando
+        // El backend ya no responde 404 por tracker vacío (200 + NONE);
+        // aquí solo llegan errores reales (red/5xx): seguir hasta agotar
         if (attempts >= maxAttempts) {
           stop();
           callbacksRef.current.onSettled({ tipo: 'ERROR', error: err, attempts });

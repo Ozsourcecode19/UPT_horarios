@@ -66,7 +66,7 @@ class ScheduleMoveRequest(BaseModel):
 # Schema para consultar el estado de una generación de horarios en segundo plano
 class GenerationStatus(BaseModel):
     periodo_id: int
-    status: str  # PENDING | DONE | FAILED
+    status: str  # NONE (sin registro en el tracker) | PENDING | DONE | FAILED
     count: Optional[int] = None
     message: Optional[str] = None
     timestamp: Optional[datetime] = None

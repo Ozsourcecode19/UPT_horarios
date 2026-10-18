@@ -52,7 +52,7 @@ def test_generation_status_requiere_autenticacion(engine):
         assert res.status_code == 401
 
 
-def test_generation_status_404_sin_estado(engine):
+def test_generation_status_none_sin_estado(engine):
     from fastapi.testclient import TestClient
     from main import app
 
@@ -72,8 +72,12 @@ def test_generation_status_404_sin_estado(engine):
                 params={"periodo_id": 1},
                 headers={"Authorization": f"Bearer {_token('admin_test')}"},
             )
-            assert res.status_code == 404
-            assert "No hay estado" in res.json()["detail"]
+            # 200 + NONE: el tracker vacío es un estado esperado (en memoria),
+            # no un recurso inexistente — evita 404 espurios en cada reinicio.
+            assert res.status_code == 200
+            body = res.json()
+            assert body["status"] == "NONE"
+            assert body["periodo_id"] == 1
     finally:
         app.dependency_overrides.pop(database.get_db, None)
         _limpiar_bd(engine)

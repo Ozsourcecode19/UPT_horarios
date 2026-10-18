@@ -107,9 +107,35 @@ describe('useGenerationPolling', () => {
     unmount();
   });
 
-  it('resuelve ERROR si el servicio rechaza (404) tras agotar intentos', async () => {
+  it('NONE (tracker vacío) sigue esperando y agota PENDING_TIMEOUT sin marcar ERROR', async () => {
+    // El backend ahora responde 200 + NONE en vez de 404 mientras el tracker
+    // no tenga la tarea: el ciclo debe seguir como con PENDING.
+    const service = makeService(async () => ({ status: 'NONE', count: null }));
+    const onStatus = vi.fn();
+    const onSettled = vi.fn();
+
+    const { result, unmount } = renderHook(() =>
+      useGenerationPolling({ scheduleService: service, ...OPCIONES, onStatus, onSettled })
+    );
+
+    act(() => { result.current.start(9); });
+    await advance(OPCIONES.intervalMs * OPCIONES.maxAttempts);
+
+    expect(service.getGenerationStatus).toHaveBeenCalledTimes(OPCIONES.maxAttempts);
+    // El texto de estado es amigable ("ESPERANDO"), no "NONE"
+    expect(onStatus).toHaveBeenNthCalledWith(1,
+      expect.stringContaining('ESPERANDO'),
+      expect.objectContaining({ status: 'NONE' }),
+      1
+    );
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(onSettled.mock.calls[0][0].tipo).toBe('PENDING_TIMEOUT');
+    unmount();
+  });
+
+  it('resuelve ERROR si el servicio rechaza (5xx/red) tras agotar intentos', async () => {
     const service = makeService(async () => {
-      throw Object.assign(new Error('Not Found'), { response: { status: 404 } });
+      throw Object.assign(new Error('Internal Server Error'), { response: { status: 500 } });
     });
     const onSettled = vi.fn();
 

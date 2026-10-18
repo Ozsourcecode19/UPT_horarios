@@ -104,7 +104,7 @@ export const resumenConflictos = (
     }
   }
 
-  if (generationStatus) {
+  if (generationStatus && generationStatus.status !== 'NONE') {
     if (generationStatus.status === 'FAILED') {
       add('error', 'Última generación fallida', generationStatus.message || 'La generación más reciente terminó en error.');
     } else if (generationStatus.status === 'DONE') {

@@ -73,12 +73,21 @@ def get_generation_status(periodo_id: int):
     """
     Consulta el estado de una generación de horarios previamente solicitada
     mediante POST /schedules/generate para el periodo académico indicado.
-    Devuelve el estado actual (PENDING, DONE o FAILED), el número de horarios
-    generados (si aplica) y un mensaje informativo.
+    Devuelve el estado actual: NONE si aún no hay registro en el tracker
+    (en memoria; vacío tras un reinicio del proceso o antes de la primera
+    generación), PENDING, DONE o FAILED; el número de horarios generados
+    (si aplica) y un mensaje informativo.
     """
     tracker_status = status_tracker.get_status(periodo_id)
     if tracker_status is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No hay estado de generación registrado para el periodo {periodo_id}. Dispara POST /schedules/generate primero.")
+        # 200 + NONE en vez de 404: el tracker está en memoria, así que estar
+        # "vacío" es un estado esperado y periódico (cada reinicio con
+        # --reload), no un recurso inexistente.
+        return schemas.GenerationStatus(
+            periodo_id=periodo_id,
+            status="NONE",
+            message="Sin generación registrada para este periodo (tracker vacío).",
+        )
     return schemas.GenerationStatus(**tracker_status)
 
 # Endpoint para consultar el checklist de prerequisitos antes de generar horarios
@@ -98,12 +107,10 @@ def get_schedule_versions(periodo_id: int, db: Session = Depends(get_db)):
     Devuelve las versiones de horario generadas para un periodo académico,
     con su estado (ACTIVO/HISTORICO), total de registros y fecha de generación.
     Permite consultar el historial y, junto a POST /schedules/restore, restaurar
-    una versión anterior.
+    una versión anterior. Un periodo sin generar devuelve lista vacía (200),
+    no un 404: "sin datos" ≠ "recurso inexistente".
     """
-    versiones = crud.get_versiones_horario(db, periodo_id=periodo_id)
-    if not versiones:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No hay versiones de horario registradas para el periodo {periodo_id}.")
-    return versiones
+    return crud.get_versiones_horario(db, periodo_id=periodo_id)
 
 # Endpoint para restaurar una versión de horario de un periodo académico (E4)
 @router.post("/restore", response_model=schemas.RestoreResult, summary="Restaurar versión de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
