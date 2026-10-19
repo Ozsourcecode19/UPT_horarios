@@ -211,6 +211,7 @@ const Horarios = () => {
   const closeMenuTimer = useRef(null);
   const printAreaRef = useRef(null);
   const segmentedRef = useRef(null);
+  const medidorRef = useRef(null);
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
@@ -218,27 +219,24 @@ const Horarios = () => {
   }, [isEditModalOpen, selectedEvent, listadoHorarios, bloques]);
 
   // Detecta si los botones del segmented "Ver Por" exceden el ancho del contenedor
-  // y, en ese caso, muestra solo los iconos (sin texto) para evitar desbordamiento en móvil
+  // y, en ese caso, muestra solo los iconos (sin texto) para evitar desbordamiento en móvil.
+  // Se mide un clon invisible SIEMPRE CON TEXTO (medidorRef), independiente del
+  // estado iconOnly, para evitar el bucle de realimentación del ResizeObserver.
   useEffect(() => {
     const container = segmentedRef.current;
     if (!container || TIPOS_VISTA.length === 0) return;
 
     const observer = new ResizeObserver(() => {
-      const parentWidth = container.parentElement?.clientWidth || 0;
-      let buttonsWidth = 0;
-      const buttons = container.querySelectorAll('button');
-      buttons.forEach(b => {
-        buttonsWidth += b.offsetWidth;
-      });
-      // gap-1 entre botones: (n-1) * 4px (1rem = 16px, gap-1 = 0.25rem = 4px)
-      const gapTotal = Math.max(0, buttons.length - 1) * 4;
-      const totalNeeded = buttonsWidth + gapTotal + 2; // +2 para padding del contenedor
-      setIconOnly(totalNeeded > parentWidth);
+      const disponible = container.clientWidth || 0;
+      const needed = medidorRef.current?.scrollWidth || 0;
+      // +4 px de margen anti-flicker para evitar oscilación en el borde exacto
+      setIconOnly(needed > disponible + 4);
     });
 
     observer.observe(container);
+    observer.observe(container.parentElement ?? document.body);
     return () => observer.disconnect();
-  }, [segmentedRef, TIPOS_VISTA.length]);
+  }, [segmentedRef, medidorRef, TIPOS_VISTA.length]);
 
   const bloqueSeleccionado = useBloqueSeleccionado(bloques, editBloqueId);
   const sedeAulaEdicion = useSedeAulaEdicion(aulas, editAulaId);
@@ -367,13 +365,22 @@ const Horarios = () => {
           )}
         </div>
         <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
-          <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="space-y-1.5 flex-1 min-w-0 relative">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
             <div ref={segmentedRef} className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
                 <button key={valor} onClick={() => setFilterType(valor)} title={etiqueta} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   <Icono className={`w-4 h-4 shrink-0 ${iconOnly ? 'mx-auto' : ''}`} />
                   {!iconOnly && <span className="truncate min-w-0">{etiqueta}</span>}
+                </button>
+              ))}
+            </div>
+            {/* Clon medidor: siempre con texto, fuera del flujo, para medir el ancho requerido sin depender del estado iconOnly */}
+            <div ref={medidorRef} className="absolute top-0 left-0 invisible whitespace-nowrap p-1" aria-hidden="true">
+              {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
+                <button key={valor} className="flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold shrink-0" tabIndex={-1}>
+                  <Icono className="w-4 h-4 shrink-0" />
+                  <span className="truncate min-w-0">{etiqueta}</span>
                 </button>
               ))}
             </div>
