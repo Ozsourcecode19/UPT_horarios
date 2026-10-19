@@ -3,6 +3,7 @@
 
 // Utils (lógica pura)
 export { calcularEstadisticas } from './utils/docentes';
+export { estadoEfectivoCelda, contarEstados } from './utils/disponibilidad';
 
 // Schemas
 export { docenteSchema } from './schemas';

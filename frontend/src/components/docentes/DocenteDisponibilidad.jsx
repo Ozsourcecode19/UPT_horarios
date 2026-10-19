@@ -11,6 +11,7 @@ import ConfiguracionesService from '../../api/configuraciones';
 import { FETCH_ALL_LIMIT } from '../../constants';
 import { DIAS_COMPLETOS } from '../../constants';
 import { DEBOUNCE_DELAY } from '../../constants';
+import { estadoEfectivoCelda, contarEstados } from '../../features/docentes/utils/disponibilidad';
 
 // 18 bloques estándar de 45 minutos (fallback de contingencia)
 const FALLBACK_BLOQUES_TIME = [
@@ -216,6 +217,10 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     mutationFn: DisponibilidadesService.createDisponibilidad,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disponibilidades', selectedDocenteId] });
+    },
+    onError: (err) => {
+      console.error(err);
+      showToast(err.response?.data?.detail || "Error al guardar la disponibilidad", "error");
     }
   });
 
@@ -223,6 +228,10 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     mutationFn: ({ id, data }) => DisponibilidadesService.updateDisponibilidad(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disponibilidades', selectedDocenteId] });
+    },
+    onError: (err) => {
+      console.error(err);
+      showToast(err.response?.data?.detail || "Error al actualizar la disponibilidad", "error");
     }
   });
 
@@ -230,6 +239,10 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     mutationFn: DisponibilidadesService.deleteDisponibilidad,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disponibilidades', selectedDocenteId] });
+    },
+    onError: (err) => {
+      console.error(err);
+      showToast(err.response?.data?.detail || "Error al eliminar la disponibilidad", "error");
     }
   });
 
@@ -243,68 +256,77 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
     const cellKey = `${diaId}-${slot.start}`;
     setSavingCells(prev => ({ ...prev, [cellKey]: true }));
 
-    // Buscar si ya existe una restricción registrada
-    const existing = disps.find(d => 
-      d.dia_semana === diaId && 
-      d.hora_inicio.slice(0, 5) === slot.start.slice(0, 5)
-    );
+    // Estado derivado con la misma semántica del solver (cobertura de ventanas /
+    // lista blanca). Solo se mutan filas de rango EXACTO por celda; nunca las
+    // ventanas anchas DISPONIBLE (una ventana NO_DISPONIBLE ancha se respeta
+    // como bloqueo y solo se añade una marca por celda encima).
+    const { estado, filaNoDisp, filaPref } = estadoEfectivoCelda(disps, diaId, slot);
 
-    // Ciclo: Disponible (vacío) -> NO_DISPONIBLE -> PREFERENCIA -> Disponible
-    const nextStateMap = {
-      'undefined': 'NO_DISPONIBLE',
-      'NO_DISPONIBLE': 'PREFERENCIA',
-      'PREFERENCIA': 'DISPONIBLE'
-    };
-
-    const currentState = existing ? existing.tipo_disponibilidad : 'undefined';
-    const nextState = nextStateMap[currentState];
+    // Ciclo: DISPONIBLE -> NO_DISPONIBLE (exacta) -> PREFERENCIA -> DISPONIBLE.
+    // Las celdas "Fuera de ventana" (bloqueadas por ventanas DISPONIBLE del
+    // docente) alternan la marca PREFERENCIA: quedan verdes con badge, pero el
+    // solver no asignará clases hasta que una ventana las cubra.
+    const nuevaFilaDemo = (tipo) => ({
+      id: Math.max(...demoDisps.map(d => d.id), 0) + 1,
+      docente_id: Number(selectedDocenteId),
+      sede_id: selectedSedeId ? Number(selectedSedeId) : null,
+      dia_semana: diaId,
+      hora_inicio: slot.start,
+      hora_fin: slot.end,
+      tipo_disponibilidad: tipo,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
 
     try {
       if (demoMode) {
         // Lógica local
-        if (nextState === 'DISPONIBLE') {
-          // Eliminar
-          setDemoDisps(prev => prev.filter(d => d.id !== existing.id));
-        } else if (currentState === 'undefined') {
-          // Crear nuevo
-          const nuevo = {
-            id: Math.max(...demoDisps.map(d => d.id), 0) + 1,
-            docente_id: Number(selectedDocenteId),
-            sede_id: selectedSedeId ? Number(selectedSedeId) : null,
-            dia_semana: diaId,
-            hora_inicio: slot.start,
-            hora_fin: slot.end,
-            tipo_disponibilidad: nextState,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          setDemoDisps(prev => [...prev, nuevo]);
+        if (estado === 'DISPONIBLE') {
+          setDemoDisps(prev => [...prev, nuevaFilaDemo('NO_DISPONIBLE')]);
+        } else if (estado === 'NO_DISPONIBLE') {
+          if (filaNoDisp) {
+            setDemoDisps(prev => prev.map(d => d.id === filaNoDisp.id ? {
+              ...d,
+              tipo_disponibilidad: 'PREFERENCIA',
+              updated_at: new Date().toISOString()
+            } : d));
+          } else {
+            setDemoDisps(prev => [...prev, nuevaFilaDemo('PREFERENCIA')]);
+          }
         } else {
-          // Actualizar
-          setDemoDisps(prev => prev.map(d => d.id === existing.id ? { 
-            ...d, 
-            tipo_disponibilidad: nextState,
-            updated_at: new Date().toISOString()
-          } : d));
+          // PREFERENCIA: eliminar la marca
+          setDemoDisps(prev => prev.filter(d => d.id !== filaPref.id));
         }
       } else {
         // Lógica contra API real
-        if (nextState === 'DISPONIBLE') {
-          await deleteMutation.mutateAsync(existing.id);
-        } else if (currentState === 'undefined') {
+        if (estado === 'DISPONIBLE') {
           await createMutation.mutateAsync({
             docente_id: Number(selectedDocenteId),
             sede_id: selectedSedeId ? Number(selectedSedeId) : null,
             dia_semana: diaId,
             hora_inicio: slot.start,
             hora_fin: slot.end,
-            tipo_disponibilidad: nextState
+            tipo_disponibilidad: 'NO_DISPONIBLE'
           });
+        } else if (estado === 'NO_DISPONIBLE') {
+          if (filaNoDisp) {
+            await updateMutation.mutateAsync({
+              id: filaNoDisp.id,
+              data: { tipo_disponibilidad: 'PREFERENCIA' }
+            });
+          } else {
+            await createMutation.mutateAsync({
+              docente_id: Number(selectedDocenteId),
+              sede_id: selectedSedeId ? Number(selectedSedeId) : null,
+              dia_semana: diaId,
+              hora_inicio: slot.start,
+              hora_fin: slot.end,
+              tipo_disponibilidad: 'PREFERENCIA'
+            });
+          }
         } else {
-          await updateMutation.mutateAsync({
-            id: existing.id,
-            data: { tipo_disponibilidad: nextState }
-          });
+          // PREFERENCIA: eliminar la marca
+          await deleteMutation.mutateAsync(filaPref.id);
         }
       }
     } catch (err) {
@@ -325,7 +347,7 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
   // --- LIMPIAR TODAS LAS RESTRICCIONES ---
   const handleClearAll = async () => {
     if (!selectedDocenteId) return;
-    if (!window.confirm("¿Está seguro de que desea restablecer la disponibilidad de este docente? Se eliminarán todas sus restricciones (volverá a estar 100% disponible).")) return;
+    if (!window.confirm("¿Está seguro de que desea restablecer la disponibilidad de este docente? Se eliminarán todas sus restricciones y ventanas de disponibilidad (volverá a estar 100% disponible).")) return;
 
     const docenteDisps = disps;
     if (docenteDisps.length === 0) {
@@ -351,9 +373,12 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
   };
 
   // --- ESTADÍSTICAS RÁPIDAS ---
-  const noDispCount = disps.filter(d => d.tipo_disponibilidad === 'NO_DISPONIBLE').length;
-  const prefCount = disps.filter(d => d.tipo_disponibilidad === 'PREFERENCIA').length;
-  const totalSlots = timeSlots.length * dias.length;
+  // Conteo por CELDA con la semántica del solver (una ventana DISPONIBLE ancha
+  // cuenta todas las celdas que cubre/bloquea, no una sola fila).
+  const { noDispCount, prefCount, totalSlots } = React.useMemo(
+    () => contarEstados(disps, timeSlots, diasLaborables),
+    [disps, timeSlots, diasLaborables]
+  );
   const dispPercent = totalSlots > 0 ? Math.round(((totalSlots - noDispCount) / totalSlots) * 100) : 100;
 
   return (
@@ -456,6 +481,13 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                 <span className="font-bold mx-1 text-emerald-600">Preferencia (Verde)</span>.
                 Los cambios se guardan y validan automáticamente en tiempo real.
               </p>
+              <p className="text-blue-700 mt-1">
+                Las celdas rojas con{' '}
+                <span className="font-bold">«Fuera de ventana»</span> no están cubiertas por las ventanas de
+                disponibilidad del docente, así que el planificador no asignará clases ahí. Si las marcas como
+                Preferencia quedarán verdes con esa etiqueta, pero seguirán bloqueadas hasta que exista una
+                ventana que las cubra.
+              </p>
             </div>
           </div>
 
@@ -522,21 +554,27 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
 
                         {/* Celdas para cada día */}
                         {dias.map(dia => {
-                          const existing = disps.find(d => 
-                            d.dia_semana === dia.id && 
-                            d.hora_inicio.slice(0, 5) === slot.start.slice(0, 5)
-                          );
+                          // Estado derivado con la semántica del solver: la celda
+                          // refleja lo que el planificador realmente hará con ella.
+                          const { estado, causa, filaNoDisp } = estadoEfectivoCelda(disps, dia.id, slot);
 
                           const isSaving = savingCells[`${dia.id}-${slot.start}`];
-                          const state = existing ? existing.tipo_disponibilidad : 'DISPONIBLE';
 
                           // Clases de estilo según estado
                           let cellStyle = 'bg-white text-slate-400 border-slate-200/80 hover:bg-slate-50 hover:text-slate-600';
-                          if (state === 'NO_DISPONIBLE') {
+                          if (estado === 'NO_DISPONIBLE') {
                             cellStyle = 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100/70';
-                          } else if (state === 'PREFERENCIA') {
+                          } else if (estado === 'PREFERENCIA') {
                             cellStyle = 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100/70';
                           }
+
+                          // Badge que explica un bloqueo "heredado": ventana
+                          // DISPONIBLE que no cubre la celda, o ventana
+                          // NO_DISPONIBLE ancha. Las celdas rojas normales
+                          // (restricción exacta por celda) no llevan badge.
+                          let badgeBloqueo = null;
+                          if (causa === 'ventana') badgeBloqueo = 'Fuera de ventana';
+                          else if (causa === 'restriccion' && (estado === 'PREFERENCIA' || !filaNoDisp)) badgeBloqueo = 'Restricción amplia';
 
                           return (
                             <td key={dia.id} className="p-2.5 text-center">
@@ -547,15 +585,21 @@ const DocenteDisponibilidad = ({ docentes = [], sedes = [], initialDocenteId = n
                               >
                                 {isSaving ? (
                                   <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                                ) : state === 'NO_DISPONIBLE' ? (
+                                ) : estado === 'NO_DISPONIBLE' ? (
                                   <>
                                     <X className="w-4 h-4 text-rose-500 stroke-[3]" />
                                     <span className="text-[10px] font-bold uppercase tracking-wider">No Disponible</span>
+                                    {badgeBloqueo && (
+                                      <span className="text-[9px] font-semibold uppercase tracking-wide text-rose-400">{badgeBloqueo}</span>
+                                    )}
                                   </>
-                                ) : state === 'PREFERENCIA' ? (
+                                ) : estado === 'PREFERENCIA' ? (
                                   <>
                                     <Heart className="w-4 h-4 text-emerald-500 fill-emerald-500 animate-pulse" />
                                     <span className="text-[10px] font-bold uppercase tracking-wider">Preferencia</span>
+                                    {badgeBloqueo && (
+                                      <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500">{badgeBloqueo}</span>
+                                    )}
                                   </>
                                 ) : (
                                   <>

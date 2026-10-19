@@ -1024,6 +1024,23 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 ---
 
+### Contexto de la Sesión Actual (2026-10-19) — Disponibilidad docente: semántica de cobertura del solver en la UI
+
+**Problema reportado:** en `/docentes/disponibilidad`, clicar celdas del **primer bloque** no reflejaba cambio de estado (Juan Pérez, María González). **Causa raíz:** los seeds (`Reset_y_poblar_datos.sql`, `Seed_datos_prueba.sql`) insertan disponibilidades como **ventanas anchas `DISPONIBLE`** cuyo `hora_inicio` coincide con el primer bloque de la grilla (Juan Pérez 08:00, María González 07:00). El ciclo de estados de la UI no contemplaba un registro existente `DISPONIBLE` (`nextStateMap` sin esa clave) → `nextState = undefined` → `PUT { tipo_disponibilidad: undefined }` serializado como `PUT {}` → el backend (`model_dump(exclude_unset=True)`) hacía un no-op silencioso. El solver **sí** procesaba la fila; la UI no sabía interpretarla.
+
+**Fix 1 — ciclo de estados (`DocenteDisponibilidad.jsx`):** las filas `DISPONIBLE` se ignoran al buscar la fila exacta de la celda (significan "sin restricción"); `nextStateMap` con clave `'DISPONIBLE' -> 'NO_DISPONIBLE'` como defensa; `onError` con toast en create/update/delete (antes un fallo era silencioso).
+
+**Fix 2 — la grilla refleja la semántica REAL del solver:** el solver evalúa por **cobertura** (`or_tools_adapter._docente_disponible_en_bloque`, idéntico en `schedule_validation.validar_asignacion`): (1) `NO_DISPONIBLE` que cubre el bloque (`hora_ini <= bloque.ini AND hora_fin >= bloque.fin`, mismo día) bloquea con prioridad; (2) si existe **alguna** fila `DISPONIBLE` explícita, un bloque solo está disponible si una ventana `DISPONIBLE` **de ese día** lo cubre (lista blanca — días sin ventana quedan bloqueados); (3) `PREFERENCIA` es ignorado por el backend (marca informativa). La UI anterior mostraba "Disponible" por defecto en celdas que el solver bloqueaba, y las tarjetas contaban **filas**, no celdas.
+
+1. **Utils puros nuevos** `features/docentes/utils/disponibilidad.js` (+18 tests en `__tests__/disponibilidad.test.js`): `estadoEfectivoCelda(disps, diaId, slot)` → `{estado: 'DISPONIBLE'|'NO_DISPONIBLE'|'PREFERENCIA', causa: 'restriccion'|'ventana'|null, filaNoDisp, filaPref}` (comparaciones `HH:MM` normalizadas; sede ignorada = solver de generación) y `contarEstados(disps, slots, dias)` (conteo por celda). Exportados desde el barrel `features/docentes/index.js`.
+2. **Render de celdas** con estado derivado + badge de bloqueo heredado: **"Fuera de ventana"** (ventana `DISPONIBLE` no cubre la celda) y **"Restricción amplia"** (ventana `NO_DISPONIBLE` ancha); las celdas rojas normales (restricción exacta por celda) no llevan badge. En celdas marcadas Preferencia pero bloqueadas el badge es ámbar.
+3. **`handleCellClick`** guiado por el estado derivado: `DISPONIBLE` → POST `NO_DISPONIBLE` exacta; `NO_DISPONIBLE` con fila exacta → PUT `PREFERENCIA`; bloqueadas sin fila exacta → POST `PREFERENCIA` exacta (alterna la marca con badge, sin tocar la ventana); `PREFERENCIA` → DELETE. **Nunca se muta una ventana ancha** (evita bloquear 4-5 bloques de golpe; `NO_DISPONIBLE` exacta tiene precedencia sobre la ventana que la cubría).
+4. **Estadísticas** (`noDispCount`/`prefCount`/`dispPercent`) derivadas por celda vía `contarEstados`; caja "¿Cómo configurar?" documenta "Fuera de ventana"; confirm de "Restablecer" menciona que también borra ventanas.
+
+**Verificación:** `pnpm test` ✅ **446 tests en 32 archivos** (+18) · `pnpm build` ✅. **Limitación conocida (deseada):** `PREFERENCIA` sigue sin efecto en el solver; celdas "Fuera de ventana" marcadas quedan verdes con badge pero no asignan hasta que una ventana las cubra.
+
+---
+
 ## 7. Responsive y móvil (2026-10-18)
 
 **Rama:** `feat/responsive-smartphone`. Cuatro fases, un commit por fase, backend intacto. Estado: **la app es usable en smartphone (360–430 px)**.
