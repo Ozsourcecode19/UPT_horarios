@@ -227,10 +227,11 @@ const Horarios = () => {
     if (!container || TIPOS_VISTA.length === 0) return;
 
     const observer = new ResizeObserver(() => {
-      const disponible = container.clientWidth || 0;
+      const contenedor = container.clientWidth || 0;
+      const disponible = Math.max(0, contenedor - 8); // restar p-1 (8 px) del contenedor
       const needed = medidorRef.current?.scrollWidth || 0;
-      // +4 px de margen anti-flicker para evitar oscilación en el borde exacto
-      setIconOnly(needed > disponible + 4);
+      // +2 px de tolerancia por redondeo; la medición del clon es estable ⇒ sin bucle
+      setIconOnly(needed > disponible + 2);
     });
 
     observer.observe(container);
@@ -376,7 +377,7 @@ const Horarios = () => {
               ))}
             </div>
             {/* Clon medidor: siempre con texto, fuera del flujo, para medir el ancho requerido sin depender del estado iconOnly */}
-            <div ref={medidorRef} className="absolute top-0 left-0 invisible whitespace-nowrap p-1" aria-hidden="true">
+            <div ref={medidorRef} className="absolute top-0 left-0 invisible whitespace-nowrap gap-1 sm:gap-2" aria-hidden="true">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
                 <button key={valor} className="flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold shrink-0" tabIndex={-1}>
                   <Icono className="w-4 h-4 shrink-0" />
