@@ -40,6 +40,7 @@
 4. [Bugs Conocidos y Plan de Corrección](#4-bugs-conocidos-y-plan-de-corrección)
 5. [Roadmap: Del MVP al Producto Robusto](#5-roadmap-del-mvp-al-producto-robusto)
 6. [Notas para Antigravity (IA Pair Programmer)](#6-notas-para-antigravity-ia-pair-programmer)
+7. [Responsive y móvil](#7-responsive-y-móvil-2026-10-18)
 
 ---
 
@@ -1020,3 +1021,30 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 7. **Test guard de contraste** (no hay linter en el repo): `checklistPanel.test.jsx` y `avisoCoberturaVentana.test.jsx` leen `src/styles/index.css` (`node:fs` + `resolve(process.cwd(), …)`; **no** `import.meta.url`, que en vitest no es `file:`) y afirman que toda clase `text|bg|border-amber-*` renderizada tiene su regla `.dark .<clase escapada>` — si alguien agrega una clase ámbar nueva sin remap, el test falla.
 
 **Verificación:** `pnpm test` ✅ **411 tests en 28 archivos** (+16: `schedule.test.js` +5, `checklistPanel.test.jsx` +5 (4 + guard), `avisoCoberturaVentana.test.jsx` +4 (nuevo), `dashboardStats.test.js` +2) · `pnpm build` ✅ · backend `pytest` ✅ **93 passed** (+6 en `tests/test_cobertura_turnos.py`) · `import main` ✅. Contra la BD real: reporta VESPERTINO en las 3 sedes (hasta 14:30/15:30) y **no** marca MATUTINO (su hueco final es de exactamente 1 bloque). El guard fue probado en negativo (remap renombrado temporalmente → falla) y el CSS quedó byte-idéntico al original (`diff -q`).
+
+---
+
+## 7. Responsive y móvil (2026-10-18)
+
+**Rama:** `feat/responsive-smartphone`. Cuatro fases, un commit por fase, backend intacto. Estado: **la app es usable en smartphone (360–430 px)**.
+
+### Qué cambió (por fase)
+
+1. **`fix(frontend)` — arreglos puntuales:** `SedeFormModal` (`grid-cols-1 sm:grid-cols-3`), `MateriaFormModal` (swatches de color con área táctil ≥40 px), `styles/index.css` (`.grilla-scroll` con `overflow-x: auto` explícito + `overscroll-behavior-x: contain`; `.ev-del` **visible en táctil** vía `@media (hover: none)` — antes era `opacity:0` hasta `:hover` e intangible en celular), pista "Desliza para ver todos los días →" (`.grilla-hint`, sticky a la izquierda, solo ≤640 px), padding de contenido `p-4 sm:p-6 lg:p-10` y `Pagination` con botones ≥40 px en móvil.
+2. **`feat(frontend)` — tablas adaptables:** las 10 tablas CRUD + `UsuariosTab` plegan columnas secundarias con `hidden md:table-cell` (**`<th>` y su `<td>` siempre parejados** — si no, se desalinean filas) y reducen padding `py-3 px-4 md:py-4 md:px-6`. Ocultas: Aulas (Capacidad, Tipo), Sedes (Dirección), Bloques (Duración, Orden), Carreras (Tipo), Docentes (Email, Carga — email queda como subtexto `md:hidden` bajo el nombre), Materias (Carga), Periodos (Tipo de Corte), Secciones (Sede/Matrícula/Período — sede subtexto), Clases (Prioridad/Sede Especial/Estado), Trayectos (Orden/Año), Usuarios (Email — subtexto). Acciones con `p-2.5 md:p-2`.
+3. **`feat(frontend)` — tap-to-move en la grilla:** el HTML5 DnD **no funciona con toques**, así que en táctiles el 1er toque en una clase la selecciona (anillo `.seleccionada`) y el 2º toque en una celda destino la mueve **reusando `onDropEnCelda` → `useDragDropValidation` → `POST /schedules/validate-move`**. Piezas: `hooks/useIsTouch.js` (`matchMedia('(hover: none), (pointer: coarse)')`), `features/schedule/utils/tapMove.js` (lógica pura `resolverTap`/`TAP`), barra flotante `.touch-bar` (`position:fixed`, `no-print`, con `Editar`/`Cancelar`) dentro de `GridSemanalBloques` y celdas `celda-origen`/`celda-destino`. **En escritorio no cambia nada** (DnD + click → `EditEventModal`). `DocenteDisponibilidad` ya era por `onClick` → funciona con táctil sin cambios.
+4. **`chore(frontend)` — pulido:** `theme-color` (claro/oscuro) + `apple-touch-icon` en `index.html` (sin PWA/manifest, decisión explícita).
+
+### La grilla en móvil
+
+`@media (max-width: 640px)` → `table.grilla-bloques { min-width: 680px }`: en vez de estrangular 5 columnas de día a ~40 px, la tabla gana ancho y se desplaza horizontalmente con la columna de hora **sticky** (`td.celda-hora { position: sticky; left: 0 }` ya existente). El ancho de impresión (A4 apaisado >640 px) no entra en ese media query.
+
+### Checklist de QA manual (DevTools o dispositivo real)
+
+- **360×800 / 390×844 / 430×932:** Login (teclado), Dashboard (hero/stats/analíticos), Horarios (filtros, scroll horizontal de grilla + hint, **tap-to-move**, EditEventModal, checklist, versiones, impresión), los 10 CRUDs (filtros apilados, columnas plegadas, acciones táctiles, modales), Disponibilidad/Habilitaciones docente, Settings, paginación, toasts.
+
+### Limitaciones conocidas
+
+- Sin PWA/manifest/service worker (no offline).
+- La impresión sigue orientada a escritorio (A4 apaisado); `.touch-bar` y `.ev-del` se ocultan con `no-print`.
+- `hidden md:table-cell` no se valida en jsdom (sin CSS): los tests no detectan desalineaciones th/td — revisar en QA visual.
