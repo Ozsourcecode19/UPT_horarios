@@ -407,7 +407,7 @@ sequenceDiagram
 | GET | `/habilitaciones-docentes/{id}/validate-delete` | Autenticado | Defensa de eliminación de habilitaciones (nivel 1). |
 | POST | `/schedules/generate?periodo_id=` | ADMIN/JEFE-PNF | Dispara generación asíncrona (202). |
 | GET | `/schedules/generation-status?periodo_id=` | Autenticado | Estado de generación (`NONE` si el tracker en memoria está vacío —tras reinicio o antes de la primera generación—, `PENDING/DONE/FAILED` + count). **200 siempre; sin 404.** |
-| GET | `/schedules/pre-generation-check?periodo_id=` | Autenticado | Checklist de prerequisitos para generar (E2). |
+| GET | `/schedules/pre-generation-check?periodo_id=` | Autenticado | Checklist de prerequisitos para generar (E2). Incluye `turnos_sin_cobertura[]` (advertencia): turnos (división) con clases del periodo cuya ventana no está cubierta por bloques activos (`SIN_BLOQUES` o `COBERTURA_INCOMPLETA`); **no afecta `listo`**. |
 | GET | `/schedules/versions?periodo_id=` | Autenticado | Lista versiones de horario del periodo (E4). Lista vacía si no hay; **200, sin 404.** |
 | POST | `/schedules/restore` | ADMIN/JEFE-PNF | Restaura versión de horario (ACTIVO actual→HISTORICO, objetivo→ACTIVO) (E4). |
 | GET | `/schedules/fullcalendar?periodo_id=` | Autenticado | Horarios en formato eventos (backend calcula start/end/día; frontend renderiza en grilla nativa). |
@@ -636,7 +636,7 @@ sequenceDiagram
 
 ### 8.1 Estado actual
 
-- **Backend (E9 + sesiones):** suite `pytest`/`httpx` en `backend/tests/` con **87 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible, sesiones N/M y omitidas), asignar-manual (N, `bloques_previos`, R5-B'), `update_leccion` (archivado automático al cambiar N/M, R0 coherencia grupo↔periodo), `clases_sin_slots`, cálculo `lunes_base`, smoke de API, validaciones de CRUD y estrés (~100 lecciones). **Sin** BD Postgres ni triggers PL/pgSQL.
+- **Backend (E9 + sesiones):** suite `pytest`/`httpx` en `backend/tests/` con **93 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible, sesiones N/M y omitidas), asignar-manual (N, `bloques_previos`, R5-B'), `update_leccion` (archivado automático al cambiar N/M, R0 coherencia grupo↔periodo), `clases_sin_slots`, **cobertura de bloques por turno en el pre-generation-check** (`test_cobertura_turnos.py`), cálculo `lunes_base`, smoke de API, validaciones de CRUD y estrés (~100 lecciones). **Sin** BD Postgres ni triggers PL/pgSQL.
 - **Frontend (E22):** suite **vitest** con **198 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `filterEvents`, `resolveVentanaGrilla`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`, `horaCompleta`, `calcularFin`, `generarSimulacionDemo`, `calcularEstadisticas`), hooks (`useGenerationPolling`, `useScheduleGeneration`, `useDragDropValidation`), y utilidades de planning/schedule/bloques/aulas. Tests en `src/utils/__tests__/`, `src/hooks/__tests__/`, `src/features/schedule/__tests__/`, `src/features/bloques/__tests__/` y `src/features/aulas/__tests__/`.
 - La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a la grilla nativa).
 
@@ -706,7 +706,7 @@ npm run dev    # http://localhost:3000
 
 1. **Polling/WebSocket robusto** de estado de generación (`GET /api/schedules/generation-status`). **✅ Implementado (E1+E3).**
 2. **Control de versiones del horario** (`version_horario` incremental + comparación/restauración). **✅ Implementado (E4+E4b).**
-3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).**
+3. **Validación previa a la generación** (`GET /api/schedules/pre-generation-check`). **✅ Implementado (E2).** Ampliado (2026-10-18): detecta **cobertura de bloques por turno** (`turnos_sin_cobertura[]` en `crud/horarios_generados._turnos_sin_cobertura`) — por cada (turno, sede con clases) compara la ventana `ventana_{division}` contra el último bloque usable (activo, día laborable, completo dentro de la ventana **y** de la jornada) y reporta `SIN_BLOQUES` o `COBERTURA_INCOMPLETA` si falta más de un bloque (`duracion_bloque_default`) al final. Es advertencia: no modifica `listo`.
 4. **Vista de recursos** (aulas en paralelo). **✅ Implementado (E8, custom):** vista "por Aulas" multi-columna. **Reemplazada (E18):** la grilla nativa por bandas de bloque reemplazó FullCalendar completamente.
 5. **Paginación server-side** en todos los endpoints CRUD. **✅ Implementado:** schema `PaginatedResponse[T]`, búsqueda `ILIKE`, hook `usePaginatedQuery`.
 6. **Dashboard dinámico** con datos reales y gráficas. **✅ Implementado (E6+E11):** stats reales + analytics de carga docente/distribución materias/conflictos.

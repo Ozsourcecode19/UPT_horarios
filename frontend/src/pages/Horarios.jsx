@@ -9,7 +9,7 @@ import {
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
   useScheduleGeneration, useDragDropValidation,
   FlowStepper, ChecklistPanel,
-  GridSemanalBloques, VersionPanel, EditEventModal,
+  GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana,
 } from '../features/schedule';
 import {
   useHorariosData, useHorariosExport,
@@ -426,6 +426,7 @@ const Horarios = () => {
               {formatHora12(ventanaActiva.inicio.substring(0, 5))} – {formatHora12(ventanaActiva.fin.substring(0, 5))}
             </span>
           </div>
+          <AvisoCoberturaVentana bandas={bandasActivas} ventana={ventanaActiva} configs={configuraciones} />
           <div className="flex-1 min-h-0 overflow-auto" style={{ '--alto-banda': altoBandaPrint }}>
             <GridSemanalBloques
               eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
@@ -444,6 +445,7 @@ const Horarios = () => {
       {!exceedsSinglePage && (
         <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
           <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
+          <AvisoCoberturaVentana bandas={bandas} ventana={ventanaGrilla} configs={configuraciones} />
           <GridSemanalBloques
             eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
             bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}

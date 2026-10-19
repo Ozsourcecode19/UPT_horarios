@@ -8,7 +8,7 @@ import type {
 } from '../../../types/entities';
 import type {
   BandaEje, BloqueIndice, CeldaEventos,
-  VentanaTurno, FilterOptions, ResolveVentanaGrillaParams,
+  VentanaTurno, FilterOptions, ResolveVentanaGrillaParams, HuecoVentana,
 } from '../../../types/schedule';
 import { COLOR_FALLBACK } from '../../../constants';
 
@@ -315,6 +315,43 @@ export const bloqueDentroVentana = (bloque: BloqueHorario, ventana: VentanaTurno
   const ini = horaAMinutos(bloque.hora_inicio);
   const fin = ini + (Number(bloque.duracion_minutos) || 0);
   return ini >= horaAMinutos(ventana.inicio) && fin <= horaAMinutos(ventana.fin);
+};
+
+/**
+ * Duración estándar de bloque (`duracion_bloque_default`, 15–120 min).
+ * Fallback 45 si la clave falta o tiene un valor inválido.
+ * @param configs - Configuraciones del sistema
+ * @returns Duración en minutos
+ */
+export const duracionBloqueDefault = (configs: Configuracion[] = []): number => {
+  const crudo = (configs || []).find(c => c.clave === 'duracion_bloque_default')?.valor;
+  const dur = Number(crudo);
+  return Number.isFinite(dur) && dur >= 15 && dur <= 120 ? Math.trunc(dur) : 45;
+};
+
+/**
+ * Detecta el HUECO FINAL de cobertura de la grilla: la ventana resuelta
+ * (turno/jornada) termina más de un bloque después del último bloque
+ * renderizable → faltan bloques en esa sede/turno (catálogo incompleto).
+ * El umbral de "más de un bloque" evita falsos positivos por desalineación
+ * de la rejilla de bloques (mismo criterio que el backend en
+ * `crud/horarios_generados._turnos_sin_cobertura`).
+ * @param bandas - Bandas ya recortadas a la ventana (construirBandasEje)
+ * @param ventana - Ventana resuelta de la grilla
+ * @param duracionBloque - Duración estándar de bloque (duracionBloqueDefault)
+ * @returns Hueco o null si la cobertura es suficiente
+ */
+export const detectarHuecoVentana = (
+  bandas: BandaEje[] = [],
+  ventana: VentanaTurno | null,
+  duracionBloque: number = 45,
+): HuecoVentana | null => {
+  if (!ventana || !Array.isArray(bandas) || bandas.length === 0) return null;
+  const ventanaFinMin = horaAMinutos(ventana.fin);
+  const hastaMin = bandas.reduce((max, b) => Math.max(max, Number(b.finMin) || 0), 0);
+  const huecoMin = ventanaFinMin - hastaMin;
+  if (!Number.isFinite(ventanaFinMin) || huecoMin <= duracionBloque) return null;
+  return { hastaMin, ventanaFinMin, huecoMin };
 };
 
 /**

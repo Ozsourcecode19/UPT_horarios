@@ -9,6 +9,7 @@ export {
   horaAMinutos, construirBandasEje, indiceBloques, resolverBloqueDeCelda, agruparEventosPorCelda,
   recalcularEventoDemo, generarEventosSimulados,
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
+  duracionBloqueDefault, detectarHuecoVentana,
 } from './utils/schedule';
 export { validateMoveMock } from './utils/scheduleValidation';
 export { agruparSesiones, resolverRun } from './utils/sesiones';
@@ -22,6 +23,7 @@ export { default as useGenerationPolling } from './hooks/useGenerationPolling';
 export { default as FlowStepper } from './components/FlowStepper';
 export { default as ChecklistPanel } from './components/ChecklistPanel';
 export { default as GridSemanalBloques } from './components/GridSemanalBloques';
+export { default as AvisoCoberturaVentana } from './components/AvisoCoberturaVentana';
 export { default as VersionPanel } from './components/VersionPanel';
 export { default as EditEventModal } from './components/EditEventModal';
 

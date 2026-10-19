@@ -434,6 +434,8 @@ Si no hay lecciones, disponibilidades o habilitaciones, OR-Tools generará 0 reg
 - Bloquear el botón de generación y mostrar checklist si falta algo
 
 > **✅ Implementado (E2):** El endpoint devuelve `{lecciones_activas, docentes_con_disponibilidad, docentes_con_habilitacion, aulas, bloques, lecciones_sin_habilitacion, lecciones_sin_disponibilidad, listo}`. `Horarios.jsx` muestra un panel de checklist y deshabilita "Generación Inteligente" cuando `listo=false` (críticos en 0).
+>
+> **➕ Ampliación (2026-10-18) — cobertura de bloques por turno:** el endpoint agrega `turnos_sin_cobertura[]` (`{division, sede_id, sede_nombre, ventana_inicio, ventana_fin, bloque_hasta, motivo}` con `SIN_BLOQUES`/`COBERTURA_INCOMPLETA`), una **advertencia que no toca `listo`**. `ChecklistPanel` la lista en un recuadro ámbar (visible aunque `listo=true`) y `dashboardStats.resumenConflictos` agrega la observación "Bloques sin cubrir la ventana del turno". Ver "Contexto de la Sesión Actual (2026-10-18)" al final de esta guía.
 
 ---
 
@@ -998,3 +1000,23 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
    - `e.target.value` siempre es string. Agregado `Number()` en el `onChange` del selector de periodo en `Horarios.jsx`.
 
 9. **Verificación:** ✅ Frontend build OK, 198 tests vitest passed, backend 69 tests pytest passed.
+
+---
+
+### Contexto de la Sesión Actual (2026-10-18) — Cobertura de bloques por turno (Fase B)
+
+**Problema reportado:** en la vista Horarios el turno Tarde renderizaba solo 2 filas de bloques. **No era un bug de render:** el catálogo `bloques_horarios` de las sedes 1/2 termina a las **14:30** (07:00 + 45 min × 10) mientras la ventana de la tarde llega a 17:00/18:00, y `hora_fin_jornada` es el techo que comparten el solver, el generador de grilla estándar y el checklist. La grilla solo dibuja lo que existe.
+
+**Detección añadida (no modifica datos ni bloquea la generación):**
+
+1. **Backend** — `GET /schedules/pre-generation-check` incluye `turnos_sin_cobertura[]` (`crud/horarios_generados._turnos_sin_cobertura`): por cada (turno, sede con clases del periodo) compara la ventana `ventana_{division}` con el último bloque **usable** (activo, día laborable, completo dentro de la ventana y de la jornada) → `SIN_BLOQUES` o `COBERTURA_INCOMPLETA` si falta más de un bloque (`duracion_bloque_default`) al final. Es advertencia: **`listo` no cambia**.
+2. **Frontend — utils** (`features/schedule/utils/schedule.ts`, +5 tests en `schedule.test.js`):
+   - `duracionBloqueDefault(configs)` → `duracion_bloque_default` (15–120) o **45**.
+   - `detectarHuecoVentana(bandas, ventana, duracion)` → `{hastaMin, ventanaFinMin, huecoMin}` solo si la ventana termina a **más de un bloque** del último fin de banda (mismo umbral que el backend: evita falsos positivos por desalineación de la rejilla); `null` sin bandas/ventana.
+3. **Frontend — componente nuevo** `schedule/components/AvisoCoberturaVentana.jsx` (exportado desde el barrel): recuadro ámbar `no-print` sobre la grilla en **las dos ramas** de `Horarios.jsx` (individual con `bandas`/`ventanaGrilla`; tabs de turno con `bandasActivas`/`ventanaActiva`). Texto: "Los bloques activos llegan hasta X, pero la ventana de la grilla termina a las Y…" con `formatHora12`.
+4. **ChecklistPanel** — recuadro ámbar con `TURNOS_LABELS` + sede por entrada (`mensajeCobertura`: `Tarde · Sede Principal: los bloques llegan solo hasta 14:30 (la ventana termina a las 17:00)`), visible **aunque `listo=true`**.
+5. **Dashboard** (`utils/dashboardStats.ts`) — observación `warn` "Bloques sin cubrir la ventana del turno".
+6. **Modo oscuro (shim E13)** — `styles/index.css` añadía remap para `bg-amber-50/70`, `border-amber-200/70`, `text-amber-800` y `text-amber-500` (los recuadros nuevos ya eran legibles), pero **faltaba** `.dark .text-amber-700\/80` (la línea de ayuda del recuadro del checklist): sin él el texto queda `rgb(180 83 9 / .8)` sobre fondo ámbar oscuro ≈ **2:1** de contraste. Añadido `.dark .text-amber-700\/80 { color: rgb(252 211 77 / .92); }` (≈ 8.5:1).
+7. **Test guard de contraste** (no hay linter en el repo): `checklistPanel.test.jsx` y `avisoCoberturaVentana.test.jsx` leen `src/styles/index.css` (`node:fs` + `resolve(process.cwd(), …)`; **no** `import.meta.url`, que en vitest no es `file:`) y afirman que toda clase `text|bg|border-amber-*` renderizada tiene su regla `.dark .<clase escapada>` — si alguien agrega una clase ámbar nueva sin remap, el test falla.
+
+**Verificación:** `pnpm test` ✅ **411 tests en 28 archivos** (+16: `schedule.test.js` +5, `checklistPanel.test.jsx` +5 (4 + guard), `avisoCoberturaVentana.test.jsx` +4 (nuevo), `dashboardStats.test.js` +2) · `pnpm build` ✅ · backend `pytest` ✅ **93 passed** (+6 en `tests/test_cobertura_turnos.py`) · `import main` ✅. Contra la BD real: reporta VESPERTINO en las 3 sedes (hasta 14:30/15:30) y **no** marca MATUTINO (su hueco final es de exactamente 1 bloque). El guard fue probado en negativo (remap renombrado temporalmente → falla) y el CSS quedó byte-idéntico al original (`diff -q`).

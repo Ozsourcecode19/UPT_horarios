@@ -3,6 +3,18 @@
 // en E14. Muestra los contadores críticos/advertencia y las causas cuando el
 // periodo no está listo. El caller decide visibilidad (oculto en Modo Demo).
 import { CheckCircle, AlertTriangle, RefreshCw, X, Info } from 'lucide-react';
+import { TURNOS_LABELS } from '../../../constants';
+
+/** Texto de una entrada de cobertura (preCheck.turnos_sin_cobertura). */
+const mensajeCobertura = (cob) => {
+  const turno = TURNOS_LABELS[cob.division] ?? cob.division;
+  const sede = cob.sede_nombre ? ` · ${cob.sede_nombre}` : '';
+  if (cob.motivo === 'SIN_BLOQUES') {
+    return `${turno}${sede}: sin bloques activos entre ${cob.ventana_inicio} y ${cob.ventana_fin}.`;
+  }
+  const hasta = cob.bloque_hasta ? `solo hasta ${cob.bloque_hasta}` : 'incompleta';
+  return `${turno}${sede}: los bloques llegan ${hasta} (la ventana termina a las ${cob.ventana_fin}).`;
+};
 
 const ChecklistPanel = ({ preCheck, onRevalidar }) => {
   if (!preCheck) return null;
@@ -68,6 +80,24 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
             {preCheck.lecciones_sin_habilitacion > 0 && <p>· {preCheck.lecciones_sin_habilitacion} clase(s) sin habilitación para su docente y unidad curricular.</p>}
             {preCheck.lecciones_sin_disponibilidad > 0 && <p>· {preCheck.lecciones_sin_disponibilidad} clase(s) cuyo docente no define disponibilidad.</p>}
             {preCheck.lecciones_sin_candidatos > 0 && <p>· {preCheck.lecciones_sin_candidatos} clase(s) sin aula ni bloque activo en su sede (no podrán asignarse; crea aulas/bloques en esa sede).</p>}
+          </div>
+        </div>
+      )}
+
+      {(preCheck.turnos_sin_cobertura || []).length > 0 && (
+        <div className="mt-4 flex items-start gap-2 text-xs text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-xl p-3">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+          <div className="space-y-1">
+            <p className="font-bold">
+              Bloques que no cubren la ventana del turno ({preCheck.turnos_sin_cobertura.length}):
+            </p>
+            {preCheck.turnos_sin_cobertura.map(cob => (
+              <p key={`${cob.division}-${cob.sede_id}`}>· {mensajeCobertura(cob)}</p>
+            ))}
+            <p className="text-amber-700/80">
+              Las clases de ese turno quedarán sin espacios al final de la ventana. Amplía la jornada en
+              Configuración y genera la grilla estándar en Bloques Horarios.
+            </p>
           </div>
         </div>
       )}

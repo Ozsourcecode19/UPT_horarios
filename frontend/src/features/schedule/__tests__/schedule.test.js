@@ -15,6 +15,8 @@ import {
   indiceBloques,
   resolverBloqueDeCelda,
   agruparEventosPorCelda,
+  duracionBloqueDefault,
+  detectarHuecoVentana,
 } from '../utils/schedule';
 
 // --- mapeo de colores ---
@@ -415,6 +417,46 @@ describe('construirBandasEje', () => {
 
   it('sin bloques devuelve vacío', () => {
     expect(construirBandasEje([], [])).toEqual([]);
+  });
+});
+
+// --- cobertura de la ventana (Fase B) ---
+
+describe('duracionBloqueDefault', () => {
+  it('lee duracion_bloque_default (15–120) como número o string', () => {
+    expect(duracionBloqueDefault([{ clave: 'duracion_bloque_default', valor: 60 }])).toBe(60);
+    expect(duracionBloqueDefault([{ clave: 'duracion_bloque_default', valor: '45' }])).toBe(45);
+  });
+
+  it('cae a 45 si la clave falta o el valor es inválido', () => {
+    expect(duracionBloqueDefault([])).toBe(45);
+    expect(duracionBloqueDefault([{ clave: 'duracion_bloque_default', valor: 500 }])).toBe(45);
+    expect(duracionBloqueDefault([{ clave: 'duracion_bloque_default', valor: 'x' }])).toBe(45);
+  });
+});
+
+describe('detectarHuecoVentana', () => {
+  const ventana = { inicio: '13:00:00', fin: '18:00:00' }; // fin = 1080
+  const bandasTarde = [
+    { iniMin: 780, finMin: 825, etiqueta: '1:00 PM - 1:45 PM' },  // 13:00–13:45
+    { iniMin: 825, finMin: 870, etiqueta: '1:45 PM - 2:30 PM' },  // 13:45–14:30
+  ];
+
+  it('reporta el hueco cuando faltan más de un bloque al final', () => {
+    expect(detectarHuecoVentana(bandasTarde, ventana, 45)).toEqual({
+      hastaMin: 870, ventanaFinMin: 1080, huecoMin: 210,
+    });
+  });
+
+  it('no advierte si falta un bloque o menos (desalineación de la rejilla)', () => {
+    expect(detectarHuecoVentana([{ iniMin: 780, finMin: 1035 }], ventana, 45)).toBeNull(); // hueco 45
+    expect(detectarHuecoVentana([{ iniMin: 780, finMin: 1080 }], ventana, 45)).toBeNull(); // hueco 0
+  });
+
+  it('sin bandas o sin ventana → null (el aviso vacío ya lo maneja la grilla)', () => {
+    expect(detectarHuecoVentana([], ventana, 45)).toBeNull();
+    expect(detectarHuecoVentana(bandasTarde, null, 45)).toBeNull();
+    expect(detectarHuecoVentana(null, ventana, 45)).toBeNull();
   });
 });
 

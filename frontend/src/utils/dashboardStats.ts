@@ -102,6 +102,11 @@ export const resumenConflictos = (
     if (preCheck.clases_periodo_incoherente) {
       add('warn', 'Clases con periodo incoherente', `${preCheck.clases_periodo_incoherente} clase(s) cuya Sección pertenece a otro periodo; el algoritmo las descarta. Corrige el periodo en Planificación → Clases.`);
     }
+    const turnosSinCobertura = preCheck.turnos_sin_cobertura || [];
+    if (turnosSinCobertura.length > 0) {
+      add('warn', 'Bloques sin cubrir la ventana del turno',
+        `${turnosSinCobertura.length} turno/sede(s) con clases del periodo cuyos bloques no cubren su ventana (p. ej. la tarde termina antes de la hora configurada). Amplía la jornada y regenera la grilla estándar en Bloques Horarios.`);
+    }
   }
 
   if (generationStatus && generationStatus.status !== 'NONE') {

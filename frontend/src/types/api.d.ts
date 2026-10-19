@@ -79,6 +79,16 @@ export interface GenerationStatus {
   timestamp?: string | null
 }
 
+export interface TurnoCobertura {
+  division: string
+  sede_id: number
+  sede_nombre?: string
+  ventana_inicio: string
+  ventana_fin: string
+  bloque_hasta?: string | null
+  motivo: 'SIN_BLOQUES' | 'COBERTURA_INCOMPLETA' | string
+}
+
 export interface PreGenerationCheck {
   lecciones_activas: number
   docentes_con_disponibilidad: number
@@ -90,6 +100,7 @@ export interface PreGenerationCheck {
   lecciones_sin_candidatos: number
   clases_sin_slots?: number
   clases_periodo_incoherente?: number
+  turnos_sin_cobertura?: TurnoCobertura[]
   listo: boolean
 }
 

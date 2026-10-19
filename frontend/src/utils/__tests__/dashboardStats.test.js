@@ -129,6 +129,24 @@ describe('resumenConflictos', () => {
     expect(item.mensaje).toContain('otro periodo');
   });
 
+  it('warn por turnos_sin_cobertura (bloques que no cubren la ventana)', () => {
+    const preCheck = {
+      ...preCheckListo,
+      turnos_sin_cobertura: [
+        { division: 'VESPERTINO', sede_id: 1, motivo: 'COBERTURA_INCOMPLETA' },
+      ],
+    };
+    const res = resumenConflictos(preCheck, { status: 'DONE', count: 10 });
+    expect(res.nivel).toBe('warn');
+    const item = res.items.find(i => i.label === 'Bloques sin cubrir la ventana del turno');
+    expect(item.mensaje).toContain('1 turno/sede(s)');
+  });
+
+  it('sin turnos_sin_cobertura (campo ausente) no agrega la observación', () => {
+    const res = resumenConflictos(preCheckListo, { status: 'DONE', count: 10 });
+    expect(res.items.some(i => i.label === 'Bloques sin cubrir la ventana del turno')).toBe(false);
+  });
+
   it('nivel "error" si el periodo no esta listo por falta de requisitos criticos', () => {
     const preCheck = { listo: false, lecciones_activas: 0, aulas: 0, bloques: 0, docentes_con_habilitacion: 0 };
     const res = resumenConflictos(preCheck, null);

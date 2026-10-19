@@ -813,6 +813,9 @@ table.grilla-bloques {
 .dark .border-amber-100\/60 { border-color: rgb(245 158 11 / .18); }
 .dark .text-amber-600 { color: #fcd34d; }
 .dark .text-amber-700 { color: #fcd34d; }
+/* línea de ayuda del recuadro de cobertura de bloques (Fase B): sin este
+   remap queda rgb(180 83 9 / .8) sobre fondo ámbar oscuro → ~2:1 de contraste */
+.dark .text-amber-700\/80 { color: rgb(252 211 77 / .92); }
 .dark .text-amber-800 { color: #fde68a; }
 /* red */
 .dark .bg-red-50 { background-color: rgb(239 68 68 / .12); }

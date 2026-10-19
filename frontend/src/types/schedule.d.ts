@@ -41,6 +41,16 @@ export interface CoberturaDivision {
   ventana: VentanaTurno | null
 }
 
+/** Hueco final de cobertura de la grilla (ventana vs último bloque) */
+export interface HuecoVentana {
+  /** Fin (minutos) del último bloque renderizable */
+  hastaMin: number
+  /** Fin (minutos) de la ventana resuelta de la grilla */
+  ventanaFinMin: number
+  /** Minutos sin cubrir entre ambos */
+  huecoMin: number
+}
+
 // ─── Métricas de planificación ──────────────────────────────
 
 /** Métricas calculadas del módulo de planificación (Grupos + Lecciones) */

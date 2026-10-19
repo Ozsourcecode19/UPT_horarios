@@ -73,6 +73,23 @@ class GenerationStatus(BaseModel):
     class Config:
         from_attributes = True
 
+# Entrada de cobertura de bloques por turno (división) y sede.
+# Motivos:
+#   SIN_BLOQUES          -> la ventana del turno no tiene ningún bloque usable
+#   COBERTURA_INCOMPLETA -> la cobertura termina antes de `ventana_fin` (falta
+#                           más de un bloque completo al final de la ventana)
+class TurnoCobertura(BaseModel):
+    division: str                 # MATUTINO | VESPERTINO | NOCTURNO
+    sede_id: int
+    sede_nombre: str = ""
+    ventana_inicio: str = ""      # HH:MM
+    ventana_fin: str = ""         # HH:MM
+    bloque_hasta: Optional[str] = None  # HH:MM del fin del último bloque usable
+    motivo: str                   # SIN_BLOQUES | COBERTURA_INCOMPLETA
+    class Config:
+        from_attributes = True
+
+
 # Schema para el checklist previo a la generación de horarios
 class PreGenerationCheck(BaseModel):
     lecciones_activas: int = 0
@@ -87,6 +104,9 @@ class PreGenerationCheck(BaseModel):
     clases_sin_slots: int = 0
     # R0: clases cuya Sección pertenece a otro periodo (el solver las descarta)
     clases_periodo_incoherente: int = 0
+    # Turnos (división) cuya ventana no está cubierta por los bloques activos
+    # en alguna sede con clases del periodo. Es una ADVERTENCIA: no afecta `listo`.
+    turnos_sin_cobertura: List[TurnoCobertura] = Field(default_factory=list)
     listo: bool = False
     class Config:
         from_attributes = True

@@ -1,6 +1,7 @@
 # backend/crud/horarios_generados.py
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
+import json
 import models, schemas
 from typing import List, Optional
 from datetime import date, time, timedelta, datetime
@@ -8,6 +9,159 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DBAPIError
 from fastapi import HTTPException, status 
 from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
 import logging
+
+# ─── Cobertura de bloques por turno (división) ──────────────────────────────
+# Ventana estándar por turno cuando falta o está malformada la clave
+# `ventana_{division}` en configuracion. Mismo fallback que usa el frontend
+# (VENTANAS_TURNO_DEFAULT en features/schedule/utils/schedule.ts).
+VENTANAS_TURNO_DEFAULT = {
+    "MATUTINO": ("07:00:00", "12:00:00"),
+    "VESPERTINO": ("13:00:00", "18:00:00"),
+    "NOCTURNO": ("18:00:00", "22:00:00"),
+}
+
+
+def _a_minutos(hms) -> Optional[int]:
+    """'HH:MM[:SS]' (o time) → minutos desde medianoche; None si es inválido."""
+    try:
+        partes = [int(x) for x in str(hms).split(":")]
+    except (TypeError, ValueError):
+        return None
+    if not partes:
+        return None
+    hora = partes[0]
+    minuto = partes[1] if len(partes) > 1 else 0
+    if not (0 <= hora <= 23 and 0 <= minuto <= 59):
+        return None
+    return hora * 60 + minuto
+
+
+def _hhmm(minutos: int) -> str:
+    return f"{minutos // 60:02d}:{minutos % 60:02d}"
+
+
+def _ventana_de_turno(division: str, config_values: dict) -> tuple:
+    """(inicio, fin) en minutos de la ventana de un turno: lee
+    `ventana_{division}` de configuracion y cae al estándar si falta o está
+    malformada (mismo criterio que resolveVentanaTurno del frontend)."""
+    valor = config_values.get(f"ventana_{division.lower()}")
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except (ValueError, TypeError):
+            valor = None
+    if isinstance(valor, dict):
+        ini = _a_minutos(valor.get("hora_inicio"))
+        fin = _a_minutos(valor.get("hora_fin"))
+        if ini is not None and fin is not None and fin > ini:
+            return ini, fin
+    ini, fin = VENTANAS_TURNO_DEFAULT[division]
+    return _a_minutos(ini), _a_minutos(fin)
+
+
+def _duracion_bloque_default(config_values: dict) -> int:
+    """`duracion_bloque_default` (15–120) o 45 si falta/no es válido."""
+    try:
+        dur = int(config_values.get("duracion_bloque_default"))
+    except (TypeError, ValueError):
+        return 45
+    return dur if 15 <= dur <= 120 else 45
+
+
+def _turnos_sin_cobertura(
+    db: Session,
+    lecciones_activas: List[models.Leccion],
+    grupo_sede: dict,
+    grupo_division: dict,
+    config_values: dict,
+    dias_laborables: List[int],
+    jornada_ini_min: int,
+    jornada_fin_min: int,
+) -> List[schemas.TurnoCobertura]:
+    """
+    Detecta ventanas de turno (MATUTINO/VESPERTINO/NOCTURNO) que usan las
+    clases activas del periodo pero que el catálogo de bloques NO cubre.
+
+    Para cada (turno, sede con clases) calcula el último bloque usable:
+      - activo, en día laborable,
+      - cabe COMPLETO dentro de la ventana del turno (regla del solver) y
+        además dentro de la jornada general [hora_inicio_jornada, hora_fin_jornada].
+    Si no hay ninguno → SIN_BLOQUES; si la ventana termina más de un bloque
+    (duracion_bloque_default) después del último usable → COBERTURA_INCOMPLETA.
+
+    Es una ADVERTENCIA: no afecta `listo` (la generación sigue siendo posible,
+    pero esas clases quedarán sin slot en el final de la ventana).
+    """
+    sedes_por_turno: dict = {}
+    for leccion in lecciones_activas:
+        division = str(grupo_division.get(leccion.grupo_id) or "").upper()
+        if division not in VENTANAS_TURNO_DEFAULT:
+            continue  # grupos sin turno válido → jornada global, sin ventana propia
+        sede_id = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
+        if sede_id is None:
+            continue
+        sedes_por_turno.setdefault(division, set()).add(sede_id)
+
+    try:
+        dias = {int(d) for d in dias_laborables}
+    except (TypeError, ValueError):
+        dias = {1, 2, 3, 4, 5}
+
+    sede_ids = sorted({s for sedes in sedes_por_turno.values() for s in sedes})
+    if not sede_ids:
+        return []
+
+    nombres_sede = {s.id: s.nombre for s in db.query(models.Sede)
+                    .filter(models.Sede.id.in_(sede_ids)).all()}
+
+    bloques_por_sede: dict = {}
+    for bloque in db.query(models.BloqueHorario).filter(
+        models.BloqueHorario.sede_id.in_(sede_ids),
+        models.BloqueHorario.activo == True,  # noqa: E712
+    ):
+        if bloque.dia_semana not in dias:
+            continue
+        bloques_por_sede.setdefault(bloque.sede_id, []).append(bloque)
+
+    duracion = _duracion_bloque_default(config_values)
+    coberturas: List[schemas.TurnoCobertura] = []
+
+    for division in ("MATUTINO", "VESPERTINO", "NOCTURNO"):
+        for sede_id in sorted(sedes_por_turno.get(division, ())):
+            v_ini, v_fin = _ventana_de_turno(division, config_values)
+            r_ini = max(v_ini, jornada_ini_min)
+            r_fin = min(v_fin, jornada_fin_min)
+
+            bloque_hasta = None  # fin (minutos) del último bloque usable
+            for bloque in bloques_por_sede.get(sede_id, ()):
+                ini = _a_minutos(bloque.hora_inicio)
+                if ini is None:
+                    continue
+                fin = ini + (bloque.duracion_minutos or 0)
+                if ini < r_ini or fin > r_fin:
+                    continue
+                if bloque_hasta is None or fin > bloque_hasta:
+                    bloque_hasta = fin
+
+            if bloque_hasta is None:
+                motivo = "SIN_BLOQUES"
+            elif (v_fin - bloque_hasta) > duracion:
+                motivo = "COBERTURA_INCOMPLETA"
+            else:
+                continue  # cubierto (el residuo final puede ser < 1 bloque por rejilla)
+
+            coberturas.append(schemas.TurnoCobertura(
+                division=division,
+                sede_id=sede_id,
+                sede_nombre=nombres_sede.get(sede_id, ""),
+                ventana_inicio=_hhmm(v_ini),
+                ventana_fin=_hhmm(v_fin),
+                bloque_hasta=None if bloque_hasta is None else _hhmm(bloque_hasta),
+                motivo=motivo,
+            ))
+
+    return coberturas
+
 
 def get_horario_generado(db: Session, horario_id: int) -> Optional[models.HorarioGenerado]:
     """
@@ -453,7 +607,9 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
             continue
         sedes_con_bloque.add(bloque.sede_id)
 
-    grupo_sede = {g.id: g.sede_id for g in db.query(models.Grupo).all()}
+    grupos_catalogo = db.query(models.Grupo).all()
+    grupo_sede = {g.id: g.sede_id for g in grupos_catalogo}
+    grupo_division = {g.id: g.division for g in grupos_catalogo}
     lecciones_sin_candidatos = 0
     for leccion in lecciones_activas:
         leccion_sede = leccion.sede_forzada_id or grupo_sede.get(leccion.grupo_id)
@@ -514,6 +670,19 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
     aulas = db.query(models.Aula).filter(models.Aula.activa == True).count()  # noqa: E712
     bloques = db.query(models.BloqueHorario).filter(models.BloqueHorario.activo == True).count()  # noqa: E712
 
+    # Advertencia: turnos (división) con clases del periodo cuya ventana no
+    # está cubierta por los bloques activos de su sede. No afecta `listo`.
+    turnos_cobertura = _turnos_sin_cobertura(
+        db=db,
+        lecciones_activas=lecciones_activas,
+        grupo_sede=grupo_sede,
+        grupo_division=grupo_division,
+        config_values=config_values,
+        dias_laborables=dias_laborables,
+        jornada_ini_min=hora_inicio_jornada.hour * 60 + hora_inicio_jornada.minute,
+        jornada_fin_min=hora_fin_jornada.hour * 60 + hora_fin_jornada.minute,
+    )
+
     listo = (
         len(lecciones_activas) > 0
         and aulas > 0
@@ -532,6 +701,7 @@ def get_pre_generation_check(db: Session, periodo_id: int) -> schemas.PreGenerat
         lecciones_sin_candidatos=lecciones_sin_candidatos,
         clases_sin_slots=clases_sin_slots,
         clases_periodo_incoherente=clases_periodo_incoherente,
+        turnos_sin_cobertura=turnos_cobertura,
         listo=listo,
     )
 
