@@ -40,14 +40,14 @@ const LeccionesTable = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-              <th className="py-4 px-6">Docente</th>
-              <th className="py-4 px-6">Unidad Curricular</th>
-              <th className="py-4 px-6">Sección</th>
-              <th className="py-4 px-6">Horas Semanales</th>
-              <th className="py-4 px-6 text-center">Prioridad</th>
-              <th className="py-4 px-6">Sede Especial</th>
-              <th className="py-4 px-6 text-center">Estado</th>
-              <th className="py-4 px-6 text-right">Acciones</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Docente</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Unidad Curricular</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Sección</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Horas Semanales</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">Prioridad</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Sede Especial</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">Estado</th>
+              <th className="py-3 px-4 md:py-4 md:px-6 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
@@ -59,7 +59,7 @@ const LeccionesTable = ({
 
               return (
                 <tr key={leccion.id} className="hover:bg-slate-50/40 transition-colors group">
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4 md:py-4 md:px-6">
                     {doc ? (
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600 text-xs shrink-0">
@@ -74,7 +74,7 @@ const LeccionesTable = ({
                       <span className="text-xs text-slate-400 italic">ID: {leccion.docente_id}</span>
                     )}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4 md:py-4 md:px-6">
                     {mat ? (
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: mat.color_hex }} />
@@ -87,7 +87,7 @@ const LeccionesTable = ({
                       <span className="text-xs text-slate-400 italic">ID: {leccion.materia_id}</span>
                     )}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4 md:py-4 md:px-6">
                     {grup ? (
                       <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold font-mono border border-blue-100">
                         {grup.nombre}
@@ -96,7 +96,7 @@ const LeccionesTable = ({
                       <span className="text-xs text-slate-400 italic">ID: {leccion.grupo_id}</span>
                     )}
                   </td>
-                  <td className="py-4 px-6 font-semibold text-slate-700">
+                  <td className="py-3 px-4 md:py-4 md:px-6 font-semibold text-slate-700">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-slate-400" />
                       <span>{leccion.horas_semanales} horas</span>
@@ -105,7 +105,7 @@ const LeccionesTable = ({
                       {leccion.sesiones_semana ?? 1} sesión(es) × {leccion.bloques_por_sesion ?? 1} bloque(s)
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">
                     <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold ${
                       leccion.prioridad >= 7
                         ? 'bg-rose-50 text-rose-700'
@@ -117,7 +117,7 @@ const LeccionesTable = ({
                       <span>{leccion.prioridad}</span>
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-slate-500">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-slate-500">
                     {forcingSede ? (
                       <div className="flex items-center gap-1 text-rose-600 font-semibold text-xs">
                         <MapPin className="w-3.5 h-3.5" />
@@ -127,7 +127,7 @@ const LeccionesTable = ({
                       <span className="text-xs text-slate-400 italic">Cualquiera</span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">
                     {leccion.activo ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
                         <CheckCircle className="w-3 h-3" />
@@ -140,18 +140,18 @@ const LeccionesTable = ({
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-3 px-4 md:py-4 md:px-6 text-right">
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => onEdit(leccion)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                         title="Editar clase"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(leccion)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                         title="Eliminar clase"
                       >
                         <Trash2 className="w-4 h-4" />

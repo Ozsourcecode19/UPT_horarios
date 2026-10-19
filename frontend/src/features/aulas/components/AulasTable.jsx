@@ -45,12 +45,12 @@ const AulasTable = ({
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-            <th className="py-4 px-6">Identificación de Aula</th>
-            <th className="py-4 px-6">Ubicación / Sede</th>
-            <th className="py-4 px-6">Capacidad Máxima</th>
-            <th className="py-4 px-6">Tipo</th>
-            <th className="py-4 px-6 text-center">Estado</th>
-            <th className="py-4 px-6 text-right">Acciones</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Identificación de Aula</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Ubicación / Sede</th>
+            <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Capacidad Máxima</th>
+            <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Tipo</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-center">Estado</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-right">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-sm">
@@ -61,28 +61,28 @@ const AulasTable = ({
 
             return (
               <tr key={aula.id} className="hover:bg-slate-50/40 transition-colors group">
-                <td className="py-4 px-6">
+                <td className="py-3 px-4 md:py-4 md:px-6">
                   <div>
                     <span className="font-semibold text-slate-800 block">{aula.nombre}</span>
                     <span className="text-xs text-slate-400">ID: #{aula.id}</span>
                   </div>
                 </td>
-                <td className="py-4 px-6 text-slate-600">
+                <td className="py-3 px-4 md:py-4 md:px-6 text-slate-600">
                   <div className="flex items-center gap-1.5 font-medium">
                     <MapPin className="w-4 h-4 text-slate-400" />
                     <span>{sede?.nombre || `Sede ID: #${aula.sede_id}`}</span>
                   </div>
                 </td>
-                <td className="py-4 px-6 text-slate-700 font-bold">
+                <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-slate-700 font-bold">
                   {aula.capacidad ? `${aula.capacidad} estudiantes` : <span className="text-xs italic text-slate-400">Sin límite</span>}
                 </td>
-                <td className="py-4 px-6">
+                <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${typeConfig.color}`}>
                     <TypeIcon className="w-3.5 h-3.5" />
                     <span>{typeConfig.label}</span>
                   </span>
                 </td>
-                <td className="py-4 px-6 text-center">
+                <td className="py-3 px-4 md:py-4 md:px-6 text-center">
                   {aula.activa ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
                       <CheckCircle className="w-3.5 h-3.5" />
@@ -95,19 +95,19 @@ const AulasTable = ({
                     </span>
                   )}
                 </td>
-                <td className="py-4 px-6 text-right">
+                <td className="py-3 px-4 md:py-4 md:px-6 text-right">
                   {isWritable ? (
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => onEdit(aula)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                         title="Editar aula"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(aula)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                         title="Eliminar aula"
                       >
                         <Trash2 className="w-4 h-4" />

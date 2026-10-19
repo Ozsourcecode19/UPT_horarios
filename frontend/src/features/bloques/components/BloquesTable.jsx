@@ -51,32 +51,32 @@ const BloquesTable = ({
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-            <th className="py-4 px-6">Día</th>
-            <th className="py-4 px-6">Hora Inicio</th>
-            <th className="py-4 px-6">Fin</th>
-            <th className="py-4 px-6 text-center">Duración</th>
-            <th className="py-4 px-6 text-center">Orden</th>
-            <th className="py-4 px-6 text-center">Estado</th>
-            <th className="py-4 px-6 text-right">Acciones</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Día</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Hora Inicio</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Fin</th>
+            <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">Duración</th>
+            <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">Orden</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-center">Estado</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-right">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-sm">
           {filteredBloques.map((bloque) => (
             <tr key={bloque.id} className="hover:bg-slate-50/40 transition-colors group">
-              <td className="py-4 px-6">
+              <td className="py-3 px-4 md:py-4 md:px-6">
                 <span className="font-semibold text-slate-700">
                   {DIAS_NOMBRES[bloque.dia_semana] || `Día ${bloque.dia_semana}`}
                 </span>
               </td>
-              <td className="py-4 px-6 font-semibold text-slate-800">{formatHora12(bloque.hora_inicio.slice(0, 5))}</td>
-              <td className="py-4 px-6 text-slate-500">{formatHora12(calcularFin(bloque.hora_inicio, bloque.duracion_minutos))}</td>
-              <td className="py-4 px-6 text-center">
+              <td className="py-3 px-4 md:py-4 md:px-6 font-semibold text-slate-800">{formatHora12(bloque.hora_inicio.slice(0, 5))}</td>
+              <td className="py-3 px-4 md:py-4 md:px-6 text-slate-500">{formatHora12(calcularFin(bloque.hora_inicio, bloque.duracion_minutos))}</td>
+              <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">
                 <span className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200/60">
                   {bloque.duracion_minutos} min
                 </span>
               </td>
-              <td className="py-4 px-6 text-center text-slate-500">{bloque.orden_visual}</td>
-              <td className="py-4 px-6 text-center">
+              <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center text-slate-500">{bloque.orden_visual}</td>
+              <td className="py-3 px-4 md:py-4 md:px-6 text-center">
                 <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
                   bloque.activo
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
@@ -86,20 +86,20 @@ const BloquesTable = ({
                   {bloque.activo ? 'Activo' : 'Inactivo'}
                 </span>
               </td>
-              <td className="py-4 px-6 text-right">
+              <td className="py-3 px-4 md:py-4 md:px-6 text-right">
                 <div className="flex justify-end gap-2">
                   {isWritable ? (
                     <>
                       <button
                         onClick={() => onEdit(bloque)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                         title="Editar bloque"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onConfirmAction({ bloque, tipo: bloque.activo ? 'desactivar' : 'activar' })}
-                        className={`p-2 text-slate-400 rounded-xl transition-all ${
+                        className={`p-2.5 md:p-2 text-slate-400 rounded-xl transition-all ${
                           bloque.activo
                             ? 'hover:text-amber-600 hover:bg-amber-50'
                             : 'hover:text-emerald-600 hover:bg-emerald-50'
@@ -110,7 +110,7 @@ const BloquesTable = ({
                       </button>
                       <button
                         onClick={() => onConfirmAction({ bloque, tipo: 'eliminar' })}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                         title="Eliminar bloque"
                       >
                         <Trash2 className="w-4 h-4" />

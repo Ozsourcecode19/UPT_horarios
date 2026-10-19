@@ -47,17 +47,17 @@ export default function MateriasTable({ materias, isLoading, onEdit, onDelete })
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-            <th className="py-4 px-6">Identificación Visual</th>
-            <th className="py-4 px-6">Código de Unidad Curricular</th>
-            <th className="py-4 px-6">Carga Académica Semanal</th>
-            <th className="py-4 px-6 text-center">Estado en Horario</th>
-            <th className="py-4 px-6 text-right">Acciones</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Identificación Visual</th>
+            <th className="py-3 px-4 md:py-4 md:px-6">Código de Unidad Curricular</th>
+            <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Carga Académica Semanal</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-center">Estado en Horario</th>
+            <th className="py-3 px-4 md:py-4 md:px-6 text-right">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-sm">
           {materias.map((materia) => (
             <tr key={materia.id} className="hover:bg-slate-50/40 transition-colors group">
-              <td className="py-4 px-6">
+              <td className="py-3 px-4 md:py-4 md:px-6">
                 <div className="flex items-center gap-3">
                   <div
                     className="w-5 h-5 rounded-md shadow-inner flex-shrink-0 group-hover:scale-110 transition-transform duration-200"
@@ -70,18 +70,18 @@ export default function MateriasTable({ materias, isLoading, onEdit, onDelete })
                   </div>
                 </div>
               </td>
-              <td className="py-4 px-6">
+              <td className="py-3 px-4 md:py-4 md:px-6">
                 <span className="px-2.5 py-1 bg-slate-100/80 text-slate-600 rounded-lg text-xs font-mono font-bold border border-slate-200/45">
                   {materia.codigo}
                 </span>
               </td>
-              <td className="py-4 px-6">
+              <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">
                 <div className="flex items-center gap-1.5 font-semibold text-slate-700">
                   <Clock className="w-4 h-4 text-slate-400" />
                   <span>{materia.carga_horaria_estandar} horas</span>
                 </div>
               </td>
-              <td className="py-4 px-6 text-center">
+              <td className="py-3 px-4 md:py-4 md:px-6 text-center">
                 {materia.activa ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
                     <CheckCircle className="w-3.5 h-3.5" />
@@ -94,18 +94,18 @@ export default function MateriasTable({ materias, isLoading, onEdit, onDelete })
                   </span>
                 )}
               </td>
-              <td className="py-4 px-6 text-right">
+              <td className="py-3 px-4 md:py-4 md:px-6 text-right">
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => onEdit(materia)}
-                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                    className="p-2.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                     title="Editar unidad curricular"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDelete(materia)}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    className="p-2.5 md:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                     title="Eliminar unidad curricular"
                   >
                     <Trash2 className="w-4 h-4" />

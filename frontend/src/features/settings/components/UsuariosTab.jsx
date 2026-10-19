@@ -45,7 +45,7 @@ export default function UsuariosTab({ usuarios, isUsuariosLoading, isAdmin, user
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700">
                 <th className="py-3 px-4">Usuario</th>
-                <th className="py-3 px-4">Email</th>
+                <th className="hidden md:table-cell py-3 px-4">Email</th>
                 <th className="py-3 px-4 text-center">Rol</th>
                 <th className="py-3 px-4 text-center">Estado</th>
                 <th className="py-3 px-4 text-right">Acciones</th>
@@ -60,9 +60,10 @@ export default function UsuariosTab({ usuarios, isUsuariosLoading, isAdmin, user
                       <div>
                         <span className="font-semibold text-slate-800 dark:text-slate-100 block">{u.username}</span>
                         <span className="text-xs text-slate-400 dark:text-slate-500">ID: #{u.id}</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 block truncate md:hidden">{u.email}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{u.email}</td>
+                    <td className="hidden md:table-cell py-3 px-4 text-slate-600 dark:text-slate-300">{u.email}</td>
                     <td className="py-3 px-4 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${rc.color}`}>{u.rol}</span>
                     </td>
@@ -80,10 +81,10 @@ export default function UsuariosTab({ usuarios, isUsuariosLoading, isAdmin, user
                     <td className="py-3 px-4 text-right">
                       {isAdmin && (
                         <div className="flex justify-end gap-1">
-                          <button onClick={() => onEdit(u)} className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-all" title="Editar usuario">
+                          <button onClick={() => onEdit(u)} className="p-2.5 md:p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-all" title="Editar usuario">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => onDelete(u)} className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all" title="Eliminar usuario">
+                          <button onClick={() => onDelete(u)} className="p-2.5 md:p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all" title="Eliminar usuario">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>

@@ -37,14 +37,14 @@ const GruposTable = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100">
-              <th className="py-4 px-6">Sección</th>
-              <th className="py-4 px-6">Trayecto Académico</th>
-              <th className="py-4 px-6">Ubicación / Sede</th>
-              <th className="py-4 px-6 text-center">Turno</th>
-              <th className="py-4 px-6 text-center">Matrícula (Alumnos)</th>
-              <th className="py-4 px-6">Período</th>
-              <th className="py-4 px-6 text-center">Estado</th>
-              <th className="py-4 px-6 text-right">Acciones</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Sección</th>
+              <th className="py-3 px-4 md:py-4 md:px-6">Trayecto Académico</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Ubicación / Sede</th>
+              <th className="py-3 px-4 md:py-4 md:px-6 text-center">Turno</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center">Matrícula (Alumnos)</th>
+              <th className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6">Período</th>
+              <th className="py-3 px-4 md:py-4 md:px-6 text-center">Estado</th>
+              <th className="py-3 px-4 md:py-4 md:px-6 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
@@ -55,13 +55,14 @@ const GruposTable = ({
 
               return (
                 <tr key={grupo.id} className="hover:bg-slate-50/40 transition-colors group">
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4 md:py-4 md:px-6">
                     <div>
                       <span className="font-semibold text-slate-800 block">{grupo.nombre}</span>
                       <span className="text-[10px] text-slate-400">ID: #{grupo.id}</span>
+                      <span className="text-[10px] text-slate-400 block truncate md:hidden">{sede?.nombre || 'Sin sede'}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-slate-600 font-medium">
+                  <td className="py-3 px-4 md:py-4 md:px-6 text-slate-600 font-medium">
                     {trayecto ? (
                       <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-semibold">
                         {trayecto.nombre}
@@ -70,13 +71,13 @@ const GruposTable = ({
                       <span className="text-xs text-slate-400">ID: #{grupo.trayecto_id}</span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-slate-600">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-slate-600">
                     <div className="flex items-center gap-1 text-xs font-medium">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span>{sede?.nombre || `Sede ID: #${grupo.sede_id}`}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="py-3 px-4 md:py-4 md:px-6 text-center">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                       grupo.division === 'MATUTINO' ? 'bg-blue-50 text-blue-700' :
                       grupo.division === 'VESPERTINO' ? 'bg-emerald-50 text-emerald-700' :
@@ -86,13 +87,13 @@ const GruposTable = ({
                       <span>{TURNOS_LABELS[grupo.division] ?? grupo.division}</span>
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-center font-bold text-slate-700">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-center font-bold text-slate-700">
                     {grupo.cantidad_alumnos} alumnos
                   </td>
-                  <td className="py-4 px-6 text-slate-500">
+                  <td className="hidden md:table-cell py-3 px-4 md:py-4 md:px-6 text-slate-500">
                     {periodo ? periodo.nombre : `ID: #${grupo.periodo_id}`}
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="py-3 px-4 md:py-4 md:px-6 text-center">
                     {grupo.activo ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
                         <CheckCircle className="w-3.5 h-3.5" />
@@ -105,18 +106,18 @@ const GruposTable = ({
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-3 px-4 md:py-4 md:px-6 text-right">
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => onEdit(grupo)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                         title="Editar sección"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(grupo)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        className="p-2.5 md:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                         title="Eliminar sección"
                       >
                         <Trash2 className="w-4 h-4" />
