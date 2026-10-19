@@ -43,9 +43,6 @@ const Horarios = () => {
 
   const puedeEscribir = useCanWrite();
 
-  // Modo solo-iconos para el segmented "Ver Por" cuando no cabe el texto en móvil
-  const [iconOnly, setIconOnly] = useState(false);
-
   const listadoHorariosRaw = demoMode
     ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId))
     : horariosReal;
@@ -210,34 +207,11 @@ const Horarios = () => {
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const closeMenuTimer = useRef(null);
   const printAreaRef = useRef(null);
-  const segmentedRef = useRef(null);
-  const medidorRef = useRef(null);
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
     setEditAbarca(detectarNSesion(selectedEvent, listadoHorarios, bloques));
   }, [isEditModalOpen, selectedEvent, listadoHorarios, bloques]);
-
-  // Detecta si los botones del segmented "Ver Por" exceden el ancho del contenedor
-  // y, en ese caso, muestra solo los iconos (sin texto) para evitar desbordamiento en móvil.
-  // Se mide un clon invisible SIEMPRE CON TEXTO (medidorRef), independiente del
-  // estado iconOnly, para evitar el bucle de realimentación del ResizeObserver.
-  useEffect(() => {
-    const container = segmentedRef.current;
-    if (!container || TIPOS_VISTA.length === 0) return;
-
-    const observer = new ResizeObserver(() => {
-      const contenedor = container.clientWidth || 0;
-      const disponible = Math.max(0, contenedor - 8); // restar p-1 (8 px) del contenedor
-      const needed = medidorRef.current?.scrollWidth || 0;
-      // +2 px de tolerancia por redondeo; la medición del clon es estable ⇒ sin bucle
-      setIconOnly(needed > disponible + 2);
-    });
-
-    observer.observe(container);
-    observer.observe(container.parentElement ?? document.body);
-    return () => observer.disconnect();
-  }, [segmentedRef, medidorRef, TIPOS_VISTA.length]);
 
   const bloqueSeleccionado = useBloqueSeleccionado(bloques, editBloqueId);
   const sedeAulaEdicion = useSedeAulaEdicion(aulas, editAulaId);
@@ -351,14 +325,14 @@ const Horarios = () => {
         <div className={`w-full flex flex-col sm:flex-row gap-4 sm:gap-6 ${sedes.length > 1 ? 'md:w-auto md:flex-1' : 'md:w-auto md:flex-1 md:max-w-sm'}`}>
           <div className={`space-y-1.5 min-w-0 ${sedes.length > 1 ? 'flex-1' : 'w-full'}`}>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
-            <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
+            <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
               {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.estado})</option>)}
             </select>
           </div>
           {sedes.length > 1 && (
             <div className="space-y-1.5 min-w-0 flex-1">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Sede</label>
-              <select value={selectedSedeId || ''} onChange={(e) => setSelectedSedeId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
+              <select value={selectedSedeId || ''} onChange={(e) => setSelectedSedeId(e.target.value ? Number(e.target.value) : null)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
                 <option value="">Todas las Sedes</option>
                 {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
@@ -368,11 +342,11 @@ const Horarios = () => {
         <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
           <div className="space-y-1.5 flex-1 min-w-0 relative">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
-            <div ref={segmentedRef} className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
                 <button key={valor} onClick={() => setFilterType(valor)} title={etiqueta} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <Icono className={`w-4 h-4 shrink-0 ${iconOnly ? 'mx-auto' : ''}`} />
-                  {!iconOnly && <span className="truncate min-w-0">{etiqueta}</span>}
+                  <Icono className={`w-4 h-4 shrink-0 ${filterType === valor ? 'mx-auto' : ''}`} />
+                  <span className={`truncate min-w-0 ${filterType === valor ? '' : 'max-[480px]:hidden'}`}>{etiqueta}</span>
                 </button>
               ))}
             </div>
