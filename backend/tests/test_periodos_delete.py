@@ -11,7 +11,28 @@ import pytest
 from fastapi import HTTPException
 
 import models
-from crud.periodos_academicos import delete_periodo_academico
+from crud.periodos_academicos import delete_periodo_academico, adjuntar_referencias_periodos
+
+
+def test_adjuntar_referencias_periodos_cuenta_hijas(data, db_session):
+    """El listado adjunta registros_asociados con el total de hijos en cascada."""
+    # El seed asocia lección, sección y horario al periodo
+    adjuntar_referencias_periodos(db_session, [data.periodo])
+    assert data.periodo.registros_asociados >= 3  # lecciones + secciones + horarios
+
+
+def test_adjuntar_referencias_periodos_vacio_es_cero(data, db_session):
+    """Un periodo sin datos queda con registros_asociados == 0 (apto para eliminar)."""
+    vacio = models.PeriodoAcademico(
+        nombre="2027-II-vacio", tipo_corte="TRIMESTRAL", anio_academico=2027,
+        fecha_inicio=date(2027, 5, 10), fecha_fin=date(2027, 8, 10),
+    )
+    db_session.add(vacio)
+    db_session.commit()
+
+    adjuntar_referencias_periodos(db_session, [data.periodo, vacio])
+    assert vacio.registros_asociados == 0
+    assert data.periodo.registros_asociados >= 3
 
 
 def test_delete_periodo_con_datos_responde_409(data, db_session):

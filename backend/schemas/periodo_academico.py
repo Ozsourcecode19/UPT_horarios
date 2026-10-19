@@ -78,6 +78,10 @@ class PeriodoAcademico(PeriodoAcademicoBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    # Total de hijos que se borrarían en cascada (lecciones + horarios + secciones + carreras).
+    # Se calcula solo en el listado (GET /): 0 => periodo vacío, apto para eliminar.
+    # None => no informado (POST/PUT/GET por id).
+    registros_asociados: Optional[int] = None
 
     class Config:
         from_attributes = True

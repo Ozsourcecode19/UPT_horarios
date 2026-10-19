@@ -1039,6 +1039,18 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 **Verificación:** `pnpm test` ✅ **446 tests en 32 archivos** (+18) · `pnpm build` ✅. **Limitación conocida (deseada):** `PREFERENCIA` sigue sin efecto en el solver; celdas "Fuera de ventana" marcadas quedan verdes con badge pero no asignan hasta que una ventana las cubra.
 
+### Contexto de la Sesión Actual (2026-10-19) — Periodos: Eliminar (solo ADMIN y periodo vacío)
+
+**Contexto:** `DELETE /api/periodos-academicos/{id}` existía, pero el esquema declara `ON DELETE CASCADE` sobre lecciones/horarios/secciones/carreras → borrar un periodo con datos destruía todo en cascada. El frontend nunca exponía la acción (`deletePeriodo` del cliente API era código muerto).
+
+**Backend:** barrera `409 PERIODO_EN_USO` en `crud.delete_periodo_academico` (cuenta los hijos en las 4 tablas; solo borra periodos vacíos; el error trae desglose `referencias`). El listado adjunta **`registros_asociados`** por periodo (`crud.adjuntar_referencias_periodos`, 4 consultas agrupadas; schema `PeriodoAcademico.registros_asociados: Optional[int]` → `None` en POST/PUT/GET por id, poblado solo en `GET /`).
+
+**Frontend:** `PeriodosTable` muestra el botón **Eliminar** (papelera roja) solo si `isAdmin && periodo.registros_asociados === 0`; `ConfirmToggleModal` acepta `accion: 'eliminar'` (estilo peligro; texto "no se puede deshacer; solo se permite porque el periodo está vacío"). `usePeriodosCrud` expone `handleDelete` (Modo Demo: filtra el mock local; real: `PeriodosService.deletePeriodo` + toast con `detail.mensaje` del 409 si hay carrera) y `handleConfirm` que despacha cerrar/reactivar/eliminar. Los mocks de demo llevan `registros_asociados` variados para ejemplificar el gateo.
+
+**Tests:** +2 backend (`test_periodos_delete.py`: batch con hijas ≥3 y vacío == 0) y +4 frontend (`features/periodos/__tests__/periodosTable.test.jsx`: ADMIN+vacío invoca `onDelete`; con datos no muestra el botón; no-admin "Solo lectura"; cerrado vacío muestra Reactivar+Eliminar).
+
+**Verificación:** backend ✅ **99 tests** · frontend ✅ **450 tests en 33 archivos** · `pnpm build` ✅.
+
 ---
 
 ## 7. Responsive y móvil (2026-10-18)

@@ -27,7 +27,7 @@ const Periodos = () => {
     isModalOpen, setIsModalOpen, editingPeriodo, setEditingPeriodo,
     confirmAction, setConfirmAction,
     toast,
-    handleSave, handleToggleEstado,
+    handleSave, handleConfirm,
     openModal, reconnectDemo,
   } = usePeriodosCrud({ searchTerm, debouncedSearch });
 
@@ -109,6 +109,7 @@ const Periodos = () => {
           isAdmin={isAdmin}
           onEdit={(p) => openModal(p)}
           onToggleEstado={(p, accion) => setConfirmAction({ periodo: p, accion })}
+          onDelete={(p) => setConfirmAction({ periodo: p, accion: 'eliminar' })}
         />
 
         {/* Paginación */}
@@ -132,11 +133,11 @@ const Periodos = () => {
         onSave={handleSave}
       />
 
-      {/* Modal Cerrar/Reactivar */}
+      {/* Modal Cerrar/Reactivar/Eliminar */}
       <ConfirmToggleModal
         confirmAction={confirmAction}
         onClose={() => setConfirmAction(null)}
-        onConfirm={handleToggleEstado}
+        onConfirm={handleConfirm}
       />
 
     </div>

@@ -1,7 +1,7 @@
 // src/features/periodos/components/PeriodosTable.jsx
 // Tabla de periodos con loading skeleton, empty state y acciones.
 
-import { CalendarRange, Edit2, CheckCircle, Lock } from 'lucide-react';
+import { CalendarRange, Edit2, CheckCircle, Lock, Trash2 } from 'lucide-react';
 import { TIPO_CORTE_STYLES, ESTADO_STYLES } from '../constants';
 import { formatFecha } from '../utils/periodos';
 
@@ -12,6 +12,7 @@ const PeriodosTable = ({
   isAdmin,
   onEdit,
   onToggleEstado,
+  onDelete,
 }) => {
   if (isLoading && !demoMode) {
     return (
@@ -120,6 +121,16 @@ const PeriodosTable = ({
                             title="Cerrar periodo"
                           >
                             <Lock className="w-4 h-4" />
+                          </button>
+                        )}
+                        {/* Solo ADMIN y periodo vacío (0 hijos en cascada) permite eliminar */}
+                        {periodo.registros_asociados === 0 && onDelete && (
+                          <button
+                            onClick={() => onDelete(periodo)}
+                            className="p-2.5 md:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Eliminar periodo"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </>

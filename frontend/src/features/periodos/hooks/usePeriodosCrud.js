@@ -136,6 +136,36 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
     }
   };
 
+  // Eliminar periodo: solo ADMIN y periodo vacío (registros_asociados === 0 en
+  // el listado). Si entre la carga y el clic el periodo ganó datos, el backend
+  // responde 409 PERIODO_EN_USO y mostramos su mensaje.
+  const handleDelete = async () => {
+    if (!confirmAction) return;
+    const { periodo } = confirmAction;
+
+    if (demoMode) {
+      setDemoPeriodos(prev => prev.filter(p => p.id !== periodo.id));
+      showToast("Periodo eliminado exitosamente en Modo Demo", "info");
+      setConfirmAction(null);
+    } else {
+      try {
+        await PeriodosService.deletePeriodo(periodo.id);
+        queryClient.invalidateQueries({ queryKey: ['periodos'] });
+        showToast("Periodo eliminado exitosamente", "info");
+        setConfirmAction(null);
+      } catch (err) {
+        console.error(err);
+        showToast(err?.response?.data?.detail?.mensaje || "Error al eliminar el periodo", "error");
+      }
+    }
+  };
+
+  // Despacha la acción confirmada según el tipo (cerrar/reactivar/eliminar).
+  const handleConfirm = () => {
+    if (confirmAction?.accion === 'eliminar') return handleDelete();
+    return handleToggleEstado();
+  };
+
   const reconnectDemo = () => {
     setDemoMode(false);
     queryClient.invalidateQueries({ queryKey: ['periodos'] });
@@ -150,7 +180,7 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
     isModalOpen, setIsModalOpen, editingPeriodo, setEditingPeriodo,
     confirmAction, setConfirmAction,
     toast, showToast,
-    handleSave, handleToggleEstado,
+    handleSave, handleToggleEstado, handleDelete, handleConfirm,
     openModal, reconnectDemo,
   };
 };

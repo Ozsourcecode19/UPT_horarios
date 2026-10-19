@@ -33,6 +33,9 @@ def read_periodos_academicos(skip: int = 0, limit: int = 20, search: Optional[st
     Obtiene una lista de periodos académicos con paginación.
     """
     items, total = crud.get_periodos_academicos(db, skip=skip, limit=limit, search=search)
+    # Registros asociados por periodo (0 => vacío): el frontend lo usa para
+    # habilitar el botón Eliminar solo en periodos sin datos.
+    crud.adjuntar_referencias_periodos(db, items)
     return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
 @router.put("/{periodo_id}", response_model=schemas.PeriodoAcademico, dependencies=[Depends(require_role(["ADMIN"]))])

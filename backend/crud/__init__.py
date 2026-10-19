@@ -2,7 +2,7 @@
 from .usuarios import get_usuario, get_usuarios, create_usuario, update_usuario, delete_usuario
 from .sedes import get_sede, get_sedes, create_sede, update_sede, delete_sede
 from .carreras import get_carrera, get_carreras, create_carrera, update_carrera, delete_carrera
-from .periodos_academicos import get_periodo_academico, get_periodos_academicos, create_periodo_academico, update_periodo_academico, delete_periodo_academico
+from .periodos_academicos import get_periodo_academico, get_periodos_academicos, create_periodo_academico, update_periodo_academico, delete_periodo_academico, adjuntar_referencias_periodos
 from .trayectos_academicos import get_trayecto_academico, get_trayectos_academicos, create_trayecto_academico, update_trayecto_academico, delete_trayecto_academico
 from .grupos import get_grupo, get_grupos, create_grupo, update_grupo, delete_grupo
 from .docentes import get_docente, get_docentes, create_docente, update_docente, delete_docente
@@ -20,7 +20,7 @@ __all__ = [
     "get_usuario", "get_usuarios", "create_usuario", "update_usuario", "delete_usuario",
     "get_sede", "get_sedes", "create_sede", "update_sede", "delete_sede",
     "get_carrera", "get_carreras", "create_carrera", "update_carrera", "delete_carrera",
-    "get_periodo_academico", "get_periodos_academicos", "create_periodo_academico", "update_periodo_academico", "delete_periodo_academico",
+    "get_periodo_academico", "get_periodos_academicos", "create_periodo_academico", "update_periodo_academico", "delete_periodo_academico", "adjuntar_referencias_periodos",
     "get_trayecto_academico", "get_trayectos_academicos", "create_trayecto_academico", "update_trayecto_academico", "delete_trayecto_academico",
     "get_grupo", "get_grupos", "create_grupo", "update_grupo", "delete_grupo",
     "get_docente", "get_docentes", "create_docente", "update_docente", "delete_docente",

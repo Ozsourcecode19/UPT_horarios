@@ -46,10 +46,19 @@ const PeriodosService = {
   updatePeriodo: async (id, periodoData) => {
     const response = await apiClient.put(`/periodos-academicos/${id}`, periodoData);
     return response.data;
+  },
+
+  /**
+   * Elimina un período académico (solo ADMIN y solo si está vacío).
+   * El backend responde 409 PERIODO_EN_USO si el periodo tiene registros
+   * asociados (lecciones/horarios/secciones/carreras), que se borrarian en cascada.
+   * @param {number | string} id
+   * @returns {Promise<unknown>}
+   */
+  deletePeriodo: async (id) => {
+    const response = await apiClient.delete(`/periodos-academicos/${id}`);
+    return response.data;
   }
-  // Nota: no existe deletePeriodo a propósito. El ciclo de vida de un periodo es
-  // ACTIVO <-> CERRADO (soft-delete); el endpoint DELETE del backend responde
-  // 409 PERIODO_EN_USO para periodos con datos (borrado en cascada).
 };
 
 export default PeriodosService;
