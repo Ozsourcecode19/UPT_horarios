@@ -13,6 +13,7 @@ export {
 } from './utils/schedule';
 export { validateMoveMock } from './utils/scheduleValidation';
 export { agruparSesiones, resolverRun } from './utils/sesiones';
+export { resolverTap, TAP } from './utils/tapMove';
 
 // Hooks
 export { default as useScheduleGeneration } from './hooks/useScheduleGeneration';

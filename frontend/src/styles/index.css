@@ -288,6 +288,81 @@ table.grilla-bloques {
   }
 }
 
+/* Tap-to-move en táctiles (plan responsive, Fase 3):
+   selección de la clase origen + celdas que aceptan el destino */
+.evento-card.seleccionada {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.grilla-bloques td.celda-destino {
+  outline: 1px dashed #60a5fa;
+  outline-offset: -3px;
+  background-color: #f8fbff;
+}
+
+.grilla-bloques td.celda-origen {
+  background-color: #eff6ff !important;
+}
+
+/* Barra flotante de acción (solo en pantalla; la clase JS añade no-print) */
+.touch-bar {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-radius: 1rem;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 0.35);
+}
+
+.touch-bar-texto {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.touch-bar-titulo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.touch-bar-hint {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.touch-bar-btn {
+  min-height: 40px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background-color: #2563eb;
+  color: #fff;
+  transition: background-color 0.15s ease;
+}
+
+.touch-bar-btn:active {
+  background-color: #1d4ed8;
+}
+
+.touch-bar-btn.touch-bar-cancel {
+  background-color: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+
 .evento-card .ev-x2 {
   font-style: normal;
   font-weight: 800;
@@ -531,6 +606,13 @@ table.grilla-bloques {
   .print-area .ev-del,
   .print-section .ev-del {
     display: none !important;
+  }
+
+  /* Sin anillo de selección táctil en el papel */
+  .print-area .evento-card.seleccionada,
+  .print-section .evento-card.seleccionada {
+    outline: none !important;
+    box-shadow: none !important;
   }
 
   /* Ocultar badges de conflicto en impresión */

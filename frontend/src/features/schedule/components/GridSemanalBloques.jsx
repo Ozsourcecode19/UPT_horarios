@@ -5,7 +5,9 @@
 //   franja tenue de continuación en las bandas siguientes (click/drag delegan
 //   al principal)
 // - Icono de eliminación en la tarjeta (la página confirma y resuelve la sesión)
-// - DnD HTML5 nativo; la página resuelve celda→bloque EXACTO y valida
+// - DnD HTML5 nativo en escritorio; en TÁCTIL: tap-to-move (1er toque selecciona,
+//   2º toque en la celda destino mueve vía onDropEnCelda → validate-move)
+// - La página resuelve celda→bloque EXACTO y valida
 
 import { useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -13,6 +15,8 @@ import { horaAMinutos } from '../utils/schedule';
 import { formatHora12 } from '../../../utils/timeFormat';
 import { COLOR_FALLBACK } from '../../../constants';
 import { agruparSesiones } from '../utils/sesiones';
+import { resolverTap, TAP } from '../utils/tapMove';
+import useIsTouch from '../../../hooks/useIsTouch';
 
 const DIAS = [
   { dia: 1, nombre: 'LUNES' },
@@ -38,6 +42,9 @@ const GridSemanalBloques = ({
 }) => {
   const [drag, setDrag] = useState(null); // {id, esSpan}
   const [celdaHover, setCeldaHover] = useState(null);
+  // Tap-to-move (táctiles): clase seleccionada como origen del movimiento
+  const [seleccion, setSeleccion] = useState(null);
+  const isTouch = useIsTouch();
 
   // Detección de sesiones: runs contiguos por lección+día (genérico a N bloques)
   const infoSpanPorId = useMemo(() => agruparSesiones(eventos, bloques), [eventos, bloques]);
@@ -152,8 +159,37 @@ const GridSemanalBloques = ({
     onDropEnCelda({ horarioId: String(meta.id), esSpan: !!meta.esSpan, sesionTotal: meta.sesionTotal || 1, dia, iniMin: banda.iniMin });
   };
 
+  const enModoMover = isTouch && !!seleccion;
+
   return (
     <div className="grilla-scroll">
+      {/* Barra de acción en táctiles (position:fixed → fuera del flujo/scroll) */}
+      {enModoMover && (
+        <div className="touch-bar no-print" role="toolbar" aria-label="Mover clase seleccionada">
+          <div className="touch-bar-texto">
+            <span className="touch-bar-titulo">{seleccion.titulo || 'Clase seleccionada'}</span>
+            <span className="touch-bar-hint">Toca la celda destino para mover</span>
+          </div>
+          <button
+            type="button"
+            className="touch-bar-btn"
+            onClick={() => {
+              const clickInfo = seleccion.clickInfo;
+              setSeleccion(null);
+              onEventoClick?.(clickInfo);
+            }}
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            className="touch-bar-btn touch-bar-cancel"
+            onClick={() => setSeleccion(null)}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
       <p className="grilla-hint no-print">Desliza para ver todos los días →</p>
       <table className="grilla-bloques">
         <thead>
@@ -206,7 +242,18 @@ const GridSemanalBloques = ({
                   return (
                     <td
                       key={dia}
-                      className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto}`}
+                      className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto} ${
+                        enModoMover ? (seleccion.celdaKey === key ? 'celda-origen' : 'celda-destino') : ''
+                      }`}
+                      onClick={() => {
+                        // Tap-to-move: solo en táctiles con una clase seleccionada
+                        if (!enModoMover) return;
+                        const r = resolverTap({ seleccion, target: { tipo: 'celda', dia, iniMin: fila.banda.iniMin } });
+                        if (r.accion === TAP.MOVER) {
+                          onDropEnCelda?.(r.payload);
+                          setSeleccion(null);
+                        }
+                      }}
                       onDragOver={(e) => {
                         if (!drag) return;
                         e.preventDefault();
@@ -228,7 +275,9 @@ const GridSemanalBloques = ({
                         return (
                           <div
                             key={ev.id}
-                            className={`evento-card ${esContinuacion ? 'evento-continuacion' : ''}`}
+                            className={`evento-card ${esContinuacion ? 'evento-continuacion' : ''} ${
+                              seleccion?.horarioId === String(objetivo.id) ? 'seleccionada' : ''
+                            }`}
                             style={{ '--ev-c': ev.extendedProps?.backgroundColor || COLOR_FALLBACK }}
                             draggable
                             onDragStart={(e) => {
@@ -237,12 +286,36 @@ const GridSemanalBloques = ({
                               setDrag({ id: String(objetivo.id), esSpan: !!info?.esSesion, sesionTotal: info?.total || 1 });
                             }}
                             onDragEnd={() => { setDrag(null); setCeldaHover(null); }}
-                            onClick={() => onEventoClick?.({
-                              id: String(objetivo.id),
-                              start: new Date(objetivo.start),
-                              end: new Date(objetivo.end),
-                              extendedProps: objetivo.extendedProps,
-                            })}
+                            onClick={(e) => {
+                              const clickInfo = {
+                                id: String(objetivo.id),
+                                start: new Date(objetivo.start),
+                                end: new Date(objetivo.end),
+                                extendedProps: objetivo.extendedProps,
+                              };
+                              if (isTouch) {
+                                // Tap-to-move: el toque NO abre el editor directamente
+                                e.stopPropagation();
+                                const r = resolverTap({ seleccion, target: {
+                                  tipo: 'tarjeta',
+                                  horarioId: String(objetivo.id),
+                                  esSpan: !!info?.esSesion,
+                                  sesionTotal: info?.total || 1,
+                                  celdaKey: key,
+                                  clickInfo,
+                                  titulo: ev.extendedProps?.materia || ev.title,
+                                }});
+                                if (r.accion === TAP.SELECCIONAR || r.accion === TAP.REEMPLAZAR) {
+                                  setSeleccion(r.payload);
+                                  return;
+                                }
+                                if (r.accion === TAP.CANCELAR) {
+                                  setSeleccion(null);
+                                  return;
+                                }
+                              }
+                              onEventoClick?.(clickInfo);
+                            }}
                           >
                             {!esContinuacion && onDeleteEvento && (
                               <button
