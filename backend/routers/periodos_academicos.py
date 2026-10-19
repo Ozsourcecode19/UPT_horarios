@@ -49,6 +49,10 @@ def update_periodo_academico(periodo_id: int, periodo_update: schemas.PeriodoAca
 def delete_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
     """
     Elimina un periodo académico.
+
+    Responde 409 PERIODO_EN_USO si el periodo tiene registros asociados
+    (lecciones, horarios, secciones o carreras), ya que el esquema los
+    borraría en cascada. Solo se eliminan periodos vacíos.
     """
     deleted = crud.delete_periodo_academico(db, periodo_id=periodo_id)
     if not deleted:

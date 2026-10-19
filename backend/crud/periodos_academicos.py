@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 import models, schemas
 from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError
+from fastapi import HTTPException, status
 
 def get_periodo_academico(db: Session, periodo_id: int) -> Optional[models.PeriodoAcademico]:
     """
@@ -59,11 +60,39 @@ def update_periodo_academico(db: Session, periodo_id: int, periodo_update: schem
 def delete_periodo_academico(db: Session, periodo_id: int) -> bool:
     """
     Elimina un periodo académico de la base de datos.
+
+    Barrera de seguridad PERIODO_EN_USO: el esquema declara ON DELETE CASCADE
+    en lecciones, horarios_generados, grupos y carrera_periodo, por lo que borrar
+    un periodo con datos destruiría toda esa información de forma irreversible.
+    Solo se permite eliminar periodos sin registros asociados.
+
     Retorna True si se eliminó, False si no existía.
     """
     db_periodo = db.query(models.PeriodoAcademico).filter(models.PeriodoAcademico.id == periodo_id).first()
     if not db_periodo:
         return False
+
+    referencias = {
+        "lecciones": db.query(models.Leccion).filter(models.Leccion.periodo_id == periodo_id).count(),
+        "horarios_generados": db.query(models.HorarioGenerado).filter(models.HorarioGenerado.periodo_id == periodo_id).count(),
+        "secciones": db.query(models.Grupo).filter(models.Grupo.periodo_id == periodo_id).count(),
+        "carreras": db.query(models.carrera_periodo).filter(models.carrera_periodo.c.periodo_id == periodo_id).count(),
+    }
+    afectadas = sum(referencias.values())
+    if afectadas > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error_code": "PERIODO_EN_USO",
+                "mensaje": (
+                    f"El periodo tiene {afectadas} registro(s) asociado(s) "
+                    f"(lecciones: {referencias['lecciones']}, horarios: {referencias['horarios_generados']}, "
+                    f"secciones: {referencias['secciones']}, carreras: {referencias['carreras']}). "
+                    "Cierre el periodo o elimine esos registros antes de borrarlo."
+                ),
+                "referencias": referencias,
+            },
+        )
 
     db.delete(db_periodo)
     db.commit()
