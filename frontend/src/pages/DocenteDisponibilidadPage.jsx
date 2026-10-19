@@ -123,7 +123,7 @@ const DocenteDisponibilidadPage = () => {
         </div>
       )}
 
-      {/* ENCABEZADO Y PESTAÑAS */}
+      {/* ENCABEZADO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
@@ -132,8 +132,10 @@ const DocenteDisponibilidadPage = () => {
           </h2>
           <p className="text-slate-500">Configura las franjas en las que cada docente está disponible para dictar clases.</p>
         </div>
-        <DocenteTabs />
       </div>
+
+      {/* PESTAÑAS DE NAVEGACIÓN */}
+      <DocenteTabs />
 
       {/* GRÁFICA DE DISPONIBILIDAD POR DOCENTE */}
       <DocenteDisponibilidad

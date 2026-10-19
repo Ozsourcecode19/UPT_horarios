@@ -13,14 +13,18 @@ const TABS = [
 const DocenteTabs = () => {
   const location = useLocation();
   return (
-    <div className="flex items-center gap-1 bg-slate-100/80 rounded-2xl p-1.5 w-full md:w-auto self-start flex-wrap">
+    <nav
+      aria-label="Secciones de gestión docente"
+      className="flex items-center gap-1 bg-slate-100/80 rounded-2xl p-1.5 w-full md:w-auto self-start overflow-x-auto"
+    >
       {TABS.map(({ id, label, path, icon: Icon }) => {
         const active = location.pathname === path;
         return (
           <Link
             key={id}
             to={path}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+            aria-current={active ? 'page' : undefined}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 shrink-0 whitespace-nowrap ${
               active
                 ? 'bg-white text-blue-700 shadow-md shadow-slate-200/60'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
@@ -31,7 +35,7 @@ const DocenteTabs = () => {
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 };
 
