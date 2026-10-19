@@ -402,7 +402,7 @@ const Horarios = () => {
 
       {/* Vista principal: tabs de turno + grilla unificada cuando excede 1 página */}
       {exceedsSinglePage && turnosDisponibles.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-4 md:p-6 overflow-hidden flex flex-col flex-1 min-h-0">
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl mb-4 self-start no-print">
             <button onClick={() => setTurnoActivo('TODOS')} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === 'TODOS' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               Todos

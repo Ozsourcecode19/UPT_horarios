@@ -36,7 +36,37 @@
 .grilla-scroll {
   flex: 1;
   min-height: 0;
+  /* Scroll horizontal explícito (móvil): la tabla de 6 columnas excede el
+     viewport y la columna de hora queda sticky a la izquierda. */
+  overflow-x: auto;
   overflow-y: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Pista de scroll horizontal en pantallas pequeñas (solo pantalla) */
+.grilla-hint {
+  display: none;
+}
+
+/* Móvil: en vez de estrangular 5 columnas de día a ~40 px, la tabla gana
+   ancho mínimo y se desplaza horizontalmente (la columna de hora queda sticky).
+   El ancho de impresión (>640 px) no entra en este media query. */
+@media (max-width: 640px) {
+  table.grilla-bloques {
+    min-width: 680px;
+  }
+  .grilla-hint {
+    display: block;
+    position: sticky;
+    left: 0;
+    width: fit-content;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin: 0 0 0.5rem;
+  }
 }
 
 table.grilla-bloques {
@@ -242,6 +272,20 @@ table.grilla-bloques {
 .evento-card .ev-del:hover {
   color: #dc2626;
   background-color: #fee2e2;
+}
+
+/* Táctil: sin hover, el botón de eliminar debe ser visible y con área táctil.
+   En impresión sigue mandando `.print-area .ev-del { display:none !important }`. */
+@media (hover: none) {
+  .evento-card .ev-del {
+    opacity: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 4px;
+  }
 }
 
 .evento-card .ev-x2 {

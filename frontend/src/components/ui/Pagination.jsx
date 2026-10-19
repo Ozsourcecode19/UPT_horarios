@@ -33,7 +33,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, sibl
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
+          className="p-2.5 md:p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Primera página"
         >
           <ChevronsLeft size={16} />
@@ -41,7 +41,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, sibl
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
+          className="p-2.5 md:p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Página anterior"
         >
           <ChevronLeft size={16} />
@@ -56,7 +56,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, sibl
             <button
               key={page}
               onClick={() => onPageChange(page)}
-              className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`min-h-[40px] min-w-[40px] px-2 rounded-lg text-sm font-medium transition-colors md:h-8 md:min-w-[32px] ${
                 page === currentPage
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
@@ -70,7 +70,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, sibl
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
+          className="p-2.5 md:p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Página siguiente"
         >
           <ChevronRight size={16} />
@@ -78,7 +78,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, sibl
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
+          className="p-2.5 md:p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Última página"
         >
           <ChevronsRight size={16} />

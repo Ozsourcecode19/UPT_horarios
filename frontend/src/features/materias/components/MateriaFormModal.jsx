@@ -104,7 +104,7 @@ export default function MateriaFormModal({ isOpen, onClose, onSave, editingMater
                     key={c.hex}
                     type="button"
                     onClick={() => setValue('color_hex', c.hex)}
-                    className={`w-full h-8 rounded-lg relative hover:scale-105 active:scale-95 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.04)] ${
+                    className={`w-full h-10 sm:h-8 rounded-lg relative hover:scale-105 active:scale-95 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.04)] ${
                       selectedColor.toUpperCase() === c.hex.toUpperCase()
                         ? 'ring-2 ring-blue-600 ring-offset-2 scale-105'
                         : 'hover:opacity-90'

@@ -154,6 +154,7 @@ const GridSemanalBloques = ({
 
   return (
     <div className="grilla-scroll">
+      <p className="grilla-hint no-print">Desliza para ver todos los días →</p>
       <table className="grilla-bloques">
         <thead>
           <tr>

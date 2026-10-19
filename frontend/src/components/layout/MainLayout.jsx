@@ -210,7 +210,7 @@ const MainLayout = () => {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-auto p-6 lg:p-10">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-10">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

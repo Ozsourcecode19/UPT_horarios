@@ -66,8 +66,8 @@ const SedeFormModal = ({
       )}
     >
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre de Sede *</label>
                 <input
                   type="text"
