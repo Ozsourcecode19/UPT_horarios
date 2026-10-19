@@ -339,13 +339,13 @@ const Horarios = () => {
             </div>
           )}
         </div>
-        <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2]">
-          <div className="space-y-1.5">
+        <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
-            <div className="flex items-center gap-1 min-w-0 bg-slate-100 p-1 rounded-2xl sm:gap-2">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
-                <button key={valor} onClick={() => setFilterType(valor)} className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <Icono className="w-4 h-4" /><span>{etiqueta}</span>
+                <button key={valor} onClick={() => setFilterType(valor)} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  <Icono className="w-4 h-4 shrink-0" /><span className="truncate min-w-0">{etiqueta}</span>
                 </button>
               ))}
             </div>
