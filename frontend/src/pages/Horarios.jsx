@@ -340,22 +340,13 @@ const Horarios = () => {
           )}
         </div>
         <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
-          <div className="space-y-1.5 flex-1 min-w-0 relative">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
             <div className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
                 <button key={valor} onClick={() => setFilterType(valor)} title={etiqueta} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   <Icono className={`w-4 h-4 shrink-0 ${filterType === valor ? 'mx-auto' : ''}`} />
                   <span className={`truncate min-w-0 ${filterType === valor ? '' : 'max-[480px]:hidden'}`}>{etiqueta}</span>
-                </button>
-              ))}
-            </div>
-            {/* Clon medidor: siempre con texto, fuera del flujo, para medir el ancho requerido sin depender del estado iconOnly */}
-            <div ref={medidorRef} className="absolute top-0 left-0 invisible whitespace-nowrap gap-1 sm:gap-2" aria-hidden="true">
-              {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
-                <button key={valor} className="flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold shrink-0" tabIndex={-1}>
-                  <Icono className="w-4 h-4 shrink-0" />
-                  <span className="truncate min-w-0">{etiqueta}</span>
                 </button>
               ))}
             </div>
