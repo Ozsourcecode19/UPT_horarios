@@ -43,6 +43,9 @@ const Horarios = () => {
 
   const puedeEscribir = useCanWrite();
 
+  // Modo solo-iconos para el segmented "Ver Por" cuando no cabe el texto en móvil
+  const [iconOnly, setIconOnly] = useState(false);
+
   const listadoHorariosRaw = demoMode
     ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId))
     : horariosReal;
@@ -207,11 +210,35 @@ const Horarios = () => {
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const closeMenuTimer = useRef(null);
   const printAreaRef = useRef(null);
+  const segmentedRef = useRef(null);
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
     setEditAbarca(detectarNSesion(selectedEvent, listadoHorarios, bloques));
   }, [isEditModalOpen, selectedEvent, listadoHorarios, bloques]);
+
+  // Detecta si los botones del segmented "Ver Por" exceden el ancho del contenedor
+  // y, en ese caso, muestra solo los iconos (sin texto) para evitar desbordamiento en móvil
+  useEffect(() => {
+    const container = segmentedRef.current;
+    if (!container || TIPOS_VISTA.length === 0) return;
+
+    const observer = new ResizeObserver(() => {
+      const parentWidth = container.parentElement?.clientWidth || 0;
+      let buttonsWidth = 0;
+      const buttons = container.querySelectorAll('button');
+      buttons.forEach(b => {
+        buttonsWidth += b.offsetWidth;
+      });
+      // gap-1 entre botones: (n-1) * 4px (1rem = 16px, gap-1 = 0.25rem = 4px)
+      const gapTotal = Math.max(0, buttons.length - 1) * 4;
+      const totalNeeded = buttonsWidth + gapTotal + 2; // +2 para padding del contenedor
+      setIconOnly(totalNeeded > parentWidth);
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [segmentedRef, TIPOS_VISTA.length]);
 
   const bloqueSeleccionado = useBloqueSeleccionado(bloques, editBloqueId);
   const sedeAulaEdicion = useSedeAulaEdicion(aulas, editAulaId);
@@ -342,10 +369,11 @@ const Horarios = () => {
         <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
           <div className="space-y-1.5 flex-1 min-w-0">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
-            <div className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
+            <div ref={segmentedRef} className="flex items-center gap-1 min-w-0 overflow-hidden bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
-                <button key={valor} onClick={() => setFilterType(valor)} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <Icono className="w-4 h-4 shrink-0" /><span className="truncate min-w-0">{etiqueta}</span>
+                <button key={valor} onClick={() => setFilterType(valor)} title={etiqueta} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  <Icono className={`w-4 h-4 shrink-0 ${iconOnly ? 'mx-auto' : ''}`} />
+                  {!iconOnly && <span className="truncate min-w-0">{etiqueta}</span>}
                 </button>
               ))}
             </div>
