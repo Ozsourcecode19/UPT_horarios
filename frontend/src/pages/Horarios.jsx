@@ -322,15 +322,15 @@ const Horarios = () => {
       <div className="no-print"><FlowStepper preCheck={preCheck} demoMode={demoMode} /></div>
 
       <div className="no-print bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col md:flex-row items-center gap-6 justify-between">
-        <div className={`w-full flex gap-4 ${sedes.length > 1 ? 'md:w-auto md:flex-1' : 'md:w-auto md:flex-1 md:max-w-sm'}`}>
-          <div className={`space-y-1.5 ${sedes.length > 1 ? 'flex-1' : 'w-full'}`}>
+        <div className={`w-full flex flex-col sm:flex-row gap-4 sm:gap-6 ${sedes.length > 1 ? 'md:w-auto md:flex-1' : 'md:w-auto md:flex-1 md:max-w-sm'}`}>
+          <div className={`space-y-1.5 min-w-0 ${sedes.length > 1 ? 'flex-1' : 'w-full'}`}>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
             <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
               {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.estado})</option>)}
             </select>
           </div>
           {sedes.length > 1 && (
-            <div className="space-y-1.5 flex-1">
+            <div className="space-y-1.5 min-w-0 flex-1">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Sede</label>
               <select value={selectedSedeId || ''} onChange={(e) => setSelectedSedeId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-semibold text-slate-700">
                 <option value="">Todas las Sedes</option>
@@ -339,18 +339,18 @@ const Horarios = () => {
             </div>
           )}
         </div>
-        <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 flex-[2]">
+        <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2]">
           <div className="space-y-1.5">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl">
+            <div className="flex items-center gap-1 min-w-0 bg-slate-100 p-1 rounded-2xl sm:gap-2">
               {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
-                <button key={valor} onClick={() => setFilterType(valor)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={valor} onClick={() => setFilterType(valor)} className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   <Icono className="w-4 h-4" /><span>{etiqueta}</span>
                 </button>
               ))}
             </div>
           </div>
-          <div className="space-y-1.5 flex-1 animate-in slide-in-from-left-4 duration-300">
+          <div className="space-y-1.5 min-w-0 flex-1 animate-in slide-in-from-left-4 duration-300">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
               {filterType === 'grupo' ? 'Seleccionar Sección' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
             </label>
