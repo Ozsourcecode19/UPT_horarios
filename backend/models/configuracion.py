@@ -1,5 +1,5 @@
 # models/configuracion.py
-from sqlalchemy import Column, String, DateTime, Boolean # Remover 'Integer'
+from sqlalchemy import Column, String, DateTime, Boolean, JSON # Remover 'Integer'
 from sqlalchemy.dialects.postgresql import JSONB
 from config.database import Base
 from datetime import datetime, timezone # Asegúrate de importar timezone
@@ -9,7 +9,9 @@ class Configuracion(Base):
 
     # CORREGIDO: clave es la PRIMARY KEY, no 'id'
     clave = Column(String(50), primary_key=True, index=True) # Clave primaria y única
-    valor = Column(JSONB, nullable=False) # Almacena datos estructurados
+    # JSONB en PostgreSQL; variante JSON compilable en SQLite (app de escritorio,
+    # ver PLAN_DESKTOP.md Fase 0). Sin la variante, CREATE TABLE falla en sqlite.
+    valor = Column(JSONB().with_variant(JSON(), "sqlite"), nullable=False) # Almacena datos estructurados
     descripcion = Column(String) # Puede ser NULL
     tipo_dato = Column(String(20), nullable=False) # 'string', 'integer', 'boolean', 'array', 'json'
     editable = Column(Boolean, default=True)

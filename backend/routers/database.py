@@ -30,10 +30,13 @@ TABLES_TO_COUNT = [
 def get_database_health(db: Session = Depends(get_db)):
     """
     Retorna el estado de salud de la base de datos:
-    versión de PostgreSQL, versión del esquema y conteo de filas por tabla.
+    versión del motor, versión del esquema y conteo de filas por tabla.
     """
-    # PostgreSQL version
-    pg_version = db.execute(text("SELECT version()")).scalar()
+    # Versión del motor: PostgreSQL (web) o SQLite (app de escritorio)
+    if db.get_bind().dialect.name == "sqlite":
+        bd_version = db.execute(text("SELECT 'SQLite ' || sqlite_version()")).scalar()
+    else:
+        bd_version = db.execute(text("SELECT version()")).scalar()
 
     # Schema version from configuracion table
     schema_version = None
@@ -57,7 +60,7 @@ def get_database_health(db: Session = Depends(get_db)):
             tables.append(TableStats(table_name=table, row_count=0))
 
     return DatabaseHealth(
-        postgresql_version=pg_version,
+        postgresql_version=bd_version,
         connection_status="OK",
         schema_version=schema_version,
         tables=tables,

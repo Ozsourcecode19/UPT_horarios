@@ -1,6 +1,5 @@
 # backend/crud/configuraciones.py
 from sqlalchemy.orm import Session
-from sqlalchemy.dialects.postgresql import JSONB # Importar para manejo de JSONB si es necesario
 import models, schemas
 from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError

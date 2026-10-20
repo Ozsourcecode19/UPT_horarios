@@ -2,9 +2,10 @@
 """Fixtures compartidas para los tests E9.
 
 Estrategia: SQLite en memoria con los modelos SQLAlchemy reales (sin la BD
-Postgres productiva ni los triggers PL/pgSQL). Se aplica un fix para que la
-columna JSONB de Configuracion compile sobre sqlite y se crea el esquema con
-Base.metadata.create_all.
+Postgres productiva ni los triggers PL/pgSQL). La columna `valor` de
+Configuracion ya trae en el propio modelo su variante JSON para sqlite
+(ver models/configuracion.py), por lo que `create_all` compila sin fixes
+adicionales.
 
 import: los modulos del backend usan imports planos (models, crud, services),
 por lo que backends/ debe estar en sys.path. pytest.ini lo resuelve con
@@ -12,9 +13,7 @@ por lo que backends/ debe estar en sys.path. pytest.ini lo resuelve con
 """
 from dataclasses import dataclass
 
-import sqlalchemy as sa
 import pytest
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -22,11 +21,6 @@ from sqlalchemy.pool import StaticPool
 import models
 from config.database import Base
 from datetime import date, time
-
-# Fix necesario: el modelo usa JSONB (dialecto postgres) que sqlite no puede
-# renderizar en CREATE TABLE. Se sustituye por una variante compilable en
-# sqlite conservando el comportamiento JSON. Debe aplicarse antes de create_all.
-models.Configuracion.__table__.c.valor.type = JSONB().with_variant(sa.JSON(), "sqlite")
 
 
 @pytest.fixture(scope="session")

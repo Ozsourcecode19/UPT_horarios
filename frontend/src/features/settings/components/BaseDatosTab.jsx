@@ -24,7 +24,7 @@ export default function BaseDatosTab({ dbHealth, isDbHealthLoading, onRefresh })
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-100/60 dark:border-blue-800/40 rounded-2xl p-5">
-              <div className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-2">PostgreSQL</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-2">{dbHealth.postgresql_version?.startsWith('SQLite') ? 'SQLite' : 'PostgreSQL'}</div>
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug">{dbHealth.postgresql_version?.split(',')[0] || 'N/A'}</p>
             </div>
             <div className="bg-gradient-to-br from-emerald-50 to-green-50/50 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-100/60 dark:border-emerald-800/40 rounded-2xl p-5">
