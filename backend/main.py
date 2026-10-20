@@ -7,6 +7,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import (
@@ -15,10 +17,21 @@ from routers import (
     habilitaciones_docentes, configuraciones, bloques_horarios,
     lecciones, horarios_generados, schedules, auth, database
 )
+from config.startup import inicializar_base
 
 import models
 
-app = FastAPI(title="API de Horarios UPT", version="2.1.1")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Fase 2 (PLAN_DESKTOP.md): en SQLite (app de escritorio) crea esquema y
+    # seed en el primer arranque; en PostgreSQL no hace nada (el esquema lo
+    # gestiona database/). Idempotente.
+    inicializar_base()
+    yield
+
+
+app = FastAPI(title="API de Horarios UPT", version="2.1.1", lifespan=lifespan)
 
 # Configurar CORS para permitir solicitudes desde el frontend React
 app.add_middleware(

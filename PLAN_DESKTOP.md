@@ -128,7 +128,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 
 - [x] Fase 0 — Backend multi-dialecto ✅ (2026-10-20)
 - [x] Fase 1 — Triggers → listeners Python (+ tests) ✅ (2026-10-20)
-- [ ] Fase 2 — Esquema + seed SQLite
+- [x] Fase 2 — Esquema + seed SQLite ✅ (2026-10-20)
 - [ ] Fase 3 — PyInstaller
 - [ ] Fase 4 — Shell Tauri
 - [ ] Fase 5 — UX escritorio
@@ -178,4 +178,29 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - Verificación: **backend 117 tests OK** (104 + 13 nuevos en `test_integridad_listeners.py`) ·
   `import main` OK · frontend sin cambios (450 tests OK desde Fase 0).
 
-*Última actualización: 2026-10-20 — Fase 1 completa; sigue Fase 2 (esquema + seed SQLite).*
+**2026-10-20 — Fase 2 completa** (rama `feat/desktop-tauri`; el seed se derivó del **código y los
+modelos**, sin usar `database/operaciones/Reset_y_poblar_datos.sql` como referencia, por decisión
+del usuario):
+- Nuevo `backend/config/startup.py` → `inicializar_base(engine)`:
+  - **Solo SQLite** (guard por `engine.dialect.name` antes de tocar conexión; en Postgres es
+    no-op: ahí gestiona `database/`, nunca alembic). Idempotente.
+  - `Base.metadata.create_all` + seed: usuario `admin` / `admin123` (rol ADMIN, solo si `usuarios`
+    está vacía; se imprime aviso en el primer arranque) y **8 claves de `configuracion`** derivadas
+    de lo que el código realmente lee: `version_sistema`, `ventana_{matutino,vespertino,nocturno}`
+    (dict `{"hora_inicio","hora_fin"}` desde `VENTANAS_TURNO_DEFAULT`), `hora_inicio_jornada`
+    (07:00), `hora_fin_jornada` (18:00), `dias_laborables` [1-5], `duracion_bloque_default` 45 —
+    mismos valores que ya usan los fallbacks de `generar_bloques_estandar` y `_ventana_de_turno`.
+- `main.py`: **lifespan** (`@asynccontextmanager`) que llama `inicializar_base()` al arrancar →
+  `DATABASE_URL=sqlite:///... uvicorn main:app` deja una BD lista y usable en el primer arranque.
+- Nuevo `tests/test_startup.py` (4 tests): primer arranque (esquema+admin+8 claves), idempotencia,
+  no recrear admin si ya hay usuarios, y **no-op Postgres sin siquiera conectar**.
+- Smoke end-to-end real (TestClient + `DATABASE_URL` SQLite): lifespan crea BD → `POST /api/token`
+  con `admin/admin123` → 200 JWT → `GET /api/database/health` → "SQLite 3.46.1" →
+  `GET /api/configuraciones/` → total 8 → `ventana_matutino` correcta. **Ruta de login real:
+  `POST /api/token`** (el router de auth no lleva subprefijo `/auth`).
+- Docs: AGENTS.md (121 tests), SDD.md (§5.1 árbol + §8.1), este archivo.
+- Verificación: **backend 121 tests OK** (117 + 4) · smoke `import main`/TestClient OK ·
+  frontend sin cambios.
+
+*Última actualización: 2026-10-20 — Fase 2 completa; sigue Fase 3 (PyInstaller) y Fase 4 (Tauri,
+que pueden avanzar en paralelo — validar temprano el empaquetado en ambos SO).*
