@@ -33,8 +33,8 @@ def read_periodos_academicos(skip: int = 0, limit: int = 20, search: Optional[st
     Obtiene una lista de periodos académicos con paginación.
     """
     items, total = crud.get_periodos_academicos(db, skip=skip, limit=limit, search=search)
-    # Registros asociados por periodo (0 => vacío): el frontend lo usa para
-    # habilitar el botón Eliminar solo en periodos sin datos.
+    # Carga académica del periodo (lecciones + horarios generados; 0 => sin
+    # carga): el frontend lo usa para habilitar el botón Eliminar.
     crud.adjuntar_referencias_periodos(db, items)
     return PaginatedResponse(items=items, total=total, page=skip // limit + 1, page_size=limit)
 
@@ -53,9 +53,10 @@ def delete_periodo_academico(periodo_id: int, db: Session = Depends(get_db)):
     """
     Elimina un periodo académico.
 
-    Responde 409 PERIODO_EN_USO si el periodo tiene registros asociados
-    (lecciones, horarios, secciones o carreras), ya que el esquema los
-    borraría en cascada. Solo se eliminan periodos vacíos.
+    Responde 409 PERIODO_EN_USO si el periodo tiene carga académica
+    (lecciones o horarios generados), ya que el esquema los borraría en
+    cascada. Solo se eliminan periodos sin carga: las secciones vacías y
+    los vínculos de carrera se eliminan junto con el periodo.
     """
     deleted = crud.delete_periodo_academico(db, periodo_id=periodo_id)
     if not deleted:

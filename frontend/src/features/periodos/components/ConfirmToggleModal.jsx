@@ -70,8 +70,9 @@ const ConfirmToggleModal = ({
                 <>
                   Estás a punto de eliminar permanentemente el periodo{' '}
                   <span className="font-semibold text-slate-700">{periodo.nombre}</span>.
-                  Esta acción no se puede deshacer; solo se permite porque el periodo
-                  está vacío (sin clases, horarios ni secciones asignadas).
+                  Esta acción no se puede deshacer y solo se permite porque el periodo
+                  no tiene clases ni horarios generados. Si tiene secciones vacías o
+                  carreras asociadas, también se eliminarán junto con el periodo.
                 </>
               )}
             </p>

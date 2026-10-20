@@ -1,7 +1,8 @@
 // src/features/periodos/__tests__/periodosTable.test.jsx
-// Gateo del botón Eliminar en la tabla de periodos: solo ADMIN y periodo vacío
-// (registros_asociados === 0, dato que el backend calcula en el listado y que
-// protege el borrado en cascada con la barrera 409 PERIODO_EN_USO).
+// Gateo del botón Eliminar en la tabla de periodos: solo ADMIN y sin carga
+// académica (registros_asociados === 0: lecciones + horarios generados, dato
+// que el backend calcula en el listado). Las secciones vacías y los vínculos
+// de carrera no cuentan: se eliminan en cascada con el periodo.
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';

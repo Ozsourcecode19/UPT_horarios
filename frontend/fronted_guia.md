@@ -1051,6 +1051,8 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 
 **Verificación:** backend ✅ **99 tests** · frontend ✅ **450 tests en 33 archivos** · `pnpm build` ✅.
 
+**Corrección posterior (mismo día) — qué cuenta como "vacío":** la primera versión bloqueaba el borrado con las 4 tablas hijas (lecciones, horarios, secciones **y `carrera_periodo`**). Resultado: "Trimestre 2-2026" (0 clases, 0 horarios, 0 secciones) no mostraba Eliminar porque el esquema siembra un vínculo `carrera_periodo (2, 2) -- Enfermería -> Trimestre 2` que **no se gestiona desde la UI** → el periodo era indeletable para siempre. Redefinición: la barrera y `registros_asociados` cuentan solo **lecciones + horarios generados** (carga académica irreversible); las secciones vacías y los vínculos de carrera se eliminan en cascada con el periodo y el modal de confirmación lo advierte. `test_periodos_delete.py` pasó a 7 tests, incluidos `test_delete_periodo_solo_secciones_vacias_no_bloquea` y `test_delete_periodo_solo_vinculo_carrera_no_bloquea` (este último reproduce el caso Trimestre 2). **Verificación:** backend ✅ **100 tests**.
+
 ---
 
 ## 7. Responsive y móvil (2026-10-18)

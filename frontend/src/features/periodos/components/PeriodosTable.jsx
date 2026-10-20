@@ -123,7 +123,8 @@ const PeriodosTable = ({
                             <Lock className="w-4 h-4" />
                           </button>
                         )}
-                        {/* Solo ADMIN y periodo vacío (0 hijos en cascada) permite eliminar */}
+                        {/* Solo ADMIN y sin carga académica (registros_asociados === 0:
+                            lecciones + horarios generados) permite eliminar */}
                         {periodo.registros_asociados === 0 && onDelete && (
                           <button
                             onClick={() => onDelete(periodo)}

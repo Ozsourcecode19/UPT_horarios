@@ -60,14 +60,18 @@ def update_periodo_academico(db: Session, periodo_id: int, periodo_update: schem
 
 def _contar_referencias_periodo(db: Session, periodo_id: int) -> dict:
     """
-    Conteo de registros hijos que el esquema borraría con ON DELETE CASCADE.
-    Usado por la barrera de borrado y por el listado (campo registros_asociados).
+    Conteo de carga académica bloqueante para el borrado: lecciones (clases) y
+    horario_generado (filas del horario). Ambas son datos irreversibles.
+
+    NO cuentan las secciones (grupos) ni los vínculos carrera_periodo: son
+    entidades propias del periodo que se eliminan en cascada con él (no pueden
+    existir sin periodo). Además carrera_periodo lo siembra el propio esquema y
+    no se gestiona desde la UI, por lo que contarlo volvería indeletables a los
+    periodos recién sembrados.
     """
     return {
         "lecciones": db.query(models.Leccion).filter(models.Leccion.periodo_id == periodo_id).count(),
         "horarios_generados": db.query(models.HorarioGenerado).filter(models.HorarioGenerado.periodo_id == periodo_id).count(),
-        "secciones": db.query(models.Grupo).filter(models.Grupo.periodo_id == periodo_id).count(),
-        "carreras": db.query(models.carrera_periodo).filter(models.carrera_periodo.c.periodo_id == periodo_id).count(),
     }
 
 
@@ -75,10 +79,10 @@ def delete_periodo_academico(db: Session, periodo_id: int) -> bool:
     """
     Elimina un periodo académico de la base de datos.
 
-    Barrera de seguridad PERIODO_EN_USO: el esquema declara ON DELETE CASCADE
-    en lecciones, horarios_generados, grupos y carrera_periodo, por lo que borrar
-    un periodo con datos destruiría toda esa información de forma irreversible.
-    Solo se permite eliminar periodos sin registros asociados.
+    Barrera de seguridad PERIODO_EN_USO: solo se eliminan periodos sin carga
+    académica (lecciones o horarios generados), ya que el esquema los borraría
+    con ON DELETE CASCADE de forma irreversible. Las secciones vacías y los
+    vínculos de carrera se eliminan junto con el periodo.
 
     Retorna True si se eliminó, False si no existía.
     """
@@ -94,10 +98,10 @@ def delete_periodo_academico(db: Session, periodo_id: int) -> bool:
             detail={
                 "error_code": "PERIODO_EN_USO",
                 "mensaje": (
-                    f"El periodo tiene {afectadas} registro(s) asociado(s) "
-                    f"(lecciones: {referencias['lecciones']}, horarios: {referencias['horarios_generados']}, "
-                    f"secciones: {referencias['secciones']}, carreras: {referencias['carreras']}). "
-                    "Cierre el periodo o elimine esos registros antes de borrarlo."
+                    f"El periodo tiene carga académica que se perdería: "
+                    f"{referencias['lecciones']} leccion(es) y "
+                    f"{referencias['horarios_generados']} fila(s) de horario generado. "
+                    "Regenere o libere sus horarios y clases antes de borrarlo."
                 ),
                 "referencias": referencias,
             },
@@ -111,8 +115,8 @@ def delete_periodo_academico(db: Session, periodo_id: int) -> bool:
 def adjuntar_referencias_periodos(db: Session, items) -> None:
     """
     Adjunta `registros_asociados` a cada periodo de la página del listado:
-    total de hijos que se borrarían en cascada (0 => el periodo está vacío y
-    el frontend puede habilitar el botón Eliminar). Cuatro consultas agrupadas.
+    su carga académica bloqueante (lecciones + horarios generados; 0 => vacío,
+    el frontend habilita el botón Eliminar). Dos consultas agrupadas.
     """
     ids = [p.id for p in items]
     totales = {pid: 0 for pid in ids}
@@ -120,8 +124,6 @@ def adjuntar_referencias_periodos(db: Session, items) -> None:
         consultas = (
             db.query(models.Leccion.periodo_id, func.count()).filter(models.Leccion.periodo_id.in_(ids)).group_by(models.Leccion.periodo_id),
             db.query(models.HorarioGenerado.periodo_id, func.count()).filter(models.HorarioGenerado.periodo_id.in_(ids)).group_by(models.HorarioGenerado.periodo_id),
-            db.query(models.Grupo.periodo_id, func.count()).filter(models.Grupo.periodo_id.in_(ids)).group_by(models.Grupo.periodo_id),
-            db.query(models.carrera_periodo.c.periodo_id, func.count()).filter(models.carrera_periodo.c.periodo_id.in_(ids)).group_by(models.carrera_periodo.c.periodo_id),
         )
         for q in consultas:
             for pid, n in q.all():
