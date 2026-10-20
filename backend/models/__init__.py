@@ -24,3 +24,10 @@ __all__ = [
     "HabilitacionDocente", "Configuracion", "BloqueHorario", "Leccion",
     "HorarioGenerado", "carrera_periodo"
 ]
+
+# Fase 1 (PLAN_DESKTOP.md): listeners de integridad que replican en cualquier
+# dialecto los triggers PL/pgSQL de PostgreSQL (sync horario↔bloque, sede
+# tripartita y solape de disponibilidades). Van al final del módulo: los
+# modelos deben estar definidos antes de registrarlos.
+from core.db_integrity import registrar_listeners
+registrar_listeners()

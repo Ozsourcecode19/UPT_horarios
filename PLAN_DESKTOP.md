@@ -127,7 +127,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 ## 7. Estado
 
 - [x] Fase 0 — Backend multi-dialecto ✅ (2026-10-20)
-- [ ] Fase 1 — Triggers → listeners Python (+ tests)
+- [x] Fase 1 — Triggers → listeners Python (+ tests) ✅ (2026-10-20)
 - [ ] Fase 2 — Esquema + seed SQLite
 - [ ] Fase 3 — PyInstaller
 - [ ] Fase 4 — Shell Tauri
@@ -154,4 +154,28 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - Investigación: `.ilike()` y `regexp_match` (`materias`) ya compilan/funcionan en SQLite; las 2
   queries raw de `routers/schedules.py` (`/diagnostico/orphaned`) son SQL estándar → sin cambios.
 
-*Última actualización: 2026-10-20 — Fase 0 completa; sigue Fase 1 (triggers → listeners).*
+**2026-10-20 — Fase 1 completa** (rama `feat/desktop-tauri`):
+- Nuevo `backend/core/db_integrity.py`: 3 listeners de mapper (eventos de SQLAlchemy, aplican en
+  TODOS los engines/sesiones, registrados al final de `models/__init__.py` vía `registrar_listeners()`):
+  - `_sync_al_insertar` / `_sync_al_actualizar` ← `trg_sync_horario_bloque` (paridad exacta con
+    `UPDATE OF bloque_id`: `history.added` ⟺ el SET menciona bloque_id).
+  - `_validar_sede` ← `trg_validar_sede_horario` (sede tripartita aula/bloque/lección con
+    `COALESCE(sede_forzada_id, grupo.sede_id)`; Python `!=` replica `IS DISTINCT FROM`).
+  - `_validar_solape` ← `trg_verificar_solapamiento_disponibilidad` (misma condición de solape,
+    exclusión del propio id, solo tipo DISPONIBLE = el `WHEN` del trigger).
+  - Errores como `IntegrityError` (los handlers existentes reaccionan igual que con la BD).
+  - Nota técnica: `datetime.time` **no** acepta `+ timedelta`; usar `datetime.combine(date.min, t)`.
+- En Postgres corren listeners Y triggers (idempotentes: misma lógica, misma fuente). NO se portaron
+  `update_*_updated_at` (redundantes con `onupdate=`) ni las `fn_*` de consulta (ningún `.py` las llama).
+- Ajuste de test: `test_lesson_not_found` insertaba `leccion_id=None` que el trigger real de Postgres
+  también rechaza → ahora usa insert **Core** (fuera de listeners) simulando dato huérfano legacy.
+- Documentación: AGENTS.md (conteos, gotcha de integridad, lista de docs), SDD.md (§4.3, §5.1, §8.1).
+- Desviación documentada (módulo + AGENTS + SDD): los 3 **bulk updates** que solo cambian `estado`
+  (`_archive_previous_schedules`, restauración de versiones, archivado al borrar lecciones) no
+  disparan listeners; en PG el trigger de sede sí correría. Riesgo residual ≈ 0 (no cambian
+  referencias y la fila ya fue validada al insertar). Si algún día se necesita paridad estricta:
+  añadir validación en `after_bulk_update`.
+- Verificación: **backend 117 tests OK** (104 + 13 nuevos en `test_integridad_listeners.py`) ·
+  `import main` OK · frontend sin cambios (450 tests OK desde Fase 0).
+
+*Última actualización: 2026-10-20 — Fase 1 completa; sigue Fase 2 (esquema + seed SQLite).*

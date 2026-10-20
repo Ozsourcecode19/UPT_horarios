@@ -334,6 +334,14 @@ erDiagram
 | `fn_validar_movimiento_horario()` | Función PL/pgSQL | Validación de movimientos a nivel de BD (respaldo del servicio Python). |
 | `fn_diagnostico_instalacion()` | Función PL/pgSQL | Diagnóstico de instalación del esquema. |
 
+> **Réplica en Python (migración desktop, rama `feat/desktop-tauri`):** los tres triggers de negocio
+> (`trg_sync_horario_bloque`, `trg_validar_sede_horario`, `trg_verificar_solapamiento_disponibilidad`)
+> tienen ahora su equivalente en `backend/core/db_integrity.py` como eventos de mapper de SQLAlchemy,
+> registrados al final de `models/__init__.py`. Aplican en todos los dialectos (Postgres, SQLite y
+> tests); en Postgres corren ambos y son idempotentes entre sí. `update_updated_at_column()` no se
+> portó (redundante con `onupdate=` de los modelos) ni las `fn_*` de consulta (ningún código Python
+> las llama). Detalle y desviación conocida en el módulo y en `PLAN_DESKTOP.md`.
+
 ---
 
 ## 5. Diseño del Backend
@@ -345,6 +353,7 @@ backend/
 ├── main.py                     # Creación de la app FastAPI, CORS, registro de routers
 ├── config/database.py          # Engine, SessionLocal, get_db
 ├── core/security.py            # JWT, bcrypt, dependencias get_current_user / require_role
+├── core/db_integrity.py        # Listeners de integridad (réplica de los triggers; dialecto-agnostic)
 ├── models/                     # Modelos SQLAlchemy (1 archivo por entidad)
 ├── schemas/                    # Esquemas Pydantic (request/response)
 ├── crud/                       # Operaciones de persistencia por entidad
@@ -637,8 +646,8 @@ sequenceDiagram
 
 ### 8.1 Estado actual
 
-- **Backend (E9 + sesiones):** suite `pytest`/`httpx` en `backend/tests/` con **93 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all` y fix `JSONB→JSON`; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible, sesiones N/M y omitidas), asignar-manual (N, `bloques_previos`, R5-B'), `update_leccion` (archivado automático al cambiar N/M, R0 coherencia grupo↔periodo), `clases_sin_slots`, **cobertura de bloques por turno en el pre-generation-check** (`test_cobertura_turnos.py`), cálculo `lunes_base`, smoke de API, validaciones de CRUD y estrés (~100 lecciones). **Sin** BD Postgres ni triggers PL/pgSQL.
-- **Frontend (E22):** suite **vitest** con **198 tests** (`vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `filterEvents`, `resolveVentanaGrilla`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`, `horaCompleta`, `calcularFin`, `generarSimulacionDemo`, `calcularEstadisticas`), hooks (`useGenerationPolling`, `useScheduleGeneration`, `useDragDropValidation`), y utilidades de planning/schedule/bloques/aulas. Tests en `src/utils/__tests__/`, `src/hooks/__tests__/`, `src/features/schedule/__tests__/`, `src/features/bloques/__tests__/` y `src/features/aulas/__tests__/`.
+- **Backend (E9 + sesiones + fases desktop F0/F1):** suite `pytest`/`httpx` en `backend/tests/` con **117 tests** sobre SQLite in-memory (`conftest.py` con `StaticPool` + `create_all`; el modelo `Configuracion` soporta sqlite de fábrica, sin fix en conftest; `pytest.ini` con `pythonpath = .`). Cubre tracker de estado, `validate_move`, `or_tools_adapter` (factible/infactible, sesiones N/M y omitidas), asignar-manual (N, `bloques_previos`, R5-B'), `update_leccion` (archivado automático al cambiar N/M, R0 coherencia grupo↔periodo), `clases_sin_slots`, **cobertura de bloques por turno en el pre-generation-check** (`test_cobertura_turnos.py`), cálculo `lunes_base`, smoke de API, validaciones de CRUD y estrés (~100 lecciones), más **soporte de dialecto SQLite** (`test_dialecto_sqlite.py`: PRAGMAs, JSON de `configuracion`, health check) e **integridad replicada de los triggers** (`test_integridad_listeners.py`: sync horario↔bloque, sede tripartita, solape de disponibilidades). Sin BD Postgres: los triggers PL/pgSQL no se ejecutan, su lógica sí (listeners de `core/db_integrity.py`).
+- **Frontend (E22):** suite **vitest** con **450 tests en 33 archivos** (2026-10-19; `vitest.config.js` con entorno `jsdom`, `setupFiles` → `src/test/setup.js` con `@testing-library/jest-dom`, script `"test": "vitest run"`). Cubre la lógica pura extraída (`mapScheduleEvents`, `filterEvents`, `resolveVentanaGrilla`, `recalcularEventoDemo`, `generarEventosSimulados`, `validateMoveMock`, `horaCompleta`, `calcularFin`, `generarSimulacionDemo`, `calcularEstadisticas`), hooks (`useGenerationPolling`, `useScheduleGeneration`, `useDragDropValidation`), y utilidades de planning/schedule/bloques/aulas. Tests en `src/utils/__tests__/`, `src/hooks/__tests__/`, `src/features/schedule/__tests__/`, `src/features/bloques/__tests__/` y `src/features/aulas/__tests__/`.
 - La verificación práctica adicional se ha realizado de forma manual/integrada (p. ej., prueba directa contra `horarios_upt` que validó estado `OPTIMAL (4)`, persistencia idempotente y mapeo a la grilla nativa).
 
 ### 8.2 Estrategia recomendada

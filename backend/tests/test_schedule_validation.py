@@ -69,12 +69,22 @@ def test_not_found_por_estado_no_activo(data, db_session):
 
 
 def test_lesson_not_found(data, db_session):
-    horario_sin_leccion = models.HorarioGenerado(
-        leccion_id=None, aula_id=data.aula.id, bloque_id=data.bloque.id,
-        estado="ACTIVO", version_horario=1, periodo_id=data.periodo.id,
+    # Fila huérfana (sin lección) como las que la BD antigua pudo dejar: el
+    # listener de sede la rechazaría (paridad con el trigger real de
+    # PostgreSQL, que también la rechaza), así que se inserta a nivel Core,
+    # fuera de los listeners.
+    db_session.execute(
+        models.HorarioGenerado.__table__.insert().values(
+            leccion_id=None, aula_id=data.aula.id, bloque_id=data.bloque.id,
+            estado="ACTIVO", version_horario=1, periodo_id=data.periodo.id,
+        )
     )
-    db_session.add(horario_sin_leccion)
     db_session.commit()
+    horario_sin_leccion = (
+        db_session.query(models.HorarioGenerado)
+        .filter(models.HorarioGenerado.leccion_id.is_(None))
+        .one()
+    )
     res = validate_move(db_session, horario_id=horario_sin_leccion.id, nuevo_bloque_id=data.bloque2.id)
     assert res.valido is False
     assert res.error_code == "LESSON_NOT_FOUND"
