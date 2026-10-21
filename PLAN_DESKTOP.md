@@ -113,7 +113,8 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 
 ## 6. Roadmap post-migración (acordado, aún sin priorizar)
 
-1. **Corto**: backup automático con rotación al arrancar + restauración en UI · actualizador
+1. **Corto**: ~~backup automático con rotación al arrancar + restauración en UI~~ ✅ hecho en
+   Fase 5 · actualizador
    automático (plugin *updater* de Tauri con firma) · export/import `.zip` entre PCs ·
    verificación de integridad al inicio (`/diagnostico/orphaned`, `fn_diagnostico_instalacion`).
 2. **Medio**: objetivos secundarios en el CP-SAT (minimizar huecos, dispersión por sede,
@@ -131,7 +132,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - [x] Fase 2 — Esquema + seed SQLite ✅ (2026-10-20)
 - [x] Fase 3 — PyInstaller ✅ (2026-10-20)
 - [x] Fase 4 — Shell Tauri ✅ (2026-10-20)
-- [ ] Fase 5 — UX escritorio
+- [x] Fase 5 — UX escritorio ✅ (2026-10-20)
 - [ ] Fase 6 — Build/CI
 - [ ] Roadmap post-migración (pendiente de priorizar)
 
@@ -294,5 +295,92 @@ del usuario):
 - Verificación: **backend 126 tests OK** · **frontend 450 tests OK** · smoke del binario
   (login/health/configs) OK · dev end-to-end OK (ventana + login + CRUD real).
 
-*Última actualización: 2026-10-20 — Fase 4 completa (app de escritorio Tauri funcionando, `.deb` +
-AppImage); quedan Fase 5 (UX escritorio) y Fase 6 (build/CI Windows).*
+**2026-10-20 — Fase 5 completa** (rama `feat/desktop-tauri`):
+- **Backend — respaldos y restauración** (+8 tests → 134): nuevo `services/respaldos.py`
+  (`crear_respaldo` con la API `backup` de `sqlite3` = copia consistente en caliente sobre WAL;
+  `listar_respaldos`; `ruta_descarga` con nombre estricto `respaldo-YYYYMMDD-HHMMSS-µs.db` —
+  microsegundos evitan colisión y el regex rechaza traversal; `validar_restauracion` = escribe
+  `restauracion-pendiente.db`, `PRAGMA integrity_check` + tablas requeridas
+  (`usuarios`/`configuracion`/`periodos_academicos`) y elimina el pendiente si falla; rotación
+  `MANTENER_RESPALDOS = 10` en cada creación) + `respaldo_automatico(engine)` llamado por el
+  lifespan de `main.py` (solo SQLite, nunca interrumpe el arranque; en Postgres no-op).
+  4 endpoints ADMIN en `routers/database.py`: `POST/GET /api/database/respaldos`,
+  `GET /api/database/respaldos/{nombre}` (FileResponse) y
+  `POST /api/database/respaldos/validar-restauracion` (multipart). **La sustitución del archivo
+  la hace Rust**: el backend no puede reescribir su propio `.db` en caliente. Tests en
+  `tests/test_respaldos.py` (8: crear/listar/descargar con cabecera SQLite, rotación = 10,
+  validación de nombre, 403 LECTOR, validar OK, rechaza archivo malo, guard 400 en memoria,
+  respaldo automático).
+- **Hallazgo REGEXP**: el `CHECK` de `models/materia.py` (`color_hex.regexp_match(...)`) se
+  compila a `… REGEXP …` en el DDL de SQLite. El dialecto pysqlite de SQLAlchemy registra la
+  función solo, pero una conexión `sqlite3.connect()` a pelo **falla con `unknown function:
+  REGEXP()`** en cuanto algo evalúa el esquema (`PRAGMA integrity_check`). Fix en
+  `services/respaldos.py`: fábrica `_conexion()` que registra `REGEXP` (semántica `re.search`)
+  en toda conexión a pelo del módulo. Aplica a cualquier código nuevo que use sqlite3 directo.
+- **Rust (`main.rs` reescrito, compila limpio)**: menú nativo **Archivo** (Imprimir… `Ctrl+P` →
+  emite `menu_imprimir` · Abrir carpeta de datos `Ctrl+D` · Salir `Ctrl+Q`), **Ver** (Recargar
+  `Ctrl+R` · Pantalla completa `F11`) y **Ayuda** (Acerca de → emite `menu_acerca_de` con versión
+  + rutas de BD/respaldos; **sin plugins** en `Cargo.toml`); persistencia de tamaño/posición
+  en `<config-dir>/ventana.json` (se guarda en `CloseRequested`, se restaura con la ventana aún
+  oculta antes del `show()`); refactor del spawn en `crear_comando()` + estado `ConfigSidecar`
+  (guard y reap con `wait()`); comando **`restaurar_bd`**: pendiente existe → `matar_backend` →
+  borra `horarios.db{,-wal,-shm}` → `rename` del pendiente (atómico, mismo dir) → relanza sidecar
+  → espera ping (30 s) → `window.location.reload()`. `tauri.conf.json` con
+  **`withGlobalTauri: true`** (el frontend compartido habla por `window.__TAURI__`, sin
+  dependencia `@tauri-apps/api`).
+  - Errores de API de Tauri 2 resueltos: `PredefinedMenuItem::separator(manager)` de 1 arg,
+    `on_window_event` recibe 1 arg (el evento) y `WebviewWindow` no deref a `Window`.
+  - **Crash `free(): corrupted unsorted chunks` (2 veces; reproducido abriendo "Acerca de")**:
+    la primera versión usó `tauri-plugin-dialog` (feature default `gtk3` → rfd) y rfd arranca
+    un **segundo loop GTK en su `GtkGlobalThread`** (`gtk_init_check` + `gtk_main_iteration`
+    en hilo propio) concurrente con el loop de WebKitGTK → corrupción de heap en GTK.
+    **Fix: plugin eliminado** (`Cargo.toml` + `.plugin(init)` + schemas/lock) y "Acerca de"
+    ahora es un **modal del frontend** (`components/ui/AcercaDeModal.jsx`, montado en
+    `App.jsx`, escucha `menu_acerca_de` — el diálogo nativo queda prohibido en esta app).
+    Derivado: el abort **dejaba el sidecar huérfano** (el kill vive en `ExitRequested`, que un
+    SIGABRT nunca alcanza) — fix en `backend/run_server.py` → `_morir_si_muere_el_padre()` con
+    `PR_SET_PDEATHSIG` (SIGTERM al hijo si muere el padre; Linux) — verificado en el 2.º crash:
+    uvicorn hizo shutdown limpio en vez de quedar colgado en el puerto 17891.
+  - **ACL de comandos propios**: `restaurar_bd` no necesita capability: Tauri 2 solo aplica el
+    ACL a comandos de plugin, manifiesto ACL propio de la app u origen remoto
+    (`webview/mod.rs`: `plugin_command.is_some() || has_app_acl_manifest || !is_local`), así
+    que con `core:default` + origen local basta (anotado en `capabilities/default.json`).
+  - **WebKitGTK no soporta descargas del webview** (reportado en la verificación con el
+    usuario: el botón "Descargar" no guardaba nada — `a[download]` se descarta en silencio
+    porque wry no conecta `WebKitWebView::download-started`; el GET del blob devolvía 200 y
+    no aparecía el archivo). Fix: comando **`descargar_respaldo`** (valida el nombre igual
+    que el backend, copia `<datos>/respaldos/<nombre>` a la carpeta **Descargas** con
+    sufijo `-n` si ya existe) y `useRespaldos.descargar` lo invoca en escritorio; la web
+    sigue usando `blob + a[download]` (funciona en navegador).
+- **Frontend** (+19 tests → 469): `utils/desktop.js` (`esEscritorio()` = `!!window.__TAURI__`,
+  `invocarComando()`, `escucharEventoShell()`), `utils/reinicioBd.js` (bandera en memoria del
+  módulo que hace que `esErrorDeServidor()` devuelva `false` durante el reinicio: sin esto, las
+  peticiones caídas de la restauración activarían el **Modo Demo** con persistencia en
+  localStorage que sobreviviría al reload) · `api/database.js` (+4 métodos de respaldos con blob
+  para descarga) · `useRespaldos` (TanStack: lista `enabled: esEscritorio()`, crear, validar →
+  invoke `restaurar_bd`) · `RespaldosBD.jsx` (sección de `BaseDatosTab` solo en escritorio:
+  crear, lista con tamaño/fecha, descargar, restaurar con `window.confirm`) · listener
+  `menu_imprimir → window.print()` en `main.jsx` · `AcercaDeModal.jsx` (modal del evento
+  `menu_acerca_de`, montado en `App.jsx`) · mensajes nuevos en `constants/messages.js`.
+  Tests: `utils/__tests__/desktop.test.js` (6), +2 en `errors.test.js` (guard de reinicio),
+  `settings/__tests__/respaldos.test.jsx` (7: además, guardar en escritorio invoca el comando
+  Rust y la rama web usa blob) y `components/ui/__tests__/acercaDeModal.test.jsx` (4), con
+  `window.__TAURI__` simulado.
+- **E2E dev (app real, ventana abierta)**: auto-backup al arrancar crea
+  `respaldos/respaldo-20261020-224718-*.db` en el app-data · `POST /respaldos` → 200 con bytes
+  reales · `GET /respaldos` (lista) · descarga 192 512 B con cabecera `SQLite format 3` ·
+  validar restauración → `{"tablas":16,"usuarios":1,"version":"2.1.1"}` · traversal → 404 ·
+  archivo basura → 400 y pendiente eliminado · la UI de Settings ya consultó la lista desde la
+  ventana.
+- **Pendiente de verificación manual (WebKitGTK)**: impresión — `Ctrl+P`/menú Imprimir con
+  `@page margin:0` + clases `no-print` en la grilla (riesgo conocido §5); probar también
+  F11, el modal "Acerca de" (menú Ayuda, tras el fix del crash) y el flujo completo de
+  restauración desde Settings.
+- Docs: AGENTS.md (134/469 tests, gotcha REGEXP de `materias`), SDD.md (§5.3 respaldos, §8.1), este
+  archivo.
+- Verificación: **backend 134 tests OK** · **frontend 469 tests OK** · E2E dev (ping, login,
+  respaldos HTTP) OK.
+
+*Última actualización: 2026-10-20 — Fase 5 completa (menú nativo, respaldos/restauración de la
+BD con reinicio, persistencia de ventana); queda Fase 6 (build/CI Windows) y la verificación
+manual de impresión en WebKitGTK).*

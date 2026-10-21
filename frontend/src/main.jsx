@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext'
 import { DemoProvider } from './context/DemoContext'
 import { ThemeProvider, resolverTema, TEMA_CLARO, TEMA_OSCURO, TEMA_SISTEMA } from './context/ThemeContext'
 import App from './App'
+import { esEscritorio, escucharEventoShell } from './utils/desktop'
 import './fonts.css'
 import './styles/index.css'
 
@@ -47,3 +48,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>
 )
+
+// Fase 5 (escritorio): el menú nativo de Tauri (Archivo → Imprimir… / Ctrl+P)
+// emite `menu_imprimir`; la web no tiene menú nativo y no entra aquí.
+if (esEscritorio()) {
+  escucharEventoShell('menu_imprimir', () => window.print())
+}

@@ -1,10 +1,12 @@
 # backend/routers/database.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from config.database import get_db
-from core.security import get_current_active_user
+from core.security import get_current_active_user, require_role
 from schemas.database import DatabaseHealth, TableStats
+from services import respaldos
 
 router = APIRouter(prefix="/database", tags=["Base de Datos"])
 
@@ -78,3 +80,42 @@ def get_database_health(db: Session = Depends(get_db)):
         schema_version=schema_version,
         tables=tables,
     )
+
+
+# ─── Respaldo y restauración (Fase 5 desktop — PLAN_DESKTOP.md) ──────────────
+# Solo SQLite (escritorio): los endpoints responden 400 en PostgreSQL. Solo
+# ADMIN: tocan la base de datos completa.
+
+
+@router.post("/respaldos", dependencies=[Depends(require_role(["ADMIN"]))])
+def crear_respaldo(db: Session = Depends(get_db)):
+    """Crea un respaldo consistente en caliente en <datos>/respaldos/."""
+    return respaldos.crear_respaldo(db)
+
+
+@router.get("/respaldos", dependencies=[Depends(require_role(["ADMIN"]))])
+def listar_respaldos(db: Session = Depends(get_db)):
+    """Respaldos existentes, del más reciente al más antiguo."""
+    return respaldos.listar_respaldos(db)
+
+
+@router.get("/respaldos/{nombre}", dependencies=[Depends(require_role(["ADMIN"]))])
+def descargar_respaldo(nombre: str, db: Session = Depends(get_db)):
+    """Descarga un respaldo (.db) para conservarlo fuera de la PC."""
+    ruta = respaldos.ruta_descarga(db, nombre)
+    return FileResponse(
+        ruta,
+        media_type="application/x-sqlite3",
+        filename=nombre,
+    )
+
+
+@router.post("/respaldos/validar-restauracion", dependencies=[Depends(require_role(["ADMIN"]))])
+async def validar_restauracion(archivo: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Valida un archivo .db y lo deja como restauración pendiente.
+
+    La sustitución real la ejecuta el shell Tauri (comando `restaurar_bd`):
+    detiene el sidecar, reemplaza horarios.db y lo relanza.
+    """
+    contenido = await archivo.read()
+    return respaldos.validar_restauracion(db, contenido)

@@ -85,3 +85,20 @@ export const MSG_TURNO_RESTRICCION = (division) =>
 export const MSG_USUARIO_REQUERIDO = 'El usuario es requerido';
 export const MSG_PASSWORD_MINIMO = 'La contraseña debe tener al menos 6 caracteres';
 export const MSG_CREDENCIALES_INVALIDAS = 'Credenciales inválidas o error del servidor';
+
+// ─── Respaldo de la base de datos (escritorio) ──────────────
+
+export const MSG_RESPALDO_CREADO = 'Respaldo creado correctamente';
+export const MSG_RESPALDO_ERROR = 'No se pudo crear el respaldo';
+export const MSG_RESPALDOS_ERROR = 'No se pudieron cargar los respaldos';
+export const MSG_RESPALDO_DESCARGA_ERROR = 'No se pudo descargar el respaldo';
+export const MSG_RESPALDO_GUARDADO = (ruta) => `Respaldo guardado en: ${ruta}`;
+export const MSG_RESTAURACION_INVALIDA =
+  'El archivo no es una base de datos válida de UPT Horarios';
+export const MSG_RESTAURACION_CONFIRMAR =
+  '¿Reemplazar la base de datos actual con este archivo? Se cerrarán las sesiones y la aplicación se reiniciará.';
+export const MSG_RESTAURACION_INICIADA =
+  'Restauración iniciada: la aplicación se reiniciará con los datos restaurados';
+export const MSG_RESTAURACION_ERROR = 'No se pudo completar la restauración';
+export const MSG_RESTAURACION_SIN_PENDIENTE =
+  'No hay una restauración pendiente: valida el archivo primero';

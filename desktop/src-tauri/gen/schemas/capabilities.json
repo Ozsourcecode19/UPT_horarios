@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Capacidad por defecto de la ventana principal (solo UI; la app no expone comandos IPC propios)","local":true,"windows":["main"],"permissions":["core:default"]}}
+{"default":{"identifier":"default","description":"Capacidad por defecto de la ventana principal. La app no define manifiesto ACL propio: sus comandos locales (p. ej. restaurar_bd) se permiten por origen local (ver tauri webview/mod.rs: ACL solo con plugin, manifiesto propio u origen remoto).","local":true,"windows":["main"],"permissions":["core:default"]}}

@@ -18,6 +18,7 @@ from routers import (
     lecciones, horarios_generados, schedules, auth, database
 )
 from config.startup import inicializar_base
+from services.respaldos import respaldo_automatico
 
 import models
 
@@ -28,6 +29,10 @@ async def lifespan(app: FastAPI):
     # seed en el primer arranque; en PostgreSQL no hace nada (el esquema lo
     # gestiona database/). Idempotente.
     inicializar_base()
+    # Fase 5 (PLAN_DESKTOP.md): respaldo automático con rotación al arrancar
+    # (solo SQLite/escritorio; en PostgreSQL no hace nada y nunca interrumpe
+    # el arranque — los fallos quedan en el log).
+    respaldo_automatico()
     yield
 
 

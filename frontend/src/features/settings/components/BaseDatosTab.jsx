@@ -1,6 +1,8 @@
 // src/features/settings/components/BaseDatosTab.jsx
-// Tab de estado de la base de datos.
+// Tab de estado de la base de datos (+ respaldos, solo escritorio).
 import { Database, RefreshCw } from 'lucide-react';
+import { esEscritorio } from '../../../utils/desktop';
+import RespaldosBD from './RespaldosBD';
 
 export default function BaseDatosTab({ dbHealth, isDbHealthLoading, onRefresh }) {
   return (
@@ -73,6 +75,9 @@ export default function BaseDatosTab({ dbHealth, isDbHealthLoading, onRefresh })
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Verifica que el backend esté corriendo.</p>
         </div>
       )}
+      {/* Respaldo/restauración: solo dentro del shell de escritorio (la web
+          usa PostgreSQL y no tiene estos endpoints operativos). */}
+      {esEscritorio() && <RespaldosBD />}
     </>
   );
 }
