@@ -101,7 +101,7 @@ jobs:
           pyinstaller --noconfirm horarios_backend.spec
       - name: Dependencias de Node (frontend + desktop)
         run: |
-          pnpm install --frozen-lockfile
+          pnpm --dir frontend install --frozen-lockfile
           pnpm --dir desktop install --frozen-lockfile
       - name: Tauri build (.deb + AppImage)
         working-directory: desktop
@@ -149,7 +149,7 @@ jobs:
           pyinstaller --noconfirm horarios_backend.spec
       - name: Dependencias de Node (frontend + desktop)
         run: |
-          pnpm install --frozen-lockfile
+          pnpm --dir frontend install --frozen-lockfile
           pnpm --dir desktop install --frozen-lockfile
       - name: Tauri build (.msi + NSIS)
         working-directory: desktop
