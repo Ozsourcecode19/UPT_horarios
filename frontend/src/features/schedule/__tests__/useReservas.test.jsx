@@ -100,4 +100,43 @@ describe('useReservas', () => {
 
     expect(showToast).toHaveBeenCalledWith('No se pudo apartar.', 'error');
   });
+
+  // Un 404/405 en estos endpoints = backend desactualizado (sidecar viejo en
+  // el escritorio). El `detail` de FastAPI ("Method Not Allowed") no le dice
+  // nada al usuario: se muestra un mensaje propio.
+  it('avisa que el backend está desactualizado si la bandeja no existe', async () => {
+    scheduleService.getBandeja = vi.fn(async () => {
+      throw { response: { status: 405, data: { detail: 'Method Not Allowed' } } };
+    });
+    const showToast = vi.fn();
+    const { result } = renderHook(
+      () => useReservas({ periodoId: 7, scheduleService, showToast }),
+      { wrapper: crearWrapper() }
+    );
+
+    await waitFor(() => expect(scheduleService.getBandeja).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('desactualizado'), 'error')
+    );
+    expect(result.current.sinColocar).toEqual([]);
+  });
+
+  it('traduce el 405 al apartar a un mensaje de backend desactualizado', async () => {
+    scheduleService.reservarSesion = vi.fn(async () => {
+      throw { response: { status: 405, data: { detail: 'Method Not Allowed' } } };
+    });
+    const showToast = vi.fn();
+    const { result } = renderHook(
+      () => useReservas({ periodoId: 7, scheduleService, showToast }),
+      { wrapper: crearWrapper() }
+    );
+    await waitFor(() => expect(result.current.sinColocar).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.reservar({ leccion_id: 1 }).catch(() => {});
+    });
+
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('desactualizado'), 'error');
+    expect(showToast).not.toHaveBeenCalledWith('Method Not Allowed', 'error');
+  });
 });

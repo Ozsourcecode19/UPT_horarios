@@ -451,9 +451,11 @@ del usuario):
 - Verificación: corrida `39548804053` → **los 3 jobs en verde**; artefactos descargables en
   la corrida (`gh run view 39548804053` o la pestaña Artifacts).
 
-*Última actualización: 2026-10-21 — **bugfix del arrastre a la bandeja** (`dragover` sin datos:
-el drop nunca se disparaba; ver al final de este registro). Antes: **E23: bandeja de reserva +
-modo libre** (edición manual del
+*Última actualización: 2026-10-21 — **sidecar desactualizado**: el 405 "Method Not Allowed" del
+escritorio era el bundle viejo (sin los endpoints E23); bundle reconstruido y `preparar-sidecar.mjs`
+ahora bloquea el arranque con un backend desactualizado (ver al final de este registro). Antes:
+**bugfix del arrastre a la bandeja** (`dragover` sin datos: el drop nunca se disparaba; ver al final
+de este registro). Antes: **E23: bandeja de reserva + modo libre** (edición manual del
 horario sin solver; funciona en web y escritorio por ser frontend compartido). Ver al final de
 este registro. Antes: **documentada la alternativa Windows 7** como estudio de viabilidad en
 `PLAN_DESKTOP_WIN7.md` (**sin ejecutar**; recomendación: enfoque "sin WebView2" con
@@ -515,3 +517,28 @@ PyInstaller, shell Tauri 2 con menú y respaldos, hotfix WebKitGTK/Mesa y CI ver
   backend ni de esquema.**
 - **Verificación:** frontend **510 tests OK** (los nuevos `dragOver` reproducen el
   `getData() → ''` real y fallan con el código anterior) · `pnpm build` OK.
+
+**2026-10-21 — Sidecar desactualizado: el 405 "Method Not Allowed" del escritorio**:
+- **Síntoma:** con el bugfix del arrastre ya aplicado, arrastrar una clase a la bandeja
+  **sí llegaba a la API** (el toast mostraba el error crudo de FastAPI) pero la clase no se
+  apartaba: `POST /api/schedules/reservar` → **405 `{"detail":"Method Not Allowed"}`** y
+  `POST /api/schedules/reservas/liberar` → 404.
+- **Causa:** el **bundle del sidecar es un snapshot** y el que estaba en
+  `backend/dist/horarios-backend` era del **20-oct 23:05**, anterior al commit E23 (21-oct
+  15:42): no tenía los endpoints de la bandeja. El 405 no es "método equivocado": el path de
+  un solo segmento (`reservar`) cae sobre el patrón genérico `GET /api/schedules/{horario_id}`
+  y Starlette responde 405; los de dos segmentos (`reservas/liberar`) no coinciden con nada →
+  404. `preparar-sidecar.mjs` ya avisaba de la obsolescencia, pero solo con un `console.warn`
+  que pasó desapercibido.
+- **Corrección:**
+  1. **Bundle reconstruido** con el código actual (CPython 3.11.9 con `--enable-shared` +
+     venv temporal + PyInstaller; procedimiento reproducible en AGENTS.md). Verificado por HTTP
+     real contra el **binario empaquetado**: login → colocar → `reservar` (200, fila BORRADOR) →
+     celda libre → aparece en "reservadas" → `liberar` (200, fila ACTIVO) → vuelve a la grilla.
+     El binario sigue siendo autónomo (arranca sin `LD_LIBRARY_PATH`).
+  2. **`preparar-sidecar.mjs` ahora BLOQUEA** el arranque si el bundle es más viejo que el
+     código del backend (mensaje accionable; salto con `UPT_IGNORAR_SIDECAR_VIEJO=1`). El CI no
+     se ve afectado: compila el sidecar justo antes de `pnpm build`.
+  3. **Frontend:** `useReservas` traduce 404/405 de la bandeja a un mensaje propio
+     (`MSG_BACKEND_DESACTUALIZADO_BANDEJA`) en vez de mostrar el `detail` crudo.
+- **Verificación:** frontend **512 tests OK** · `pnpm build` OK · smoke HTTP del binario OK.

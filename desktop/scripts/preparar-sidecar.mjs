@@ -52,13 +52,31 @@ for (const entrada of readdirSync(backendDir, { recursive: true })) {
     pyReciente = rel
   }
 }
-if (pyMtime > binMtime) {
-  console.warn(
-    `[preparar-sidecar] ⚠️ El binario es MÁS VIEJO que el código del backend (${pyReciente}).`
+// Es BLOQUEANTE: arrancar con un bundle viejo deja la app con funciones rotas
+// y sin aviso (el 20-oct-2026 el escritorio devolvía 405 "Method Not Allowed"
+// al apartar una clase, porque el sidecar no tenía /api/schedules/reservar).
+if (pyMtime > binMtime && process.env.UPT_IGNORAR_SIDECAR_VIEJO !== '1') {
+  console.error(
+    `[preparar-sidecar] ⛔ El bundle del backend es MÁS VIEJO que el código del backend (${pyReciente}).`
   )
-  console.warn(
-    '   Reconstruye el bundle o el sidecar no tendrá los cambios: cd backend && .venv/bin/pyinstaller --noconfirm horarios_backend.spec'
+  console.error(
+    '   Si se arranca así, el escritorio usará un backend viejo: los endpoints nuevos'
   )
+  console.error(
+    '   responderán 404/405 (ej. POST /api/schedules/reservar → 405 Method Not Allowed)'
+  )
+  console.error(
+    '   y la app quedará con funciones rotas sin avisar. Reconstruye el bundle:'
+  )
+  console.error('     cd backend && .venv/bin/pyinstaller --noconfirm horarios_backend.spec')
+  console.error(
+    '   (si aborta con "Python was built without a shared library", compila un CPython'
+  )
+  console.error(
+    '    con --enable-shared: ver PLAN_DESKTOP.md §Fase 3. Si sabes lo que haces,'
+  )
+  console.error('    sigue con UPT_IGNORAR_SIDECAR_VIEJO=1.)')
+  process.exit(1)
 }
 
 rmSync(destino, { recursive: true, force: true })

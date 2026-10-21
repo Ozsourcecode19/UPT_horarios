@@ -49,6 +49,13 @@ export const MSG_MOVIDO_OK = 'Horario movido y sincronizado correctamente';
 export const MSG_MOVIDO_CONFLICTO = 'Conflicto en restricciones al mover el horario.';
 export const MSG_MOVIDO_DEMO_OK = 'Movimiento simulado con éxito en Modo Demo';
 export const MSG_ASIGNADO_OK = 'Clase reasignada y sincronizada correctamente';
+
+// ─── Bandeja de reserva / backend desactualizado ────────────────
+// Un 404/405 en los endpoints de la bandeja significa que el backend no
+// conoce la feature: casi siempre es el sidecar del escritorio con un build
+// anterior al código (el bundle de PyInstaller es un snapshot).
+export const MSG_BACKEND_DESACTUALIZADO_BANDEJA =
+  'El servidor no soporta la bandeja de reserva: el backend está desactualizado. En el escritorio hay que reconstruir el sidecar del backend.';
 export const MSG_ASIGNADO_DEMO_OK = 'Asignación simulada con éxito en Modo Demo';
 export const MSG_ASIGNADO_ERROR = 'No se pudo abrir el editor de la clase. Revisa la consola para más detalle.';
 export const MSG_ASIGNADO_SIN_LECCION = 'No se pudo identificar la clase seleccionada.';

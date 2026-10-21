@@ -7,10 +7,25 @@
 // Reservar = poner la sesión en BORRADOR (la celda queda libre); liberar =
 // devolverla a ACTIVO validando que la celda siga libre.
 
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
+import { MSG_BACKEND_DESACTUALIZADO_BANDEJA } from '../../../constants/messages';
 
 const BANDEJA_VACIA = { sin_colocar: [], reservadas: [] };
+
+/**
+ * ¿El error indica que el backend no conoce la bandeja de reserva?
+ *
+ * Un 404/405 en estos endpoints significa backend desactualizado (típico: el
+ * sidecar del escritorio con un build anterior al código). En ese caso el
+ * `detail` que devuelve FastAPI ("Not Found" / "Method Not Allowed") no le
+ * dice nada útil al usuario.
+ */
+const esBackendDesactualizado = (err) => {
+  const status = err?.response?.status;
+  return status === 404 || status === 405;
+};
 
 /**
  * Hook de la bandeja de reserva.
@@ -30,6 +45,14 @@ export const useReservas = ({
   scheduleService = ScheduleService,
 }) => {
   const queryClient = useQueryClient();
+  // El aviso de backend desactualizado se muestra una sola vez por sesión
+  // (la query se reintenta con cada invalidación).
+  const avisado = useRef(false);
+  const _avisarDesactualizado = () => {
+    if (avisado.current) return;
+    avisado.current = true;
+    showToast(MSG_BACKEND_DESACTUALIZADO_BANDEJA, 'error');
+  };
 
   const { data: bandeja = BANDEJA_VACIA, isLoading } = useQuery({
     queryKey: ['bandeja-reserva', periodoId],
@@ -37,7 +60,8 @@ export const useReservas = ({
       if (!periodoId) return BANDEJA_VACIA;
       try {
         return await scheduleService.getBandeja(periodoId);
-      } catch {
+      } catch (err) {
+        if (esBackendDesactualizado(err)) _avisarDesactualizado();
         return BANDEJA_VACIA;
       }
     },
@@ -62,6 +86,10 @@ export const useReservas = ({
       _invalidar();
     },
     onError: (err) => {
+      if (esBackendDesactualizado(err)) {
+        _avisarDesactualizado();
+        return;
+      }
       const detail = err?.response?.data?.detail;
       const mensaje = typeof detail === 'string' ? detail : (detail?.mensaje || 'No se pudo apartar la clase.');
       showToast(mensaje, 'error');
@@ -84,6 +112,10 @@ export const useReservas = ({
       _invalidar();
     },
     onError: (err) => {
+      if (esBackendDesactualizado(err)) {
+        _avisarDesactualizado();
+        return;
+      }
       const detail = err?.response?.data?.detail;
       const mensaje = typeof detail === 'string' ? detail : (detail?.mensaje || 'No se pudo devolver la clase a la grilla.');
       showToast(mensaje, 'error');
