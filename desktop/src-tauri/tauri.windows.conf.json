@@ -1,0 +1,8 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "//": "Config específica de Windows (Fase 6 — PLAN_DESKTOP.md): el CLI la mergea sobre tauri.conf.json solo al compilar para Windows. Allí no existen deb/appimage, y el sidecar se llama horarios-backend.exe.",
+  "bundle": {
+    "targets": ["msi", "nsis"],
+    "resources": ["binarios/horarios-backend.exe"]
+  }
+}

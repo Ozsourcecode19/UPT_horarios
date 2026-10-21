@@ -1,0 +1,163 @@
+# .github/workflows/desktop-release.yml — Fase 6 (PLAN_DESKTOP.md)
+#
+# Compila el sidecar PyInstaller y la app Tauri en cada plataforma (sin
+# cross-compilation: Windows en Windows, Linux en Linux) y publica los
+# instaladores como artefactos de la corrida:
+#   Linux  → .deb + AppImage      Windows → .msi + NSIS (setup.exe)
+#
+# Notas:
+#   * ubuntu-24.04 (no 22.04): Tauri v2 necesita libwebkit2gtk-4.1-dev, que
+#     22.04 no tiene. Piso de glibc 2.39; Canaima (glibc 2.42) lo cubre.
+#   * APPIMAGE_EXTRACT_AND_RUN=1: linuxdeploy es un AppImage y en CI no hay
+#     FUSE (igual que en Canaima).
+#   * Windows usa desktop/src-tauri/tauri.windows.conf.json (targets msi/nsis
+#     + recurso horarios-backend.exe), que el CLI mergea sobre tauri.conf.json.
+#   * La imagen de Windows trae WiX (msi) y el CLI de Tauri descarga NSIS
+#     bajo demanda.
+#   * El checkout trae backend/.venv/ y python/ commiteados (legacy): los
+#     trabajos usan el Python de actions/setup-python, nunca ese .venv.
+
+name: Distribución de escritorio (Linux + Windows)
+
+on:
+  push:
+    branches: [main, master, feat/desktop-tauri]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  pruebas:
+    name: Pruebas (backend + frontend)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Backend (pytest sobre SQLite en memoria)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pytest
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Frontend (vitest)
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+
+  linux:
+    name: Linux (.deb + AppImage)
+    needs: pruebas
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencias del sistema (Tauri 2 + WebKitGTK 4.1)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget \
+            file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            desktop/pnpm-lock.yaml
+      - name: Sidecar (PyInstaller onedir)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pyinstaller --noconfirm horarios_backend.spec
+      - name: Dependencias de Node (frontend + desktop)
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir desktop install --frozen-lockfile
+      - name: Tauri build (.deb + AppImage)
+        working-directory: desktop
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UPT-Horarios-linux
+          if-no-files-found: error
+          path: |
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+
+  windows:
+    name: Windows (.msi + NSIS)
+    needs: pruebas
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            desktop/pnpm-lock.yaml
+      - name: Sidecar (PyInstaller onedir)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pyinstaller --noconfirm horarios_backend.spec
+      - name: Dependencias de Node (frontend + desktop)
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir desktop install --frozen-lockfile
+      - name: Tauri build (.msi + NSIS)
+        working-directory: desktop
+        run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UPT-Horarios-windows
+          if-no-files-found: error
+          path: |
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe

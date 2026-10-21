@@ -42,7 +42,10 @@ let pyReciente = ''
 for (const entrada of readdirSync(backendDir, { recursive: true })) {
   const rel = String(entrada)
   if (!rel.endsWith('.py')) continue
-  if (/(^|\/)(\.venv|alembic|tests|build|dist|__pycache__)(\/|$)/.test(rel)) continue
+  // En Windows `readdirSync` recursive devuelve rutas con `\`: el regex
+  // acepta ambos separadores (si no, escanearía el .venv commiteado y
+  // avisaría falsamente que el binario está viejo).
+  if (/(^|[\\/])(\.venv|alembic|tests|build|dist|__pycache__)([\\/]|$)/.test(rel)) continue
   const m = statSync(join(backendDir, rel)).mtimeMs
   if (m > pyMtime) {
     pyMtime = m
