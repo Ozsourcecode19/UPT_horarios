@@ -133,7 +133,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - [x] Fase 3 — PyInstaller ✅ (2026-10-20)
 - [x] Fase 4 — Shell Tauri ✅ (2026-10-20)
 - [x] Fase 5 — UX escritorio ✅ (2026-10-20)
-- [ ] Fase 6 — Build/CI
+- [x] Fase 6 — Build/CI ✅ (2026-10-21)
 - [ ] Roadmap post-migración (pendiente de priorizar)
 
 ### Registro de iteraciones
@@ -407,6 +407,47 @@ del usuario):
   `APPIMAGE_EXTRACT_AND_RUN=1 pnpm build` → `.deb` **117.26 MiB** + `AppImage` **194.27 MiB**
   en `desktop/src-tauri/target/release/bundle/`.
 
-*Última actualización: 2026-10-21 — Fase 5 completa (menú nativo, respaldos/restauración de la
-BD con reinicio, persistencia de ventana) + hotfix del abort al cerrar (workaround WebKitGTK/
-Mesa, verificado en release) + build local instalable; queda Fase 6 (CI Windows+Linux).*
+**2026-10-21 — Fase 6 completa** (rama `feat/desktop-tauri`; CI en GitHub, repo privado
+`Ozsourcecode19/UPT_horarios`):
+- `.github/workflows/desktop-release.yml` (disparadores: push a `main`/`master`/
+  `feat-desktop-tauri`, tags `v*` y `workflow_dispatch`; concurrencia por ref con
+  `cancel-in-progress`):
+  - `pruebas` (ubuntu-24.04): pytest del backend sobre SQLite en memoria + vitest del
+    frontend — pasan en la nube.
+  - `linux` (tras `pruebas`): `libwebkit2gtk-4.1-dev` (Tauri v2 lo exige y 22.04 no lo tiene
+    → runner 24.04, **piso de glibc 2.39**; Canaima trae 2.42), `setup-python` 3.11 (imagen
+    oficial con libpython compartida; el `.venv` commiteado se ignora), PyInstaller onedir,
+    pnpm 11 + Node 22 con caché, rust stable + `swatinem/rust-cache`, `pnpm build` con
+    `APPIMAGE_EXTRACT_AND_RUN=1` → `.deb` + AppImage.
+  - `windows` (windows-latest): mismo flujo → `.msi` (WiX de la imagen) + NSIS (el CLI de
+    Tauri lo descarga bajo demanda).
+  - Artefactos por corrida (`upload-artifact`, `if-no-files-found: error`):
+    `UPT-Horarios-linux` (~286 MB) y `UPT-Horarios-windows` (~248 MB).
+- `desktop/src-tauri/tauri.windows.conf.json` (merge del CLI solo al compilar para Windows):
+  override mínimo de `bundle.targets` (`msi`, `nsis`). **El recurso
+  `binarios/horarios-backend` es la carpeta onedir** (no el ejecutable) y se hereda de
+  `tauri.conf.json`: en Windows esa carpeta contiene `horarios-backend.exe`, que
+  `preparar-sidecar.mjs` nombra con sufijo.
+- `preparar-sidecar.mjs`: el regex que excluye `.venv`/`tests`/etc. del escaneo de
+  obsolescencia acepta `\` además de `/` (en Windows `readdirSync` recursive devuelve rutas
+  con contrabarra).
+- Correcciones durante la puesta a punto (3 corridas hasta el verde):
+  1. `pnpm install` corría en la raíz del repo (sin `package.json`) → `ERR_PNPM_NO_PKG_MANIFEST`;
+     fix con `pnpm --dir frontend/desktop install`.
+  2. Clave `//` (intento de "comentario") en `tauri.windows.conf.json` → el schema de Tauri
+     rechaza claves adicionales; eliminada.
+  3. Recurso Windows apuntando al `.exe` en vez de la carpeta onedir →
+     "resource path `binarios\horarios-backend.exe` doesn't exist" en el build script de Rust.
+- Gotcha CI: **pwsh** (shell por defecto de los jobs de Windows) no corta ante comandos
+  nativos fallidos — solo mira `$LASTEXITCODE` al final del script: un paso puede verse
+  verde sin haber hecho lo esperado (le pasó al paso de deps de Node).
+- Aviso no bloqueante: las actions con runtime Node 20 (`checkout@v4`, `setup-node@v4`,
+  `setup-python@v5`, `pnpm/action-setup@v4`) están deprecadas (corren forzadas en Node 24);
+  subir mayores cuando toque.
+- Verificación: corrida `39548804053` → **los 3 jobs en verde**; artefactos descargables en
+  la corrida (`gh run view 39548804053` o la pestaña Artifacts).
+
+*Última actualización: 2026-10-21 — **migración de escritorio completa (Fases 0–6)**:
+backend SQLite + listeners, seed de arranque, sidecar PyInstaller, shell Tauri 2 con menú y
+respaldos, hotfix WebKitGTK/Mesa y CI verde (Linux .deb/AppImage + Windows .msi/NSIS). Queda
+priorizar el roadmap post-migración (§6).*
