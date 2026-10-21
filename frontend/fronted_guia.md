@@ -7,7 +7,18 @@
 
 ---
 
-### Contexto de la Sesión Actual (2026-10-21) — E23: bandeja de reserva + modo libre (web y escritorio)
+### Contexto de la Sesión Actual (2026-10-21) — E24: navegación estilo aSc Timetables
+
+> Rediseño de la **estructura de navegación y del área de trabajo** inspirado en [aSc Timetables](https://www.asctimetables.com/) (el programa que ya usa la institución), **conservando el aspecto amigable** actual (Tailwind, dark mode, responsive, tap-to-move e impresión). Sin cambios de backend: no hay endpoints nuevos ni que reconstruir el sidecar.
+
+**Vocabulario de aSc que se adopta:** panel de datos (entidades) a la izquierda, pestañas de horarios abiertos (*related timetables*), tira de clases sin colocar (*control panel*) abajo, *free rooms* (aulas libres) y panel de verificación (*advisor*).
+
+1. **Sidebar global reagrupado (`src/config/navigation.js`):** las secciones pasan de `INICIO · PLANIFICACIÓN · CATÁLOGO · HORARIOS · SISTEMA` a **`INICIO · DATOS · HORARIOS · SISTEMA`** (fusión de PLANIFICACIÓN + CATÁLOGO en DATOS, como el "Data input" de aSc). Cada sección declara ahora `icon` y `descripcion`. ⚠️ **Los paths y los roles NO cambian**: de ellos dependen `AppRouter` y `RoleGate`. `src/config/__tests__/navigation.test.js` **congela** la lista de rutas y sus roles para que un reacomodo accidental no abra ni cierre puertas.
+2. **Sidebar colapsable (`components/layout/MainLayout.jsx`):** en escritorio (`lg+`) se puede colapsar a **solo iconos** (botón `PanelLeftClose`, estado persistido en `localStorage` con la clave `sidebar_colapsado` → `LS_KEYS.sidebarColapsado`). En móvil el drawer **siempre va desplegado** (las etiquetas se ocultan con `lg:hidden`, nunca con `hidden`). Las sub-páginas de "Docentes" (Disponibilidad, Habilitaciones) que no caben colapsadas se alcanzan por un **flyout** al pasar el mouse sobre el ícono del padre.
+
+---
+
+### Contexto de la Sesión Anterior (2026-10-21) — E23: bandeja de reserva + modo libre (web y escritorio)
 
 > Feature de **edición manual del horario sin depender del solver** (rama `feat/desktop-tauri`; funciona igual en la web y en la app de escritorio, que sirve el mismo frontend). Verificación: backend **154 pytest ✅**, frontend **520 vitest ✅**, `pnpm build` ✅, smoke E2E contra SQLite real ✅.
 

@@ -2,6 +2,17 @@
 // Fuente única de la navegación: sidebar, header y breadcrumb.
 // Cada ítem declara la sección (flujo), el path, el ícono y los roles permitidos.
 // `roles: '*'` significa visibilidad para todos los roles.
+//
+// E24 (estructura visual inspirada en aSc Timetables): las secciones se
+// reagrupan para reflejar el flujo real del programa:
+//   INICIO  → panorama
+//   DATOS   → todo el catálogo de entrada (el "Data input" de aSc)
+//   HORARIOS→ el área de trabajo (la "ventana de horario" de aSc)
+//   SISTEMA → ajustes
+// ⚠️ Los PATHS y los ROLES no cambian: de ellos dependen `AppRouter` y
+// `RoleGate` (la barrera real sigue siendo el backend). Reagrupar secciones
+// es solo una forma de presentarlas; `navigation.test.js` congela paths y roles
+// para que un reacomodo accidental no abra ni cierre puertas.
 import {
   LayoutDashboard,
   CalendarRange,
@@ -14,24 +25,25 @@ import {
   Settings,
   GraduationCap,
   School,
+  Database,
+  FolderTree,
 } from 'lucide-react';
 
 export const NAVIGATION = [
   {
     seccion: 'INICIO',
+    icon: LayoutDashboard,
+    descripcion: 'Resumen general',
     items: [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: '*' }],
   },
   {
-    seccion: 'PLANIFICACIÓN',
+    seccion: 'DATOS',
+    icon: Database,
+    descripcion: 'Catálogo del periodo',
     items: [
       { label: 'Periodos Académicos', path: '/periodos', icon: CalendarRange, roles: ['ADMIN', 'JEFE-PNF'] },
       { label: 'Bloques Horarios', path: '/bloques', icon: Clock, roles: ['ADMIN', 'JEFE-PNF'] },
       { label: 'Aulas y Sedes', path: '/aulas', icon: MapPin, roles: '*' },
-    ],
-  },
-  {
-    seccion: 'CATÁLOGO',
-    items: [
       {
         label: 'Docentes',
         path: '/docentes',
@@ -45,15 +57,19 @@ export const NAVIGATION = [
       { label: 'Unidades Curriculares', path: '/materias', icon: BookOpen, roles: '*' },
       { label: 'Carreras', path: '/carreras', icon: School, roles: ['ADMIN', 'JEFE-PNF'] },
       { label: 'Trayectos Académicos', path: '/trayectos', icon: Layers, roles: ['ADMIN'] },
-      { label: 'Secciones y Clases', path: '/lecciones', icon: Layers, roles: '*' },
+      { label: 'Secciones y Clases', path: '/lecciones', icon: FolderTree, roles: '*' },
     ],
   },
   {
     seccion: 'HORARIOS',
+    icon: CalendarRange,
+    descripcion: 'Área de trabajo',
     items: [{ label: 'Horarios', path: '/horarios', icon: Calendar, roles: '*' }],
   },
   {
     seccion: 'SISTEMA',
+    icon: Settings,
+    descripcion: 'Ajustes del sistema',
     items: [{ label: 'Configuración', path: '/configuracion', icon: Settings, roles: ['ADMIN'] }],
   },
 ];

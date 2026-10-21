@@ -1,8 +1,11 @@
-import { useState, Component } from 'react';
+import { useState, useEffect, Component } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, LogOut, Menu, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import {
+  Calendar, LogOut, Menu, X, AlertTriangle, RefreshCw, PanelLeftClose, PanelLeftOpen,
+} from 'lucide-react';
 import { NAVIGATION, getRouteMeta, isRoleAllowed } from '../../config/navigation';
+import { LS_KEYS } from '../../constants';
 import ThemeToggle from './ThemeToggle';
 
 class ErrorBoundary extends Component {
@@ -38,18 +41,26 @@ class ErrorBoundary extends Component {
   }
 }
 
-const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick }) => (
+// Ítem del sidebar. Colapsado (escritorio) solo se ve el icono, con el texto
+// como `title` para el tooltip nativo del navegador.
+// ⚠️ El colapso SOLO aplica en lg+: en móvil el drawer siempre va desplegado,
+// así que las etiquetas se ocultan con `lg:hidden` (no con `hidden`).
+const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick, colapsado }) => (
   <Link
     to={path}
     onClick={onClick}
+    title={colapsado ? label : undefined}
+    aria-label={colapsado ? label : undefined}
     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+      colapsado ? 'lg:justify-center lg:px-0' : ''
+    } ${sub ? 'ml-4 py-2.5 text-sm' : ''} ${
       active
         ? 'bg-blue-600/10 text-blue-600 font-semibold shadow-[0_0_15px_rgba(37,99,235,0.1)]'
         : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-    } ${sub ? 'ml-4 py-2.5 text-sm' : ''}`}
+    }`}
   >
     <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
-    <span>{label}</span>
+    <span className={colapsado ? 'lg:hidden' : ''}>{label}</span>
   </Link>
 );
 
@@ -57,6 +68,16 @@ const MainLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // E24: sidebar colapsado a iconos (solo escritorio, lg+). Persistido.
+  const [colapsado, setColapsado] = useState(() => {
+    try { return localStorage.getItem(LS_KEYS.sidebarColapsado) === '1'; }
+    catch { return false; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEYS.sidebarColapsado, colapsado ? '1' : '0'); }
+    catch { /* sin localStorage */ }
+  }, [colapsado]);
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -103,53 +124,100 @@ const MainLayout = () => {
       )}
 
       {/* Sidebar */}
-      <aside className={`no-print 
+      <aside className={`no-print
         fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/60
-        transform transition-transform duration-300 ease-in-out flex flex-col
+        transition-all duration-300 ease-in-out flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${colapsado ? 'lg:w-20' : ''}
       `}>
         {/* Logo area */}
-        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+        <div className={`h-20 flex items-center justify-between border-b border-slate-100 px-6 ${colapsado ? 'lg:px-3' : ''}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Calendar className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300">
+            <span className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 truncate ${colapsado ? 'lg:hidden' : ''}`}>
               UPT Horarios
             </span>
           </div>
-          <button onClick={closeSidebar} className="lg:hidden text-slate-400 hover:text-slate-600">
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Colapsar/expandir (solo escritorio) */}
+            <button
+              onClick={() => setColapsado(c => !c)}
+              title={colapsado ? 'Expandir el menú' : 'Colapsar el menú'}
+              aria-label={colapsado ? 'Expandir el menú' : 'Colapsar el menú'}
+              className="hidden lg:flex p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              {colapsado ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+            </button>
+            <button onClick={closeSidebar} className="lg:hidden text-slate-400 hover:text-slate-600">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation por secciones (flujo de trabajo) */}
-        <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
+        <nav className={`flex-1 py-6 overflow-y-auto space-y-6 px-4 ${colapsado ? 'lg:px-2' : ''}`}>
           {navigation.map((section) => (
             <div key={section.seccion}>
-              <p className="px-4 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <p className={`px-4 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 ${colapsado ? 'lg:hidden' : ''}`}>
                 {section.seccion}
               </p>
+              <div
+                className={`mx-2 mb-2 border-t border-slate-100 ${colapsado ? 'lg:block' : 'hidden'}`}
+                title={section.seccion}
+                aria-hidden="true"
+              />
               <div className="space-y-1">
                 {section.items.map((item) => (
-                  <div key={item.path}>
+                  <div key={item.path} className={colapsado ? 'group' : ''}>
                     <SidebarItem
                       {...item}
+                      colapsado={colapsado}
                       active={isItemActive(item)}
                       onClick={closeSidebar}
                     />
                     {item.children && (
-                      <div className="mt-1 space-y-1">
-                        {item.children.map((child) => (
-                          <SidebarItem
-                            key={child.path}
-                            {...child}
-                            active={isChildActive(child.path)}
-                            sub
-                            onClick={closeSidebar}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        {/* En modo colapsado las hijas no caben: se muestran
+                            en un flyout al pasar el mouse sobre el padre. */}
+                        <div className={`mt-1 space-y-1 ${colapsado ? 'lg:hidden' : ''}`}>
+                          {item.children.map((child) => (
+                            <SidebarItem
+                              key={child.path}
+                              {...child}
+                              active={isChildActive(child.path)}
+                              sub
+                              onClick={closeSidebar}
+                            />
+                          ))}
+                        </div>
+                        {colapsado && (
+                          <div className="hidden lg:block relative">
+                            <div className="absolute left-full top-0 ml-2 w-56 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50">
+                              <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                {item.label}
+                              </p>
+                              {item.children.map((child) => (
+                                <Link
+                                  key={child.path}
+                                  to={child.path}
+                                  onClick={closeSidebar}
+                                  title={child.label}
+                                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors ${
+                                    isChildActive(child.path)
+                                      ? 'bg-blue-600/10 text-blue-600 font-semibold'
+                                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                                  }`}
+                                >
+                                  <child.icon className="w-4 h-4 shrink-0" />
+                                  <span className="truncate">{child.label}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
@@ -159,12 +227,15 @@ const MainLayout = () => {
         </nav>
 
         {/* User area */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+        <div className={`p-4 border-t border-slate-100 ${colapsado ? 'lg:px-2' : ''}`}>
+          <div className={`bg-slate-50 rounded-2xl flex items-center gap-4 p-4 ${colapsado ? 'lg:flex-col lg:gap-1 lg:p-2' : ''}`}>
+            <div
+              className="w-10 h-10 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold"
+              title={colapsado ? `${user?.username || 'Usuario'} · ${user?.role || ''}` : undefined}
+            >
               {user?.username?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className={`flex-1 min-w-0 ${colapsado ? 'lg:hidden' : ''}`}>
               <p className="text-sm font-semibold text-slate-900 truncate">
                 {user?.username || 'Usuario'}
               </p>
@@ -174,6 +245,7 @@ const MainLayout = () => {
               onClick={logout}
               className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
               title="Cerrar sesión"
+              aria-label="Cerrar sesión"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -189,6 +261,7 @@ const MainLayout = () => {
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+              aria-label="Abrir el menú"
             >
               <Menu className="w-6 h-6" />
             </button>

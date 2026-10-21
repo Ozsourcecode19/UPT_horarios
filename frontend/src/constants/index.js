@@ -64,6 +64,8 @@ export const LS_KEYS = {
   user: 'user',
   theme: 'theme',
   authReturnUrl: 'auth_return_url',
+  // E24: sidebar global colapsado a iconos (solo escritorio).
+  sidebarColapsado: 'sidebar_colapsado',
 };
 
 /** Prefijo para claves de datos demo por feature. */
