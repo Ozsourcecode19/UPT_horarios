@@ -350,7 +350,9 @@ erDiagram
 
 ```text
 backend/
-├── main.py                     # Creación de la app FastAPI, CORS, registro de routers
+├── main.py                     # Creación de la app FastAPI, CORS, registro de routers, lifespan (seed SQLite)
+├── run_server.py               # Entry point del binario de escritorio (uvicorn en 127.0.0.1, puerto por env PORT)
+├── horarios_backend.spec       # Build PyInstaller onedir del backend (sidecar de Tauri; PLAN_DESKTOP.md F3)
 ├── config/database.py          # Engine, SessionLocal, get_db
 ├── config/startup.py           # Primer arranque en SQLite: create_all + seed (no-op en Postgres)
 ├── core/security.py            # JWT, bcrypt, dependencias get_current_user / require_role

@@ -19,3 +19,8 @@ npm-debug.log
 
 # Database backups
 database/bakup/*.sql
+
+# Escritorio (PLAN_DESKTOP.md): salidas de build, nunca se versionan.
+# (dist/ ya está cubierto arriba; cubre backend/dist y desktop/dist.)
+backend/build/
+desktop/src-tauri/target/

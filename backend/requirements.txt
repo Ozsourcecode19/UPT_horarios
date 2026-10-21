@@ -20,3 +20,12 @@ bcrypt==4.0.1
 # Testing
 pytest==7.4.4
 httpx==0.26.0
+
+# Fase 2 — formularios OAuth2 (POST /api/token usa OAuth2PasswordRequestForm
+# de starlette, que importa multipart dinámicamente). Estaba instalado pero
+# no declarado.
+python-multipart==0.0.32
+
+# Empaquetado de escritorio (PLAN_DESKTOP.md — Fase 3; solo necesaria para
+# construir el binario, no para ejecutar la API en desarrollo)
+pyinstaller==6.22.3

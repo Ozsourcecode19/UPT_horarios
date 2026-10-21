@@ -129,7 +129,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - [x] Fase 0 — Backend multi-dialecto ✅ (2026-10-20)
 - [x] Fase 1 — Triggers → listeners Python (+ tests) ✅ (2026-10-20)
 - [x] Fase 2 — Esquema + seed SQLite ✅ (2026-10-20)
-- [ ] Fase 3 — PyInstaller
+- [x] Fase 3 — PyInstaller ✅ (2026-10-20)
 - [ ] Fase 4 — Shell Tauri
 - [ ] Fase 5 — UX escritorio
 - [ ] Fase 6 — Build/CI
@@ -202,5 +202,34 @@ del usuario):
 - Verificación: **backend 121 tests OK** (117 + 4) · smoke `import main`/TestClient OK ·
   frontend sin cambios.
 
-*Última actualización: 2026-10-20 — Fase 2 completa; sigue Fase 3 (PyInstaller) y Fase 4 (Tauri,
-que pueden avanzar en paralelo — validar temprano el empaquetado en ambos SO).*
+**2026-10-20 — Fase 3 completa** (rama `feat/desktop-tauri`):
+- Nuevo `backend/run_server.py`: entry point del binario — uvicorn en `127.0.0.1` (solo local),
+  puerto por env `PORT` (default 8000); importa la app de `main` (lifespan + seed incluidos).
+- Nuevo `backend/horarios_backend.spec` (versionado): **onedir**, `console=True` (los logs de
+  uvicorn van al stdout que Tauri capturará), `collect_all("ortools")` (extensiones C + datos),
+  `collect_submodules("jose")` (backends de cripto resueltos dinámicamente), hiddenimports
+  `multipart`/`python_multipart` (starlette los importa dentro de un `try` — `POST /api/token` es
+  formularios), handlers de `passlib` (bcrypt/pbkdf2/sha2_crypt) y `bcrypt`; `uvloop` excluido
+  solo en `win32`. Los hooks propios de PyInstaller cubren sqlalchemy (dialectos incl. sqlite),
+  uvicorn, passlib, bcrypt y cryptography.
+  - Hallazgo: `pathex=[]` anula el directorio del spec → `from main import app` no se resolvía
+    (`ModuleNotFoundError: main` en runtime, invisible en el build). Fix: `pathex=[SPECPATH]`.
+- ⚠️ **Hallazgo de entorno**: el Python 3.11.9 de `backend/.venv` (`/usr/local/bin/python3.11`)
+  está compilado **sin libpython compartida** y PyInstaller aborta en Linux ("Python was built
+  without a shared library"). Sin docker ni sudo, se compiló CPython 3.11.9 con `--enable-shared`
+  en prefijo local `/tmp/opencode/py311` + venv temporal `/tmp/opencode/pyi_venv` (recursos
+  efímeros de la sesión /tmp; el `.venv` del repo NO se tocó). **En CI usar imágenes oficiales de
+  Python** (ya traen shared). En Windows no aplica (los instaladores oficiales traen `python311.dll`).
+- `requirements.txt`: +`pyinstaller==6.22.3` (solo build) y **fix** `python-multipart==0.0.32`
+  (dependencia real del login vía `OAuth2PasswordRequestForm`; estaba instalada pero no declarada).
+- `.gitignore`: `backend/build/` y `desktop/src-tauri/target/` (`dist/` ya estaba cubierto).
+- **Resultado**: bundle `backend/dist/horarios-backend/` — **233 MB** (exe 15 MB + libpython +
+  ortools; algo por encima del rango estimado 120-180 MB, lo domina ortools 9.8). Smoke
+  end-to-end del binario REAL: arranque ~3.5 s → seed SQLite → login `admin/admin123` → health
+  "SQLite 3.46.1" (schema_version 2.1.1) → 8 configuraciones. El binario corre sin
+  LD_LIBRARY_PATH (libpython empaquetada en `_internal/`).
+- Docs: AGENTS.md (comando de build + gotcha del shared), SDD.md (árbol §5.1), este archivo.
+- Verificación: **backend 121 tests OK** · `import main`/`run_server` OK · smoke del binario OK.
+
+*Última actualización: 2026-10-20 — Fase 3 completa (binario de escritorio funcionando); sigue
+Fase 4 (Shell Tauri) — el sidecar backend ya está listo para `externalBin`.*
