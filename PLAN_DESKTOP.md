@@ -451,7 +451,9 @@ del usuario):
 - Verificación: corrida `39548804053` → **los 3 jobs en verde**; artefactos descargables en
   la corrida (`gh run view 39548804053` o la pestaña Artifacts).
 
-*Última actualización: 2026-10-21 — **E23: bandeja de reserva + modo libre** (edición manual del
+*Última actualización: 2026-10-21 — **bugfix del arrastre a la bandeja** (`dragover` sin datos:
+el drop nunca se disparaba; ver al final de este registro). Antes: **E23: bandeja de reserva +
+modo libre** (edición manual del
 horario sin solver; funciona en web y escritorio por ser frontend compartido). Ver al final de
 este registro. Antes: **documentada la alternativa Windows 7** como estudio de viabilidad en
 `PLAN_DESKTOP_WIN7.md` (**sin ejecutar**; recomendación: enfoque "sin WebView2" con
@@ -493,3 +495,23 @@ PyInstaller, shell Tauri 2 con menú y respaldos, hotfix WebKitGTK/Mesa y CI ver
   **smoke E2E contra SQLite real** (login → colocar → apartar → la celda queda libre → devolver
   → la clase vuelve a la grilla → modo estricto 409 vs modo libre con advertencias → permisos
   LECTOR) todo OK.
+
+**2026-10-21 — Bugfix: el arrastre a la bandeja no apartaba la clase**:
+- **Síntoma (reportado en el escritorio):** al arrastrar una clase de la grilla hasta la bandeja
+  no se apartaba; tampoco había ningún aviso. Como no era posible apartar ninguna clase, la
+  dirección inversa (ficha de la bandeja → grilla) quedó sin poder probarse.
+- **Causa:** el `onDragOver` de `BandejaReserva.jsx` decidía con
+  `e.dataTransfer.getData('text/plain')`, que **según la especificación HTML5 devuelve `''`
+  durante `dragover`** (los datos solo se leen en `dragstart` y `drop`). Sin `preventDefault()`
+  el navegador marca el panel como destino inválido y **el `drop` nunca se dispara** → el
+  `onReservarDesdeGrilla` jamás llegaba a ejecutarse. La grilla ya lo hacía bien con
+  `dataTransfer.types`; la bandeja no. **Los tests no lo detectaban** porque solo se ejercitaba
+  `drop` y jsdom no impone esa regla del spec.
+- **Corrección (solo frontend, web + escritorio):** decidir el destino con `types` (nuevo MIME
+  `application/x-urd-evento-grilla` que marca la tarjeta de la grilla + fallback a `text/plain`
+  cuando no viene el MIME de la bandeja), validar los datos recién en `drop`, y endurecer la
+  grilla por si el motor no expone los MIME propios en `dragover` (WebKitGTK). Se añade el
+  resaltado `.bandeja-reserva-sobre` para que se vea el destino válido. **Sin cambios de
+  backend ni de esquema.**
+- **Verificación:** frontend **510 tests OK** (los nuevos `dragOver` reproducen el
+  `getData() → ''` real y fallan con el código anterior) · `pnpm build` OK.

@@ -3,12 +3,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   TIPO_DND_BANDEJA,
+  TIPO_DND_EVENTO,
   crearPayloadBandeja,
   serializarPayloadBandeja,
   leerPayloadBandeja,
   textoChipBandeja,
   esChipBandeja,
   esIdEventoGrilla,
+  esArrastreDeEvento,
   filtrarClases,
   etiquetaSesion,
   construirEventoDesdeClase,
@@ -69,6 +71,31 @@ describe('bandeja — payload de drag & drop', () => {
     expect(esChipBandeja('42')).toBe(false);
     expect(esIdEventoGrilla('42')).toBe(true);
     expect(esIdEventoGrilla(textoChipBandeja(claseApi))).toBe(false);
+  });
+});
+
+describe('bandeja — arrastre en curso (decision en dragover)', () => {
+  // En `dragover` el navegador NO expone los datos: `getData()` devuelve ''
+  // y lo único legible es `types`. Por eso la deteccion se hace por `types`.
+  it('acepta el arrastre de una clase de la grilla (MIME propio)', () => {
+    expect(esArrastreDeEvento([TIPO_DND_EVENTO, 'text/plain'])).toBe(true);
+    expect(esArrastreDeEvento([TIPO_DND_EVENTO])).toBe(true);
+  });
+
+  it('acepta el fallback: text/plain sin el MIME de la bandeja', () => {
+    expect(esArrastreDeEvento(['text/plain'])).toBe(true);
+  });
+
+  it('rechaza la ficha de la bandeja (trae su propio MIME)', () => {
+    expect(esArrastreDeEvento([TIPO_DND_BANDEJA, 'text/plain'])).toBe(false);
+    expect(esArrastreDeEvento([TIPO_DND_BANDEJA])).toBe(false);
+  });
+
+  it('rechaza si no hay formatos o no hay dataTransfer', () => {
+    expect(esArrastreDeEvento([])).toBe(false);
+    expect(esArrastreDeEvento(undefined)).toBe(false);
+    expect(esArrastreDeEvento(null)).toBe(false);
+    expect(esArrastreDeEvento(['Files'])).toBe(false);
   });
 });
 

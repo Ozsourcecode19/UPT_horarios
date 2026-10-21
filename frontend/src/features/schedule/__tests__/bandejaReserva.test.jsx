@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import BandejaReserva from '../components/BandejaReserva';
-import { TIPO_DND_BANDEJA, serializarPayloadBandeja, textoChipBandeja } from '../utils/bandeja';
+import { TIPO_DND_BANDEJA, TIPO_DND_EVENTO, serializarPayloadBandeja, textoChipBandeja } from '../utils/bandeja';
 
 const sinColocar = [
   {
@@ -117,5 +117,76 @@ describe('BandejaReserva', () => {
     expect(payload.leccion_id).toBe(12);
     expect(payload.bloques_por_sesion).toBe(2);
     expect(payload.division).toBe('MATUTINO');
+  });
+});
+
+// El navegador solo entrega los datos del arrastre en `drop`: durante
+// `dragover` `getData()` devuelve '' y lo único legible es `types`.
+// Por eso el destino debe decidirse con `types` (si no, nunca se acepta
+// el drop y la clase no se aparta).
+describe('BandejaReserva — arrastre de la grilla (dragover + drop)', () => {
+  const eventoDrag = (tipo, dataTransfer) => {
+    const ev = new Event(tipo, { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
+    return ev;
+  };
+
+  it('acepta el arrastre de una clase de la grilla y la aparta al soltar', () => {
+    const onReservarDesdeGrilla = vi.fn();
+    render(<BandejaReserva {...baseProps({ onReservarDesdeGrilla })} />);
+    const panel = screen.getByLabelText('Bandeja de reserva');
+
+    // Durante el arrastre el navegador no expone los datos: getData() -> ''
+    const dragover = eventoDrag('dragover', {
+      types: ['text/plain', TIPO_DND_EVENTO],
+      getData: () => '',
+    });
+    fireEvent(panel, dragover);
+    expect(dragover.defaultPrevented).toBe(true); // sin esto el navegador no suelta
+    expect(panel.className).toContain('bandeja-reserva-sobre');
+
+    // En el `drop` los datos ya están disponibles
+    fireEvent.drop(panel, {
+      dataTransfer: { types: ['text/plain', TIPO_DND_EVENTO], getData: () => '42' },
+    });
+    expect(onReservarDesdeGrilla).toHaveBeenCalledWith('42');
+    expect(panel.className).not.toContain('bandeja-reserva-sobre');
+  });
+
+  it('acepta también el fallback (solo text/plain, sin MIME propio)', () => {
+    render(<BandejaReserva {...baseProps()} />);
+    const panel = screen.getByLabelText('Bandeja de reserva');
+    const dragover = eventoDrag('dragover', { types: ['text/plain'], getData: () => '' });
+    fireEvent(panel, dragover);
+    expect(dragover.defaultPrevented).toBe(true);
+  });
+
+  it('no acepta el arrastre de una ficha de la bandeja', () => {
+    render(<BandejaReserva {...baseProps()} />);
+    const panel = screen.getByLabelText('Bandeja de reserva');
+    const dragover = eventoDrag('dragover', {
+      types: [TIPO_DND_BANDEJA, 'text/plain'],
+      getData: () => '',
+    });
+    fireEvent(panel, dragover);
+    expect(dragover.defaultPrevented).toBe(false);
+    expect(panel.className).not.toContain('bandeja-reserva-sobre');
+  });
+
+  it('sin permiso de escritura no acepta el arrastre ni aparta la clase', () => {
+    const onReservarDesdeGrilla = vi.fn();
+    render(<BandejaReserva {...baseProps({ puedeEscribir: false, onReservarDesdeGrilla })} />);
+    const panel = screen.getByLabelText('Bandeja de reserva');
+    const dragover = eventoDrag('dragover', {
+      types: ['text/plain', TIPO_DND_EVENTO],
+      getData: () => '',
+    });
+    fireEvent(panel, dragover);
+    expect(dragover.defaultPrevented).toBe(false);
+
+    fireEvent.drop(panel, {
+      dataTransfer: { types: ['text/plain', TIPO_DND_EVENTO], getData: () => '42' },
+    });
+    expect(onReservarDesdeGrilla).not.toHaveBeenCalled();
   });
 });

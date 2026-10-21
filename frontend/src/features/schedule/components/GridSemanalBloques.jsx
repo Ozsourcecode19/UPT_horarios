@@ -16,7 +16,7 @@ import { formatHora12 } from '../../../utils/timeFormat';
 import { COLOR_FALLBACK } from '../../../constants';
 import { agruparSesiones } from '../utils/sesiones';
 import { resolverTap, TAP } from '../utils/tapMove';
-import { TIPO_DND_BANDEJA, leerPayloadBandeja } from '../utils/bandeja';
+import { TIPO_DND_BANDEJA, TIPO_DND_EVENTO, leerPayloadBandeja } from '../utils/bandeja';
 import useIsTouch from '../../../hooks/useIsTouch';
 
 const DIAS = [
@@ -169,12 +169,19 @@ const GridSemanalBloques = ({
   };
 
   // ¿Se está arrastrando algo que la grilla puede recibir? (evento propio o
-  // ficha de la bandeja). `dataTransfer.types` sí se puede leer en dragover.
+  // ficha de la bandeja). `dataTransfer.types` sí se puede leer en dragover;
+  // `getData` NO (devuelve '' hasta el evento `drop`).
   const arrastrableSobreLaGrilla = (e) => {
     if (drag) return true;
     const types = e.dataTransfer?.types;
     if (!types) return false;
-    return Array.from(types).includes(TIPO_DND_BANDEJA);
+    const lista = Array.from(types);
+    if (lista.includes(TIPO_DND_BANDEJA)) return true;
+    if (lista.includes(TIPO_DND_EVENTO)) return true;
+    // Fallback: si el motor no expone los MIME propios en `dragover`, se
+    // acepta cualquier arrastre con `text/plain`. En `drop` los datos sí
+    // están disponibles y el handler descarta lo que no corresponda.
+    return lista.includes('text/plain');
   };
 
   const enModoMover = isTouch && !!seleccion;
@@ -302,6 +309,9 @@ const GridSemanalBloques = ({
                             draggable
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));
+                              // Marca explícita del arrastre de la grilla: en `dragover`
+                              // solo se puede leer `types` (nunca `getData`).
+                              e.dataTransfer.setData(TIPO_DND_EVENTO, String(objetivo.id));
                               e.dataTransfer.effectAllowed = 'move';
                               setDrag({ id: String(objetivo.id), esSpan: !!info?.esSesion, sesionTotal: info?.total || 1 });
                             }}

@@ -328,6 +328,14 @@ table.grilla-bloques {
   overflow-y: auto;
 }
 
+/* La bandeja se resalta mientras hay un arrastre válido sobre ella
+   (una clase de la grilla que se puede apartar). */
+.bandeja-reserva-sobre {
+  border-color: #6366f1;
+  background-color: #eef2ff;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
 .bandeja-reserva-header {
   display: flex;
   align-items: center;

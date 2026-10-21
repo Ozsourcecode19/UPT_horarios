@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { Inbox, RotateCcw, Search, ShieldAlert, PackageOpen } from 'lucide-react';
 import {
   TIPO_DND_BANDEJA,
+  esArrastreDeEvento,
   esIdEventoGrilla,
   etiquetaSesion,
   filtrarClases,
@@ -89,6 +90,7 @@ const BandejaReserva = ({
   isLoading = false,
 }) => {
   const [filtro, setFiltro] = useState('');
+  const [sobre, setSobre] = useState(false); // hay un arrastre válido sobre el panel
 
   // En Modo Demo no hay servidor: la bandeja no puede apartar/devolver clases.
   const editable = puedeEscribir && !demoMode;
@@ -102,21 +104,36 @@ const BandejaReserva = ({
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    setSobre(false);
+    if (!editable) return;
+    // En `drop` los datos SÍ están disponibles (`getData` funciona).
     const texto = e.dataTransfer.getData('text/plain');
     if (!esIdEventoGrilla(texto)) return;
     onReservarDesdeGrilla?.(texto);
   };
 
+  // Durante `dragover` el dataTransfer NO expone los datos (`getData` devuelve
+  // '' según la especificación HTML5): la decisión se toma con `types` y los
+  // datos se validan en `drop`.
+  const handleDragOver = (e) => {
+    if (!editable) return;
+    if (!esArrastreDeEvento(e.dataTransfer?.types)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setSobre(true);
+  };
+
+  const handleDragLeave = (e) => {
+    // Si el puntero sigue dentro del panel (pasa por un hijo), no es salida.
+    if (e.currentTarget?.contains?.(e.relatedTarget)) return;
+    setSobre(false);
+  };
+
   return (
     <aside
-      className="bandeja-reserva no-print"
-      onDragOver={(e) => {
-        const texto = e.dataTransfer.getData?.('text/plain');
-        // Solo se acepta el arrastre de una clase de la grilla (id numérico).
-        if (!esIdEventoGrilla(texto)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
+      className={`bandeja-reserva no-print ${sobre ? 'bandeja-reserva-sobre' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       aria-label="Bandeja de reserva"
     >

@@ -9,6 +9,9 @@
 // el id del evento, así que no se puede compartir.
 
 export const TIPO_DND_BANDEJA = 'application/x-urd-horario';
+// Marcador del arrastre que sale de la GRILLA (una clase ya colocada).
+// La ficha de la bandeja usa su propio MIME (`TIPO_DND_BANDEJA`).
+export const TIPO_DND_EVENTO = 'application/x-urd-evento-grilla';
 export const PREFIJO_CHIP_BANDEJA = 'bandeja:';
 
 const DIAS_NOMBRES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -19,6 +22,25 @@ export const esChipBandeja = (texto) =>
 
 /** ¿El texto arrastrado es el id de un evento de la grilla? */
 export const esIdEventoGrilla = (texto) => /^\d+$/.test(String(texto || '').trim());
+
+/**
+ * ¿El arrastre en curso proviene de una clase de la grilla?
+ *
+ * Durante `dragover` NO se puede leer el contenido del `dataTransfer`
+ * (`getData()` devuelve '' según la especificación HTML5); lo único legible
+ * es la lista de formatos (`types`). Por eso la decisión se toma con `types`
+ * y los datos se validan recién en `drop` (donde `getData` sí funciona).
+ *
+ * @param {ArrayLike<string>|undefined} types `dataTransfer.types`
+ */
+export const esArrastreDeEvento = (types) => {
+  const lista = Array.from(types || []);
+  if (lista.includes(TIPO_DND_EVENTO)) return true;
+  // Fallback: la tarjeta de la grilla marca su MIME propio; si el motor
+  // (WebKitGTK) no expone los MIME propios en `dragover`, se acepta el
+  // `text/plain` siempre que NO sea el de una ficha de la bandeja.
+  return lista.includes('text/plain') && !lista.includes(TIPO_DND_BANDEJA);
+};
 
 /**
  * Normaliza una clase de la bandeja al payload que viaja en el drag & drop.
@@ -140,9 +162,11 @@ export const construirEventoDesdeClase = (clase, { bloque = null, aula = null, f
 
 export default {
   TIPO_DND_BANDEJA,
+  TIPO_DND_EVENTO,
   PREFIJO_CHIP_BANDEJA,
   esChipBandeja,
   esIdEventoGrilla,
+  esArrastreDeEvento,
   crearPayloadBandeja,
   serializarPayloadBandeja,
   leerPayloadBandeja,
