@@ -381,6 +381,29 @@ del usuario):
 - Verificación: **backend 134 tests OK** · **frontend 469 tests OK** · E2E dev (ping, login,
   respaldos HTTP) OK.
 
-*Última actualización: 2026-10-20 — Fase 5 completa (menú nativo, respaldos/restauración de la
-BD con reinicio, persistencia de ventana); queda Fase 6 (build/CI Windows) y la verificación
-manual de impresión en WebKitGTK).*
+**2026-10-21 — Hotfix: abort al cerrar la ventana (WebKitGTK/Mesa)** (rama `feat/desktop-tauri`):
+- Síntoma: al **cerrar la app** aparecía `free(): corrupted unsorted chunks` y `tauri dev`
+  terminaba con código 1 (`[ELIFECYCLE] Command failed`). Acumuló 3 casos en dev: los dos
+  primeros se atribuyeron al diálogo nativo rfd (ya eliminado en F5), el 3.º ocurrió con el
+  plugin fuera, tras un restore + cierre manual confirmado por el usuario → **segunda fuente**.
+- Diagnóstico: el abort salía del proceso de la **app** (GTK/WebKit UI process), no del sidecar
+  (el `[ELIFECYCLE]` exige que muera el hijo de pnpm) y no de nuestro Rust (un panic imprimiría
+  `thread 'main' panicked`). Encaja con el bug upstream **bugs.webkit.org 303336**: al hacer
+  exit, el destructor TLS de `SkiaGLContext` en una hebra secundaria libera su arena malloc
+  mientras otra retiene el lock EGL de Mesa → corrupción de heap glibc, intermitente.
+  Equipo de prueba: WebKitGTK 2.50.5 + Mesa 26.0.0 + Intel UHD 620 (i915, X11).
+- Fix (workaround documentado en https://v2.tauri.app/develop/debug/linux-graphics/): `main.rs`
+  fija `WEBKIT_DISABLE_DMABUF_RENDERER=1` en Linux antes del Builder, solo si la variable no
+  viene ya del entorno (permite probar overrides sin recompilar); conserva el resto de la
+  aceleración. Si el abort persistiera, siguiente escalón documentado:
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1`.
+- Verificación en dev: sesión completa (login, 2 restores con reinicio de sidecar, CRUD de
+  docentes) y cierre de la ventana → **cero** mensajes `free(): corrupted unsorted` en todo el
+  log (antes salía en cada cierre), apagado limpio del sidecar y puerto 17891 libre.
+  `tauri dev` aún reporta código 1 al cerrar: pendiente de confirmar con el **binario release**
+  (sin CLI de por medio) si es peculiaridad del CLI al matar el BeforeDevCommand o residuo del
+  abort; si persistiera, aplicar el escalón `COMPOSITING_MODE`.
+
+*Última actualización: 2026-10-21 — Fase 5 completa (menú nativo, respaldos/restauración de la
+BD con reinicio, persistencia de ventana) + hotfix del abort al cerrar (workaround WebKitGTK/
+Mesa); queda Fase 6 (build/CI Windows) y la prueba de cierre con el binario release).*

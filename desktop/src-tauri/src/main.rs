@@ -322,6 +322,19 @@ fn descargar_respaldo(app: tauri::AppHandle, nombre: String) -> Result<String, S
 }
 
 fn main() {
+    // Workaround del bug upstream de WebKitGTK 2.50 + Mesa 26
+    // (bugs.webkit.org 303336): al salir de la app el destructor TLS de
+    // SkiaGLContext libera su arena malloc mientras otra hebra retiene el
+    // lock EGL de Mesa, y glibc aborta con "free(): corrupted unsorted
+    // chunks" (se reproducía al cerrar la ventana). Desactiva el renderer
+    // DMABUF conservando el resto de la aceleración — workarounds en
+    // https://v2.tauri.app/develop/debug/linux-graphics/. Se respeta un
+    // valor ya presente en el entorno para poder probar sin recompilar.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![restaurar_bd, descargar_respaldo])
         .setup(|app| {
