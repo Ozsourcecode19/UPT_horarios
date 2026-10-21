@@ -6,6 +6,8 @@
 > sesiones/iteraciones (leer este archivo antes de tocar nada relacionado con desktop).
 > Complementa `AGENTS.md` (arquitectura general) y `PLAN_DE_DESARROLLO.md` (ejecuciones E0–E22);
 > en conflicto, **este archivo manda para lo desktop**, `AGENTS.md` manda para lo web.
+> **Alternativa en estudio (sin ejecutar):** `PLAN_DESKTOP_WIN7.md` documenta una variante para
+> Windows 7 — `PLAN_DESKTOP.md` sigue mandando para lo ya construido.
 
 ---
 
@@ -135,6 +137,8 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - [x] Fase 5 — UX escritorio ✅ (2026-10-20)
 - [x] Fase 6 — Build/CI ✅ (2026-10-21)
 - [ ] Roadmap post-migración (pendiente de priorizar)
+- [ ] **Alternativa Windows 7** — ⏸️ en estudio, sin ejecutar (`PLAN_DESKTOP_WIN7.md`; gate = spike
+  W7-0 en VM Win7 SP1 x64 + confirmar arquitectura de las máquinas)
 
 ### Registro de iteraciones
 
@@ -447,7 +451,9 @@ del usuario):
 - Verificación: corrida `39548804053` → **los 3 jobs en verde**; artefactos descargables en
   la corrida (`gh run view 39548804053` o la pestaña Artifacts).
 
-*Última actualización: 2026-10-21 — **migración de escritorio completa (Fases 0–6)**:
-backend SQLite + listeners, seed de arranque, sidecar PyInstaller, shell Tauri 2 con menú y
-respaldos, hotfix WebKitGTK/Mesa y CI verde (Linux .deb/AppImage + Windows .msi/NSIS). Queda
-priorizar el roadmap post-migración (§6).*
+*Última actualización: 2026-10-21 — **documentada la alternativa Windows 7** como estudio de
+viabilidad en `PLAN_DESKTOP_WIN7.md` (**sin ejecutar**; recomendación: enfoque "sin WebView2" con
+navegador local, backend Python 3.8 + OR-Tools cp38 solo en 64 bits). Antes: **migración de
+escritorio completa (Fases 0–6)**: backend SQLite + listeners, seed de arranque, sidecar
+PyInstaller, shell Tauri 2 con menú y respaldos, hotfix WebKitGTK/Mesa y CI verde (Linux
+.deb/AppImage + Windows .msi/NSIS). Queda priorizar el roadmap post-migración (§6).*
