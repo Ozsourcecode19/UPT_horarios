@@ -67,15 +67,22 @@ const EditEventModal = ({
       )}
       footer={(
         <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onDelete}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors"
-            title="Dar de baja esta clase del calendario"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Eliminar Asignación</span>
-          </button>
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors"
+              title="Dar de baja esta clase del calendario"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminar Asignación</span>
+            </button>
+          ) : (
+            // E23: asignación NUEVA desde la bandeja — todavía no hay fila que borrar
+            <span className="text-[11px] text-slate-400">
+              Clase nueva: se añadirá al horario al guardar.
+            </span>
+          )}
 
           <div className="flex gap-2">
             <button

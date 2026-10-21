@@ -23,9 +23,25 @@ class ValidationResult(NamedTuple):
     valido: bool
     mensaje: str
     error_code: Optional[str] = None # Código para manejo de errores específicos en el frontend
+    # E23 "modo libre": lista de ({error_code, mensaje}) con las violaciones
+    # degradadas a advertencia (solo se llena con forzar=True).
+    advertencias: tuple = ()
+
+# E23: códigos que el "modo libre" (forzar=True) degrada a ADVERTENCIA en vez
+# de bloquear con 409. Nunca se relajan: sede (SITE_MISMATCH), disponibilidad
+# (UNAVAILABLE_TEACHER), habilitación (UNQUALIFIED_TEACHER) ni la integridad
+# estructural de la sesión (validada en el CRUD, 422).
+CODIGOS_RELAJABLES = frozenset({
+    "FUERA_VENTANA_DIVISION",
+    "CONFLICT_TEACHER",
+    "CONFLICT_GROUP",
+    "CONFLICT_ROOM",
+})
+
 
 def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
-                       excluir_horario_id=None, excluir_leccion_id=None) -> ValidationResult:
+                       excluir_horario_id=None, excluir_leccion_id=None,
+                       forzar: bool = False) -> ValidationResult:
     """
     Valida una asignación lección -> (bloque, aula): ventana del turno del grupo,
     disponibilidad del docente, habilitación docente-materia, cruces por bloque
@@ -35,7 +51,18 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
     - excluir_horario_id: ignora esa fila concreta en los cruces (mover la propia fila).
     - excluir_leccion_id: ignora TODAS las filas ACTIVO de esa lección (su conjunto
       previo será reemplazado).
+    - forzar (E23 "modo libre"): los códigos de CODIGOS_RELAJABLES se devuelven
+      como advertencias y la validación continúa; el resto sigue bloqueando.
     """
+    advertencias: list = []
+
+    def _fallo(error_code: str, mensaje: str) -> bool:
+        """True => la validación debe abortar; False => solo es advertencia."""
+        if forzar and error_code in CODIGOS_RELAJABLES:
+            advertencias.append({"error_code": error_code, "mensaje": mensaje})
+            return False
+        return True
+
     docente_id = leccion.docente_id
     grupo_id = leccion.grupo_id
     materia_id = leccion.materia_id
@@ -72,11 +99,12 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
             bloque_ini = _a_minutos(bloque_objetivo.hora_inicio)
             bloque_fin = bloque_ini + (bloque_objetivo.duracion_minutos or 0)
             if bloque_ini < ven_ini or bloque_fin > ven_fin:
-                return ValidationResult(
-                    False,
-                    f"El turno {TURNOS_LABELS.get(str(grupo_mov.division).upper(), grupo_mov.division)} solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}.",
-                    "FUERA_VENTANA_DIVISION"
+                mensaje = (
+                    f"El turno {TURNOS_LABELS.get(str(grupo_mov.division).upper(), grupo_mov.division)} "
+                    f"solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}."
                 )
+                if _fallo("FUERA_VENTANA_DIVISION", mensaje):
+                    return ValidationResult(False, mensaje, "FUERA_VENTANA_DIVISION")
 
     # 2. Disponibilidad del docente en el bloque objetivo.
     # Consistente con el solver: sin franjas DISPONIBLE explícitas el docente se
@@ -123,10 +151,14 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
         q_base = q_base.filter(models.Leccion.id != excluir_leccion_id)
 
     if q_base.filter(models.Leccion.docente_id == docente_id).first():
-        return ValidationResult(False, "Conflicto: Docente ya tiene clase asignada en este bloque.", "CONFLICT_TEACHER")
+        mensaje = "Conflicto: Docente ya tiene clase asignada en este bloque."
+        if _fallo("CONFLICT_TEACHER", mensaje):
+            return ValidationResult(False, mensaje, "CONFLICT_TEACHER")
 
     if q_base.filter(models.Leccion.grupo_id == grupo_id).first():
-        return ValidationResult(False, "Conflicto: La sección ya tiene clase asignada en este bloque.", "CONFLICT_GROUP")
+        mensaje = "Conflicto: La sección ya tiene clase asignada en este bloque."
+        if _fallo("CONFLICT_GROUP", mensaje):
+            return ValidationResult(False, mensaje, "CONFLICT_GROUP")
 
     conflicto_aula = db_session.query(models.HorarioGenerado).filter(
         models.HorarioGenerado.estado == 'ACTIVO',
@@ -140,7 +172,9 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
         conflicto_aula = conflicto_aula.join(models.Leccion, models.HorarioGenerado.leccion_id == models.Leccion.id) \
                                         .filter(models.Leccion.id != excluir_leccion_id)
     if conflicto_aula.first():
-        return ValidationResult(False, "Conflicto: Aula ya está ocupada en este bloque.", "CONFLICT_ROOM")
+        mensaje = "Conflicto: Aula ya está ocupada en este bloque."
+        if _fallo("CONFLICT_ROOM", mensaje):
+            return ValidationResult(False, mensaje, "CONFLICT_ROOM")
 
     # 5. Consistencia de sede (Aula vs Bloque)
     sede_nueva_aula = db_session.query(models.Sede).filter(models.Sede.id == aula_objetivo.sede_id).first()
@@ -148,7 +182,7 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
     if not sede_nueva_aula or not sede_nuevo_bloque or sede_nueva_aula.id != sede_nuevo_bloque.id:
         return ValidationResult(False, f"Inconsistencia de sede: Aula ({aula_objetivo.nombre}) y Bloque ({bloque_objetivo.id}) están en sedes diferentes.", "SITE_MISMATCH")
 
-    return ValidationResult(True, "Movimiento válido.")
+    return ValidationResult(True, "Movimiento válido.", None, tuple(advertencias))
 
 
 def validate_move(db_session: Session, horario_id: int, nuevo_bloque_id: Optional[int] = None, nueva_aula_id: Optional[int] = None) -> ValidationResult:

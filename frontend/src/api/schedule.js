@@ -59,10 +59,34 @@ const ScheduleService = {
   },
 
   // E20: asignación manual desde la grilla — reemplazo transaccional de las filas
-  // ACTIVO de una lección por 1 o 2 bloques consecutivos en el aula indicada
+  // ACTIVO de una lección por 1 o 2 bloques consecutivos en el aula indicada.
+  // E23: con `forzar: true` ("modo libre") los solapes y la ventana de turno
+  // llegan como advertencias en vez de un 409. Respuesta: {filas, advertencias}.
   asignarManual: async (payload) => {
-    // payload: { leccion_id: number, aula_id: number, periodo_id: number, bloque_ids: number[] }
+    // payload: { leccion_id, aula_id, periodo_id, bloque_ids, bloques_previos?, forzar? }
     const response = await apiClient.post('/schedules/asignar-manual', payload);
+    return response.data;
+  },
+
+  // E23: bandeja de reserva — clases sin colocar y sesiones apartadas
+  getBandeja: async (periodoId) => {
+    const response = await apiClient.get('/schedules/bandeja', {
+      params: { periodo_id: periodoId }
+    });
+    return response.data;
+  },
+
+  // E23: aparta una sesión de la grilla (sus filas pasan a BORRADOR)
+  reservarSesion: async (payload) => {
+    // payload: { periodo_id, leccion_id, bloque_ids? }
+    const response = await apiClient.post('/schedules/reservar', payload);
+    return response.data;
+  },
+
+  // E23: devuelve a la grilla las sesiones reservadas
+  liberarReserva: async (payload) => {
+    // payload: { periodo_id, leccion_id, bloque_ids?, forzar? }
+    const response = await apiClient.post('/schedules/reservas/liberar', payload);
     return response.data;
   },
 

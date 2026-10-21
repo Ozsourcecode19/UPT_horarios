@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Calendar, Sparkles, Clock, Users, Download, Printer, FileText } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
 import { formatHora12 } from '../utils/timeFormat';
@@ -7,9 +7,10 @@ import { DeleteConfirmModal } from '../features/planning';
 import {
   filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje, horaAMinutos,
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
-  useScheduleGeneration, useDragDropValidation,
+  useScheduleGeneration, useDragDropValidation, useReservas,
   FlowStepper, ChecklistPanel,
-  GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana,
+  GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana, BandejaReserva,
+  agruparSesiones, resolverRun, resolverBloqueDeCelda, construirEventoDesdeClase,
 } from '../features/schedule';
 import {
   useHorariosData, useHorariosExport,
@@ -196,17 +197,47 @@ const Horarios = () => {
     onInvalidate: invalidateHorarios,
   });
 
-  const ventanaDivisionModal = useMemo(
-    () => resolveVentanaTurno(selectedEvent?.division, configuraciones),
-    [selectedEvent, configuraciones]
-  );
-
   const [editAbarca, setEditAbarca] = useState(1);
   const [confirmEliminar, setConfirmEliminar] = useState(null);
   const [printMode, setPrintMode] = useState(null); // null | 'grupo' | 'docente' | 'aula'
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const closeMenuTimer = useRef(null);
   const printAreaRef = useRef(null);
+
+  // E23 — Bandeja de reserva y "modo libre" (edición manual sin solver)
+  const [modoLibre, setModoLibre] = useState(() => localStorage.getItem('horarios_modo_libre') === '1');
+  const [nuevaDesdeBandeja, setNuevaDesdeBandeja] = useState(null); // {clase, bloque}
+
+  useEffect(() => {
+    localStorage.setItem('horarios_modo_libre', modoLibre ? '1' : '0');
+  }, [modoLibre]);
+
+  const {
+    sinColocar, reservadas, reservar, liberar, isLoading: isLoadingBandeja,
+  } = useReservas({
+    periodoId: selectedPeriodoId,
+    demoMode,
+    onInvalidate: invalidateHorarios,
+    showToast,
+  });
+
+  // Evento sintético de la clase que se está colocando desde la bandeja.
+  const eventoBandeja = useMemo(() => {
+    if (!nuevaDesdeBandeja) return null;
+    const aula = aulas.find(a => a.id === Number(nuevaDesdeBandeja.clase?.aula_id));
+    return construirEventoDesdeClase(nuevaDesdeBandeja.clase, {
+      bloque: nuevaDesdeBandeja.bloque,
+      aula,
+      fechaInicio: selectedPeriodo?.fecha_inicio,
+    });
+  }, [nuevaDesdeBandeja, aulas, selectedPeriodo]);
+
+  // Ventana del turno de la clase en edición (evento de la grilla o de la bandeja).
+  const divisionEnEdicion = eventoBandeja?.division ?? selectedEvent?.division;
+  const ventanaDivisionModal = useMemo(
+    () => resolveVentanaTurno(divisionEnEdicion, configuraciones),
+    [divisionEnEdicion, configuraciones]
+  );
 
   useEffect(() => {
     if (!isEditModalOpen || !selectedEvent) return;
@@ -239,9 +270,126 @@ const Horarios = () => {
     showToast,
   });
 
+  // E23 — Colocar una clase de la bandeja: resuelve el bloque destino y la
+  // asigna; si la clase nunca tuvo aula, se abre el editor para elegirla.
+  const abrirDesdeBandeja = useCallback((clase, { dia, iniMin } = {}) => {
+    const aulaSugerida = aulas.find(a => Number(a.sede_id) === Number(clase.sede_id) && a.activa !== false)
+      || aulas.find(a => a.id === Number(clase.aula_id));
+    const sedeId = aulaSugerida?.sede_id ?? clase.sede_id;
+    let bloque = null;
+    if (dia != null && iniMin != null && sedeId != null) {
+      bloque = resolverBloqueDeCelda(bloques, { dia, iniMin, sedeId });
+    }
+    setNuevaDesdeBandeja({ clase, bloque });
+    setEditAulaId(aulaSugerida?.id ?? clase.aula_id ?? '');
+    setEditBloqueId(bloque?.id ?? '');
+    setEditAbarca(Math.max(1, Number(clase.bloques_por_sesion) || 1));
+    setIsEditModalOpen(true);
+  }, [aulas, bloques]);
+
+  const onClaseBandeja = useCallback(async (clase, destino) => {
+    const aula = aulas.find(a => a.id === Number(clase.aula_id));
+    if (!aula) {
+      // Sin aula conocida: el editor permite elegir aula y día/hora.
+      abrirDesdeBandeja(clase, destino);
+      return;
+    }
+    const sedeId = aula.sede_id ?? clase.sede_id;
+    const bloque = (destino?.dia != null && destino?.iniMin != null)
+      ? resolverBloqueDeCelda(bloques, { dia: destino.dia, iniMin: destino.iniMin, sedeId })
+      : null;
+    if (!bloque) {
+      showToast("Esa casilla no corresponde a un bloque de la sede de la clase.", "error");
+      return;
+    }
+    const n = Math.max(1, Number(clase.bloques_por_sesion) || 1);
+    let destinos = [bloque];
+    if (n > 1) {
+      const run = resolverRun(bloque, n, bloques, sedeId);
+      if (!run) {
+        showToast(`No hay ${n} bloques consecutivos disponibles en esa casilla.`, "error");
+        return;
+      }
+      destinos = run.bloques;
+    }
+    const evento = construirEventoDesdeClase(clase, { bloque, aula, fechaInicio: selectedPeriodo?.fecha_inicio });
+    await guardarAsignacionManual({
+      horario: evento,
+      aulaId: Number(aula.id),
+      bloqueDestinos: destinos,
+      bloquesPrevios: clase.bloque_ids?.length ? clase.bloque_ids : undefined,
+      forzar: modoLibre,
+    });
+  }, [aulas, bloques, guardarAsignacionManual, modoLibre, selectedPeriodo, showToast, abrirDesdeBandeja]);
+
+  // Guardar la asignación nueva abierta desde la bandeja (modal).
+  const handleGuardarNuevaDesdeBandeja = useCallback(async (aulaId, bloqueId) => {
+    if (!nuevaDesdeBandeja) return;
+    const { clase } = nuevaDesdeBandeja;
+    const bloque = bloques.find(b => b.id === Number(bloqueId));
+    if (!bloque) { showToast("Selecciona un bloque horario válido.", "error"); return; }
+    const aula = aulas.find(a => a.id === Number(aulaId));
+    if (!aula) { showToast("Selecciona un aula válida.", "error"); return; }
+    const n = Math.max(1, Number(clase.bloques_por_sesion) || 1);
+    let destinos = [bloque];
+    if (n > 1) {
+      const run = resolverRun(bloque, n, bloques, aula.sede_id);
+      if (!run) {
+        showToast(`No hay ${n} bloques consecutivos disponibles para la sesión.`, "error");
+        return;
+      }
+      destinos = run.bloques;
+    }
+    const evento = construirEventoDesdeClase(clase, { bloque, aula, fechaInicio: selectedPeriodo?.fecha_inicio });
+    const ok = await guardarAsignacionManual({
+      horario: evento,
+      aulaId: Number(aula.id),
+      bloqueDestinos: destinos,
+      bloquesPrevios: clase.bloque_ids?.length ? clase.bloque_ids : undefined,
+      forzar: modoLibre,
+    });
+    if (ok) {
+      setNuevaDesdeBandeja(null);
+      setIsEditModalOpen(false);
+    }
+  }, [nuevaDesdeBandeja, aulas, bloques, guardarAsignacionManual, modoLibre, selectedPeriodo, showToast]);
+
+  // Apartar (reservar) una clase de la grilla: arrastrada hasta la bandeja.
+  const onReservarDesdeGrilla = useCallback(async (horarioId) => {
+    const ev = listadoHorariosRaw.find(h => String(h.id) === String(horarioId));
+    if (!ev) return;
+    const leccionId = ev.extendedProps?.leccion_id;
+    if (leccionId == null) return;
+    const misma = listadoHorariosRaw.filter(h =>
+      Number(h.extendedProps?.leccion_id) === Number(leccionId));
+    const info = misma.length > 1 ? agruparSesiones(misma, bloques).get(ev.id) : null;
+    const filas = info?.filas?.length ? info.filas : misma;
+    const bloqueIds = filas
+      .map(f => Number(f.extendedProps?.bloque_id))
+      .filter(b => !Number.isNaN(b));
+    try {
+      await reservar({ leccion_id: Number(leccionId), bloque_ids: bloqueIds });
+    } catch {
+      // El toast lo muestra useReservas (onError de la mutación).
+    }
+  }, [listadoHorariosRaw, bloques, reservar]);
+
+  // Devolver una sesión reservada a la grilla.
+  const onLiberarReserva = useCallback(async (clase) => {
+    try {
+      await liberar({
+        leccion_id: Number(clase.leccion_id),
+        bloque_ids: clase.bloque_ids?.length ? clase.bloque_ids : undefined,
+        forzar: modoLibre,
+      });
+    } catch {
+      // El toast lo muestra useReservas (onError de la mutación).
+    }
+  }, [liberar, modoLibre]);
+
   const onDropEnCelda = useMemo(() => createDropHandler({
-    bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios,
-  }), [bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios]);
+    bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios, onClaseBandeja,
+  }), [bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios, onClaseBandeja]);
 
   // Función para imprimir multi-entidad
   const handlePrintMultiEntity = (tipo) => {
@@ -401,74 +549,95 @@ const Horarios = () => {
         </div>
       )}
 
-      {/* Vista principal: tabs de turno + grilla unificada cuando excede 1 página */}
-      {exceedsSinglePage && turnosDisponibles.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-4 md:p-6 overflow-hidden flex flex-col flex-1 min-h-0">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl mb-4 self-start no-print">
-            <button onClick={() => setTurnoActivo('TODOS')} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === 'TODOS' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              Todos
-            </button>
-            {turnosDisponibles.map(turno => (
-              <button key={turno.nombre} onClick={() => setTurnoActivo(turno.nombre)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === turno.nombre ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                {TURNOS_LABELS[turno.nombre]} ({turno.bandas.length})
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-700">
-                {turnoActivo === 'TODOS' ? 'Todos los turnos' : TURNOS_LABELS[turnoActivo]}
-              </h3>
-              {filterType === 'aula' && sedeMap[itemSeleccionado?.sede_id] && (
-                <p className="text-[11px] text-slate-400">{sedeMap[itemSeleccionado.sede_id]}</p>
-              )}
-            </div>
-            <span className="text-[11px] text-slate-400">
-              {formatHora12(ventanaActiva.inicio.substring(0, 5))} – {formatHora12(ventanaActiva.fin.substring(0, 5))}
-            </span>
-          </div>
-          <AvisoCoberturaVentana bandas={bandasActivas} ventana={ventanaActiva} configs={configuraciones} />
-          <div className="flex-1 min-h-0 overflow-auto" style={{ '--alto-banda': altoBandaPrint }}>
+      {/* E23: bandeja de reserva (clases fuera de la grilla) + grilla */}
+      <div className="horarios-grilla-bandeja">
+        {!exceedsSinglePage && (
+          <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
+            <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
+            <AvisoCoberturaVentana bandas={bandas} ventana={ventanaGrilla} configs={configuraciones} />
             <GridSemanalBloques
-              eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
-              bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
-              demoMode={demoMode} contextoVista={filterType}
+              eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
+              bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
+              demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
               onEventoClick={handleEventClick}
               onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
               onDropEnCelda={onDropEnCelda}
               renderEventContent={EventRenderer}
             />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Impresión individual: 1 página cuando cabe */}
-      {!exceedsSinglePage && (
-        <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
-          <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
-          <AvisoCoberturaVentana bandas={bandas} ventana={ventanaGrilla} configs={configuraciones} />
-          <GridSemanalBloques
-            eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
-            bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
-            demoMode={demoMode} contextoVista={filterType}
-            onEventoClick={handleEventClick}
-            onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
-            onDropEnCelda={onDropEnCelda}
-            renderEventContent={EventRenderer}
-          />
-        </div>
-      )}
+        {/* Vista principal: tabs de turno + grilla unificada cuando excede 1 página */}
+        {exceedsSinglePage && turnosDisponibles.length > 0 && (
+          <div className="flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-4 md:p-6 overflow-hidden flex flex-col min-h-0">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl mb-4 self-start no-print">
+              <button onClick={() => setTurnoActivo('TODOS')} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === 'TODOS' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                Todos
+              </button>
+              {turnosDisponibles.map(turno => (
+                <button key={turno.nombre} onClick={() => setTurnoActivo(turno.nombre)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${turnoActivo === turno.nombre ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {TURNOS_LABELS[turno.nombre]} ({turno.bandas.length})
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-700">
+                  {turnoActivo === 'TODOS' ? 'Todos los turnos' : TURNOS_LABELS[turnoActivo]}
+                </h3>
+                {filterType === 'aula' && sedeMap[itemSeleccionado?.sede_id] && (
+                  <p className="text-[11px] text-slate-400">{sedeMap[itemSeleccionado.sede_id]}</p>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-400">
+                {formatHora12(ventanaActiva.inicio.substring(0, 5))} – {formatHora12(ventanaActiva.fin.substring(0, 5))}
+              </span>
+            </div>
+            <AvisoCoberturaVentana bandas={bandasActivas} ventana={ventanaActiva} configs={configuraciones} />
+            <div className="flex-1 min-h-0 overflow-auto" style={{ '--alto-banda': altoBandaPrint }}>
+              <GridSemanalBloques
+                eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
+                bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
+                demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
+                onEventoClick={handleEventClick}
+                onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
+                onDropEnCelda={onDropEnCelda}
+                renderEventContent={EventRenderer}
+              />
+            </div>
+          </div>
+        )}
 
-      {isEditModalOpen && selectedEvent && (
+        <BandejaReserva
+          sinColocar={sinColocar}
+          reservadas={reservadas}
+          puedeEscribir={puedeEscribir}
+          modoLibre={modoLibre}
+          demoMode={demoMode}
+          onToggleModoLibre={setModoLibre}
+          onSeleccionar={(clase) => abrirDesdeBandeja(clase)}
+          onLiberar={onLiberarReserva}
+          onReservarDesdeGrilla={onReservarDesdeGrilla}
+          isLoading={isLoadingBandeja}
+        />
+      </div>
+
+      {((isEditModalOpen && selectedEvent) || nuevaDesdeBandeja) && (
         <EditEventModal
-          evento={selectedEvent} aulas={aulas} bloques={bloques} sedeMap={sedeMap}
+          evento={nuevaDesdeBandeja ? eventoBandeja : selectedEvent}
+          aulas={aulas} bloques={bloques} sedeMap={sedeMap}
           ventanaDivision={ventanaDivisionModal}
-          abarca={editAbarca} previewRango={previewRango}
+          abarca={nuevaDesdeBandeja ? Math.max(1, Number(nuevaDesdeBandeja.clase?.bloques_por_sesion) || 1) : editAbarca}
+          previewRango={previewRango}
           editAulaId={editAulaId} onChangeAulaId={setEditAulaId}
           editBloqueId={editBloqueId} onChangeBloqueId={setEditBloqueId}
-          onSave={(aulaId, bloqueId, abarca) => { setEditAulaId(aulaId); setEditBloqueId(bloqueId); handleSaveChangesModal(abarca, aulaId, bloqueId); }}
-          onDelete={handleDeleteSchedule}
-          onClose={() => setIsEditModalOpen(false)}
+          onSave={(aulaId, bloqueId, abarca) => {
+            setEditAulaId(aulaId); setEditBloqueId(bloqueId);
+            if (nuevaDesdeBandeja) { handleGuardarNuevaDesdeBandeja(aulaId, bloqueId); return; }
+            handleSaveChangesModal(abarca, aulaId, bloqueId);
+          }}
+          onDelete={nuevaDesdeBandeja ? undefined : handleDeleteSchedule}
+          onClose={() => { setIsEditModalOpen(false); setNuevaDesdeBandeja(null); }}
         />
       )}
 

@@ -42,6 +42,7 @@ const baseProps = (overrides = {}) => {
       validateMove: vi.fn(async () => ({ valido: true })),
       updateSchedule: vi.fn(async () => ({})),
       deleteSchedule: vi.fn(async () => ({})),
+      asignarManual: vi.fn(async () => ({ filas: [], advertencias: [] })),
     },
     ...overrides,
   };
@@ -52,6 +53,74 @@ const render = (setup) => renderHook(() => useDragDropValidation(setup), {
 });
 
 describe('useDragDropValidation', () => {
+  // E23 — modo libre ("forzar"): los solapes avisan en vez de bloquear
+  it('modo libre: envía forzar y muestra las advertencias como aviso', async () => {
+    const asignarManual = vi.fn(async () => ({
+      filas: [], advertencias: ['Conflicto: Docente ya tiene clase asignada en este bloque.'],
+    }));
+    const setup = baseProps({ scheduleService: { asignarManual } });
+    const { result } = render(setup);
+
+    let ok;
+    await act(async () => {
+      ok = await result.current.guardarAsignacionManual({
+        horario: { id: 1, extendedProps: { leccion_id: 5, aula_id: 1 } },
+        aulaId: 1,
+        bloqueDestinos: [{ id: 10 }],
+        forzar: true,
+      });
+    });
+
+    expect(ok).toBe(true);
+    expect(asignarManual).toHaveBeenCalledWith(expect.objectContaining({ forzar: true }));
+    expect(setup.showToast).toHaveBeenCalledWith(expect.stringContaining('advertencia'), 'warning');
+  });
+
+  it('modo estricto: no envía forzar y avisa el error del backend', async () => {
+    const asignarManual = vi.fn(async () => {
+      throw { response: { data: { detail: { error_code: 'CONFLICT_ROOM', mensaje: 'Aula ocupada' } } } };
+    });
+    const setup = baseProps({ scheduleService: { asignarManual } });
+    const { result } = render(setup);
+
+    let ok;
+    await act(async () => {
+      ok = await result.current.guardarAsignacionManual({
+        horario: { id: 1, extendedProps: { leccion_id: 5, aula_id: 1 } },
+        aulaId: 1,
+        bloqueDestinos: [{ id: 10 }],
+      });
+    });
+
+    expect(ok).toBe(false);
+    expect(asignarManual).toHaveBeenCalledWith(expect.not.objectContaining({ forzar: true }));
+    expect(setup.showToast).toHaveBeenCalledWith('Aula ocupada', 'error');
+  });
+
+  it('coloca una clase de la bandeja (evento sintético) en Modo Demo', async () => {
+    const setup = baseProps({ demoMode: true });
+    const { result } = render(setup);
+
+    let ok;
+    await act(async () => {
+      ok = await result.current.guardarAsignacionManual({
+        horario: {
+          id: 'bandeja-12',
+          start: new Date(2026, 5, 29, 8, 0),
+          end: new Date(2026, 5, 29, 8, 45),
+          extendedProps: { leccion_id: 12, aula_id: 1, bloques_por_sesion: 1, materia: 'Calculo' },
+        },
+        aulaId: 1,
+        bloqueDestinos: [{ id: 10, dia_semana: 1, hora_inicio: '08:00:00', duracion_minutos: 60 }],
+      });
+    });
+
+    expect(ok).toBe(true);
+    expect(setup.setDemoHorarios).toHaveBeenCalled();
+    const nuevos = setup.setDemoHorarios.mock.calls[0][0];
+    expect(nuevos.some(e => Number(e.extendedProps?.leccion_id) === 12)).toBe(true);
+  });
+
   it('mover a celda en Modo Demo valido actualiza localmente y avisa', async () => {
     const setup = baseProps({ demoMode: true });
     const { result } = render(setup);

@@ -144,3 +144,84 @@ class AsignarManualRequest(BaseModel):
     # Filas previas (por bloque_id) de la sesión a reemplazar. Si se omite se
     # reemplazan todas las filas ACTIVO de la lección (backward-compatible).
     bloques_previos: Optional[List[int]] = None
+    # E23 "modo libre": degrada a ADVERTENCIA los solapes y la ventana de
+    # turno en vez de bloquear (409). Nunca relaja sede, extensión de la
+    # sesión ni existencia de filas.
+    forzar: bool = False
+
+
+# --- E23: bandeja de reserva (edición manual del horario, sin solver) ---
+# El estado 'BORRADOR' de horario_generado representa una sesión "apartada" en
+# la bandeja: la celda queda libre (solo las filas ACTIVO cuentan como
+# ocupadas) pero la fila conserva su bloque original para poder devolverla.
+# 'SIN_COLOCAR' (clase activa del periodo sin ninguna fila ACTIVO) es derivado:
+# no se persiste.
+
+
+class ClaseBandejaBase(BaseModel):
+    """Datos de presentación de una clase en la bandeja de reserva."""
+    leccion_id: int
+    materia_id: int
+    materia_nombre: str = ""
+    materia_codigo: str = ""
+    color_hex: str = "#3B82F6"
+    docente_id: int
+    docente_nombre: str = ""
+    grupo_id: int
+    grupo_nombre: str = ""
+    sede_id: Optional[int] = None
+    division: Optional[str] = None
+    bloques_por_sesion: int = 1
+    sesiones_semana: int = 1
+    aula_id: Optional[int] = None
+    aula_nombre: str = ""
+
+
+class ClaseSinColocar(ClaseBandejaBase):
+    """Clase activa del periodo que no tiene ninguna fila ACTIVO."""
+    origen: str = "SIN_COLOCAR"
+
+
+class SesionReservada(ClaseBandejaBase):
+    """Sesión apartada en la bandeja (filas BORRADOR de una misma corrida)."""
+    origen: str = "RESERVADA"
+    bloque_ids: List[int] = Field(default_factory=list)
+    dia_semana: int = 1
+    hora_inicio: str = ""
+    version_horario: int = 1
+
+
+class BandejaReserva(BaseModel):
+    """Contenido de la bandeja de reserva de un periodo."""
+    periodo_id: int
+    sin_colocar: List[ClaseSinColocar] = Field(default_factory=list)
+    reservadas: List[SesionReservada] = Field(default_factory=list)
+
+
+class ReservarRequest(BaseModel):
+    """Aparta (reserva) una sesión de la grilla: sus filas pasan a BORRADOR."""
+    periodo_id: int
+    leccion_id: int
+    # Si se omite, se reserva TODAS las sesiones activas de la clase.
+    bloque_ids: Optional[List[int]] = None
+
+
+class LiberarReservaRequest(BaseModel):
+    """Devuelve a la grilla las sesiones reservadas (BORRADOR -> ACTIVO)."""
+    periodo_id: int
+    leccion_id: int
+    bloque_ids: Optional[List[int]] = None
+    forzar: bool = False
+
+
+class ResultadoReserva(BaseModel):
+    """Resultado de reservar/liberar una sesión."""
+    filas: List[HorarioGenerado] = Field(default_factory=list)
+    advertencias: List[str] = Field(default_factory=list)
+    mensaje: str = ""
+
+
+class ResultadoAsignacionManual(BaseModel):
+    """Resultado de asignar-manual: filas creadas + advertencias del modo libre."""
+    filas: List[HorarioGenerado] = Field(default_factory=list)
+    advertencias: List[str] = Field(default_factory=list)

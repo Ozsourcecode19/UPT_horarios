@@ -1,13 +1,30 @@
 # Guía del Proyecto Frontend — Sistema de Horarios UPT Bolívar
-**Versión:** 2.3 — Estado Real del Proyecto  
-**Fecha de actualización:** 2026-10-17  
+**Versión:** 2.4 — Estado Real del Proyecto  
+**Fecha de actualización:** 2026-10-21  
 **Stack:** React 18 · Vite · TanStack Query · Axios · FastAPI (backend) · Grilla Nativa (sin FullCalendar)
 
 > **Terminología de UI (2026-10-16):** todos los textos visibles (labels, toasts, modales, validaciones zod, mensajes de error) usan **Unidad Curricular** (antes "Materia"), **Clase** (antes "Lección") y **Sección** (antes "Grupo"); los turnos se muestran como **Mañana/Tarde/Noche** (valor `MATUTINO/VESPERTINO/NOCTURNO` en BD, se mapean con `TURNOS_LABELS` de `src/constants/index.js`). Los identificadores NO cambian: rutas (`/materias`, `/lecciones`), nombres de archivo/feature/hook (`features/materias`, `useLeccionesCrud`, …), claves de API/query y campos (`materia_id`, `grupo_id`, `lecciones`, `division`). En historiales de sesiones anteriores (más abajo) los términos antiguos se conservan tal como se documentaron.
 
 ---
 
-### Contexto de la Sesión Actual (2026-10-17) — Sesiones de N bloques × M sesiones/semana
+### Contexto de la Sesión Actual (2026-10-21) — E23: bandeja de reserva + modo libre (web y escritorio)
+
+> Feature de **edición manual del horario sin depender del solver** (rama `feat/desktop-tauri`; funciona igual en la web y en la app de escritorio, que sirve el mismo frontend). Verificación: backend **154 pytest ✅**, frontend **498 vitest ✅**, `pnpm build` ✅, smoke E2E contra SQLite real ✅.
+
+1. **Bandeja de reserva (`features/schedule/components/BandejaReserva.jsx`):** panel `<aside>` junto a la grilla con las clases **fuera de la grilla**: "Sin ubicar" (clases del periodo sin ninguna fila ACTIVO — las que el solver omitió) y "En reserva" (sesiones apartadas). Buscador por texto libre, contador, y botón **"Devolver"** por sesión apartada.
+2. **Arrastre en dos direcciones:**
+   - **Bandeja → grilla:** la ficha es `draggable` y lleva su payload en el MIME propio **`application/x-urd-horario`** (`features/schedule/utils/bandeja.js`); `text/plain` queda para el id del evento de la grilla (por eso hace falta un MIME propio). `GridSemanalBloques` acepta el drop si `dataTransfer.types` incluye ese MIME (en `dragover` solo se puede leer `types`, no `getData`) y `createDropHandler` deriva a `onClaseBandeja`.
+   - **Grilla → bandeja:** la bandeja es un drop target que lee `text/plain`; si es un id numérico, la página aparta la sesión (los bloques de la corrida se calculan con `agruparSesiones`).
+3. **Aula de la clase sin colocar:** si la clase nunca tuvo aula, al soltarla se abre el `EditEventModal` en modo **"clase nueva"** (sin botón de eliminar) para elegir aula y día/hora; si ya tuvo aula, se reutiliza y la asignación es directa. `construirEventoDesdeClase` arma el evento sintético con la forma de los de la grilla (`extendedProps`) para que el resto del flujo no cambie.
+4. **Modo libre:** checkbox en la cabecera de la bandeja (solo ADMIN/JEFE-PNF), persistido en `localStorage` (`horarios_modo_libre`). Envía `forzar: true` a `asignar-manual`/`reservas/liberar`; el backend degrada solapes y ventana de turno a **advertencias** (badge ámbar "… (libre)" en la celda) y la sede/extensión de la sesión **nunca** se relajan. En el cliente, el toast pasa de error a warning cuando hay advertencias.
+5. **Helpers puros (`features/schedule/utils/bandeja.js`):** `crearPayloadBandeja` (idempotente: acepta la forma de la API y la del payload), `serializarPayloadBandeja`/`leerPayloadBandeja`, `textoChipBandeja`/`esChipBandeja`/`esIdEventoGrilla`, `filtrarClases`, `etiquetaSesion`, `construirEventoDesdeClase`.
+6. **Hook `useReservas`:** query `['bandeja-reserva', periodoId]` + mutaciones `reservar`/`liberar`; invalida la bandeja **y** la grilla; los errores se muestran en toast (el `catch` de la página evita rechazos sin manejar).
+7. **Táctil:** el HTML5 DnD no funciona con toques → en la bandeja un **clic** en la ficha abre el mismo modal de "clase nueva" (mismo camino que el desktop, sin tocar el tap-to-move de la grilla).
+8. **Tests:** `schedule/__tests__/bandeja.test.js` (payload, filtro, evento sintético), `schedule/__tests__/bandejaReserva.test.jsx` (secciones, filtro, arrastre, toggle, drop desde la grilla), `schedule/__tests__/useReservas.test.jsx` (query + mutaciones), `horarios.test.js` (+1: `createDropHandler` con ficha de bandeja) y `useDragDropValidation.test.jsx` (+3: modo libre, modo estricto y colocación desde la bandeja en Demo).
+
+---
+
+### Contexto de la Sesión Anterior (2026-10-17) — Sesiones de N bloques × M sesiones/semana
 
 > Feature completa (rama `feature/clase-bloques-sesiones`; plan en `PLAN_CLASE_BLOQUES_SESIONES.md` en la raíz del repo). Cada **Clase** (`lecciones`) define **N = `bloques_por_sesion`** (sesión = run de N bloques contiguos por aparición) y **M = `sesiones_semana`** (M sesiones/semana, uniformes). Verificación final: backend **87 pytest ✅**, frontend **395 vitest ✅**, `pnpm build` ✅, `import main` ✅.
 

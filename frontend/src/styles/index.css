@@ -306,6 +306,239 @@ table.grilla-bloques {
   background-color: #eff6ff !important;
 }
 
+/* ─── E23: bandeja de reserva (edición manual del horario) ────────────── */
+
+.horarios-grilla-bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.bandeja-reserva {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.bandeja-reserva-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.bandeja-contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 9999px;
+  background-color: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.bandeja-modo-libre {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.75rem;
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bandeja-modo-libre-input {
+  accent-color: #f59e0b;
+  width: 0.9rem;
+  height: 0.9rem;
+  cursor: pointer;
+}
+
+.bandeja-buscador {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+}
+
+.bandeja-buscador-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.bandeja-vacio {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.bandeja-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.bandeja-seccion-titulo {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.bandeja-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bandeja-chip {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.bandeja-chip-arrastrable {
+  cursor: grab;
+}
+
+.bandeja-chip-arrastrable:active {
+  cursor: grabbing;
+}
+
+.bandeja-chip:hover {
+  border-color: #a5b4fc;
+  box-shadow: 0 4px 12px rgb(79 70 229 / 0.12);
+}
+
+.bandeja-chip-reservada {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+
+.bandeja-chip-color {
+  display: block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-top: 0.25rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.bandeja-chip-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.bandeja-chip-detalle {
+  font-size: 0.68rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.bandeja-chip-ubicacion {
+  font-size: 0.65rem;
+  color: #b45309;
+  line-height: 1.3;
+}
+
+.bandeja-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  background-color: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.bandeja-chip-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.6rem;
+  background-color: #eef2ff;
+  color: #4338ca;
+  font-size: 0.68rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease;
+}
+
+.bandeja-chip-accion:hover:not(:disabled) {
+  background-color: #e0e7ff;
+}
+
+.bandeja-chip-accion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bandeja-chip-accion-inerte {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+
+/* Modo libre: el conflicto se avisa, no bloquea */
+.grilla-bloques td.celda-conflicto-libre {
+  outline-style: dotted !important;
+}
+
+.conflicto-badge-libre {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+@media (min-width: 1024px) {
+  .horarios-grilla-bandeja {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .bandeja-reserva {
+    width: 18rem;
+    flex-shrink: 0;
+    position: sticky;
+    top: 1rem;
+  }
+}
+
 /* Barra flotante de acción (solo en pantalla; la clase JS añade no-print) */
 .touch-bar {
   position: fixed;

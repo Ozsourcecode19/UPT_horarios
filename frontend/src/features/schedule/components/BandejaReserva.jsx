@@ -1,0 +1,207 @@
+// src/features/schedule/components/BandejaReserva.jsx
+// E23 — Bandeja de reserva: panel lateral con las clases que NO están en la grilla.
+//
+// Dos secciones:
+//   - "Sin ubicar": clases del periodo que no tienen ninguna fila ACTIVO (las
+//     que el solver omitió). Se arrastran a una celda para colocarlas.
+//   - "En reserva": sesiones apartadas de la grilla (filas BORRADOR). La celda
+//     queda libre; se devuelven a la grilla con un clic.
+//
+// La bandeja es también el destino del arrastre desde la grilla: al soltar
+// una clase aquí, su sesión se aparta (reserva) y la celda queda libre.
+
+import { useMemo, useState } from 'react';
+import { Inbox, RotateCcw, Search, ShieldAlert, PackageOpen } from 'lucide-react';
+import {
+  TIPO_DND_BANDEJA,
+  esIdEventoGrilla,
+  etiquetaSesion,
+  filtrarClases,
+  serializarPayloadBandeja,
+  textoChipBandeja,
+} from '../utils/bandeja';
+
+const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar }) => {
+  const esReservada = origen === 'RESERVADA';
+  return (
+    <div
+      draggable={puedeEscribir}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(TIPO_DND_BANDEJA, serializarPayloadBandeja(clase));
+        e.dataTransfer.setData('text/plain', textoChipBandeja(clase));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onClick={() => onSeleccionar?.(clase)}
+      className={`bandeja-chip ${esReservada ? 'bandeja-chip-reservada' : ''} ${puedeEscribir ? 'bandeja-chip-arrastrable' : ''}`}
+      title={puedeEscribir ? 'Arrastra a la grilla para colocarla (clic para elegir día y hora)' : 'Clic para elegir día y hora'}
+    >
+      <div className="flex items-start gap-2">
+        <span className="bandeja-chip-color" style={{ backgroundColor: clase.color_hex || '#3B82F6' }} />
+        <div className="min-w-0 flex-1">
+          <p className="bandeja-chip-titulo">{clase.materia_nombre || 'Clase'}</p>
+          <p className="bandeja-chip-detalle">
+            {clase.docente_nombre || 'Sin docente'} · {clase.grupo_nombre || 'Sin sección'}
+          </p>
+          {esReservada && (
+            <p className="bandeja-chip-ubicacion">
+              Apartada: {etiquetaSesion(clase)}
+              {clase.aula_nombre ? ` · ${clase.aula_nombre}` : ''}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 mt-2">
+        {clase.bloques_por_sesion > 1 && (
+          <span className="bandeja-chip-badge">×{clase.bloques_por_sesion}</span>
+        )}
+        {esReservada ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onLiberar?.(clase); }}
+            disabled={!puedeEscribir}
+            className="bandeja-chip-accion"
+            title="Devolver esta sesión a la grilla"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Devolver</span>
+          </button>
+        ) : (
+          <span className="bandeja-chip-accion bandeja-chip-accion-inerte">
+            <PackageOpen className="w-3.5 h-3.5" />
+            <span>Colocar</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const BandejaReserva = ({
+  sinColocar = [],
+  reservadas = [],
+  puedeEscribir = false,
+  modoLibre = false,
+  demoMode = false,
+  onToggleModoLibre,
+  onSeleccionar,
+  onLiberar,
+  onReservarDesdeGrilla,
+  isLoading = false,
+}) => {
+  const [filtro, setFiltro] = useState('');
+
+  // En Modo Demo no hay servidor: la bandeja no puede apartar/devolver clases.
+  const editable = puedeEscribir && !demoMode;
+
+  const sinColocarFiltradas = useMemo(() => filtrarClases(sinColocar, filtro), [sinColocar, filtro]);
+  const reservadasFiltradas = useMemo(() => filtrarClases(reservadas, filtro), [reservadas, filtro]);
+
+  const total = sinColocar.length + reservadas.length;
+
+  // Drop target: aquí se arrastran las clases de la grilla para apartarlas.
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const texto = e.dataTransfer.getData('text/plain');
+    if (!esIdEventoGrilla(texto)) return;
+    onReservarDesdeGrilla?.(texto);
+  };
+
+  return (
+    <aside
+      className="bandeja-reserva no-print"
+      onDragOver={(e) => {
+        const texto = e.dataTransfer.getData?.('text/plain');
+        // Solo se acepta el arrastre de una clase de la grilla (id numérico).
+        if (!esIdEventoGrilla(texto)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={handleDrop}
+      aria-label="Bandeja de reserva"
+    >
+      <div className="bandeja-reserva-header">
+        <div className="flex items-center gap-2">
+          <Inbox className="w-4 h-4 text-indigo-500" />
+          <h3 className="text-sm font-bold text-slate-700">Bandeja de reserva</h3>
+        </div>
+        <span className="bandeja-contador" title="Clases fuera de la grilla">{total}</span>
+      </div>
+
+      {demoMode && (
+        <p className="bandeja-vacio">
+          La bandeja no está disponible en Modo Demo (no hay servidor al que reservar las clases).
+        </p>
+      )}
+
+      {editable && onToggleModoLibre && (
+        <label className="bandeja-modo-libre" title="En modo libre los solapes y la ventana de turno se avisan pero no bloquean la edición">
+          <input
+            type="checkbox"
+            checked={!!modoLibre}
+            onChange={(e) => onToggleModoLibre(e.target.checked)}
+            className="bandeja-modo-libre-input"
+          />
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+          <span>Modo libre</span>
+        </label>
+      )}
+
+      <div className="bandeja-buscador">
+        <Search className="w-3.5 h-3.5 text-slate-400" />
+        <input
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          placeholder="Buscar clase..."
+          className="bandeja-buscador-input"
+        />
+      </div>
+
+      {isLoading && <p className="bandeja-vacio">Cargando bandeja...</p>}
+
+      {!isLoading && total === 0 && (
+        <p className="bandeja-vacio">
+          No hay clases fuera de la grilla. Arrastra una clase de la grilla hasta aquí para apartarla y liberar su celda.
+        </p>
+      )}
+
+      {reservadasFiltradas.length > 0 && (
+        <section className="bandeja-seccion">
+          <h4 className="bandeja-seccion-titulo">En reserva ({reservadasFiltradas.length})</h4>
+          <div className="bandeja-lista">
+            {reservadasFiltradas.map(clase => (
+              <Chip
+                key={`res-${clase.leccion_id}-${clase.dia_semana}-${clase.hora_inicio}`}
+                clase={clase}
+                origen="RESERVADA"
+                puedeEscribir={editable}
+                onSeleccionar={onSeleccionar}
+                onLiberar={onLiberar}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sinColocarFiltradas.length > 0 && (
+        <section className="bandeja-seccion">
+          <h4 className="bandeja-seccion-titulo">Sin ubicar ({sinColocarFiltradas.length})</h4>
+          <div className="bandeja-lista">
+            {sinColocarFiltradas.map(clase => (
+              <Chip
+                key={`sin-${clase.leccion_id}`}
+                clase={clase}
+                origen="SIN_COLOCAR"
+                puedeEscribir={editable}
+                onSeleccionar={onSeleccionar}
+                onLiberar={onLiberar}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </aside>
+  );
+};
+
+export default BandejaReserva;

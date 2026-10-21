@@ -146,6 +146,21 @@ describe('createDropHandler', () => {
     handler({ horarioId: '7', esSpan: false, dia: 1, iniMin: 420 });
     expect(guardar).toHaveBeenCalledWith(expect.objectContaining({ bloquesPrevios: undefined }));
   });
+
+  // E23: ficha de la bandeja → la clase se coloca (no es un movimiento)
+  it('una ficha de la bandeja se entrega a onClaseBandeja (no mueve un evento)', () => {
+    const guardar = vi.fn();
+    const onClaseBandeja = vi.fn();
+    const handler = createDropHandler({
+      bloques, aulas, showToast: vi.fn(), guardarAsignacionManual: guardar,
+      listadoHorarios: [], onClaseBandeja,
+    });
+    const clase = { leccion_id: 12, bloques_por_sesion: 1, aula_id: 10 };
+    handler({ claseBandeja: clase, dia: 1, iniMin: 420 });
+
+    expect(onClaseBandeja).toHaveBeenCalledWith(clase, { dia: 1, iniMin: 420 });
+    expect(guardar).not.toHaveBeenCalled();
+  });
 });
 
 describe('detectarNSesion', () => {

@@ -730,7 +730,10 @@ def get_versiones_horario(db: Session, periodo_id: int) -> List[schemas.HorarioV
         func.count(models.HorarioGenerado.id).label('total'),
         func.max(models.HorarioGenerado.created_at).label('generado_en')
     ).filter(
-        models.HorarioGenerado.periodo_id == periodo_id
+        models.HorarioGenerado.periodo_id == periodo_id,
+        # E23: las filas en reserva (BORRADOR) no son una "versión" del horario;
+        # viven en la bandeja de reserva, no en el historial.
+        models.HorarioGenerado.estado.in_(['ACTIVO', 'HISTORICO'])
     ).group_by(
         models.HorarioGenerado.version_horario,
         models.HorarioGenerado.estado
@@ -812,9 +815,43 @@ def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optio
         version_horario=version,
         total_activos=total_activos,
     )
+def _conflictos_de_rango(db: Session, *, periodo_id: int, aula_id: int, leccion,
+                         dia_semana: int, rango_ini, rango_fin,
+                         excluir_ids=None) -> List[tuple]:
+    """
+    R5-B' — solape del RANGO completo de la sesión (hora_inicio de la 1ª fila →
+    hora_fin de la última) contra las demás filas ACTIVO del periodo. Cubre
+    solapes con bloques de duración distinta que la igualdad exacta de
+    bloque_id no ve.
+
+    Devuelve una lista de (error_code, mensaje). Vacía = sin conflictos.
+    """
+    conflictos: List[tuple] = []
+    q_rango = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.estado == 'ACTIVO',
+        models.HorarioGenerado.dia_semana == dia_semana,
+        models.HorarioGenerado.hora_inicio < rango_fin,
+        models.HorarioGenerado.hora_fin > rango_ini,
+    )
+    if excluir_ids:
+        q_rango = q_rango.filter(~models.HorarioGenerado.id.in_(excluir_ids))
+    for fila in q_rango.all():
+        if fila.aula_id == aula_id:
+            conflictos.append(("CONFLICT_ROOM", "El rango seleccionado ya está ocupado en esa aula."))
+        lec_fila = db.query(models.Leccion).filter(models.Leccion.id == fila.leccion_id).first()
+        if lec_fila and lec_fila.docente_id == leccion.docente_id:
+            conflictos.append(("CONFLICT_TEACHER", "El docente ya tiene una clase en ese rango."))
+        if lec_fila and lec_fila.grupo_id == leccion.grupo_id:
+            conflictos.append(("CONFLICT_GROUP", "La sección ya tiene una clase en ese rango."))
+    return conflictos
+
+
 def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
                            bloque_ids: List[int], periodo_id: int,
-                           bloques_previos: Optional[List[int]] = None
+                           bloques_previos: Optional[List[int]] = None,
+                           forzar: bool = False,
+                           advertencias: Optional[List[str]] = None
                            ) -> List[models.HorarioGenerado]:
     """
     E20 — Asignación manual desde la grilla: reemplaza (transaccionalmente) las
@@ -830,8 +867,16 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
     - Las filas previas (todas, o solo las de `bloques_previos` cuando la
       lección tiene M>1 sesiones) pasan a estado 'ELIMINADO' (soft-delete);
       las nuevas heredan su version_horario.
+    - E23: las filas previas incluyen las que están en reserva (BORRADOR), para
+      que devolver una clase a otro hueco la reubique sin dejar filas huérfanas.
+    - E23 "modo libre" (forzar=True): los solapes y la ventana de turno se
+      devuelven como advertencias en vez de bloquear con 409. La sede, la
+      extensión de la sesión y la existencia de filas siguen bloqueando.
     """
     from services.validation.schedule_validation import validar_asignacion
+
+    if advertencias is None:
+        advertencias = []
 
     leccion = db.query(models.Leccion).filter(models.Leccion.id == leccion_id).first()
     if not leccion:
@@ -880,7 +925,8 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
     filas_previas = db.query(models.HorarioGenerado).filter(
         models.HorarioGenerado.leccion_id == leccion_id,
         models.HorarioGenerado.periodo_id == periodo_id,
-        models.HorarioGenerado.estado == 'ACTIVO',
+        # E23: incluye las sesiones en reserva (BORRADOR) para poder reubicarlas.
+        models.HorarioGenerado.estado.in_(['ACTIVO', 'BORRADOR']),
     ).all()
 
     # Alcance del reemplazo: solo la sesión apuntada por bloques_previos
@@ -907,15 +953,21 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
     else:
         filas_a_reemplazar = filas_previas
 
-    # Validaciones completas excluyendo las filas previas de ESTA lección
+    # Validaciones completas excluyendo las filas previas de ESTA lección.
+    # E23: con forzar=True los códigos relajables vuelven como advertencias.
     for bloque in ordenados:
         res = validar_asignacion(db, leccion=leccion, bloque_objetivo=bloque,
-                                 aula_objetivo=aula, excluir_leccion_id=leccion_id)
+                                 aula_objetivo=aula, excluir_leccion_id=leccion_id,
+                                 forzar=forzar)
         if not res.valido:
             db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                 detail={"error_code": res.error_code or "ASIGNACION_INVALIDA",
                                         "mensaje": res.mensaje})
+        for adv in res.advertencias:
+            mensaje = adv["mensaje"] if isinstance(adv, dict) else str(adv)
+            if mensaje not in advertencias:
+                advertencias.append(mensaje)
 
     # R5-B': solape de RANGO completo del run (inicio de la 1ª fila → fin de
     # la última) contra las demás filas ACTIVO del periodo. Cubre solapes con
@@ -925,32 +977,18 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
                   + timedelta(minutes=ordenados[-1].duracion_minutos)).time()
     rango_fin = fin_ultimo
     ids_reemplazadas = {f.id for f in filas_a_reemplazar}
-    q_rango = db.query(models.HorarioGenerado).filter(
-        models.HorarioGenerado.periodo_id == periodo_id,
-        models.HorarioGenerado.estado == 'ACTIVO',
-        models.HorarioGenerado.dia_semana == ordenados[0].dia_semana,
-        models.HorarioGenerado.hora_inicio < rango_fin,
-        models.HorarioGenerado.hora_fin > rango_ini,
-    )
-    if ids_reemplazadas:
-        q_rango = q_rango.filter(~models.HorarioGenerado.id.in_(ids_reemplazadas))
-    for fila in q_rango.all():
-        if fila.aula_id == aula_id:
+    for error_code, mensaje in _conflictos_de_rango(
+        db, periodo_id=periodo_id, aula_id=aula_id, leccion=leccion,
+        dia_semana=ordenados[0].dia_semana, rango_ini=rango_ini, rango_fin=rango_fin,
+        excluir_ids=ids_reemplazadas,
+    ):
+        if forzar:
+            if mensaje not in advertencias:
+                advertencias.append(mensaje)
+        else:
             db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                detail={"error_code": "CONFLICT_ROOM",
-                                        "mensaje": "El rango seleccionado ya está ocupado en esa aula."})
-        lec_fila = db.query(models.Leccion).filter(models.Leccion.id == fila.leccion_id).first()
-        if lec_fila and lec_fila.docente_id == leccion.docente_id:
-            db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                detail={"error_code": "CONFLICT_TEACHER",
-                                        "mensaje": "El docente ya tiene una clase en ese rango."})
-        if lec_fila and lec_fila.grupo_id == leccion.grupo_id:
-            db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                detail={"error_code": "CONFLICT_GROUP",
-                                        "mensaje": "La sección ya tiene una clase en ese rango."})
+                                detail={"error_code": error_code, "mensaje": mensaje})
 
     version = filas_a_reemplazar[0].version_horario if filas_a_reemplazar else (
         (db.query(func.max(models.HorarioGenerado.version_horario))
@@ -972,3 +1010,228 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
     for hg in creadas:
         db.refresh(hg)
     return creadas
+
+
+# --- E23: bandeja de reserva (edición manual del horario, sin solver) ---
+# Una clase "apartada" en la bandeja es una fila de horario_generado con
+# estado 'BORRADOR' (estado que ya existía en el CHECK del esquema y que
+# ninguna ruta usaba). Mientras está apartada, la celda queda LIBRE: tanto la
+# grilla como las validaciones solo miran las filas ACTIVO. La fila conserva su
+# bloque_id, así que la clase puede volver a su sitio.
+
+
+def _agrupar_sesiones(filas: List[models.HorarioGenerado], n: int) -> List[List[models.HorarioGenerado]]:
+    """
+    Agrupa filas de una misma clase en sesiones: por día y en corridas de N
+    bloques consecutivos (N = bloques_por_sesion).
+    """
+    n = max(1, int(n or 1))
+    sesiones: List[List[models.HorarioGenerado]] = []
+    por_dia = {}
+    for f in filas:
+        por_dia.setdefault(f.dia_semana, []).append(f)
+    for dia in sorted(por_dia.keys(), key=lambda d: (d is None, d)):
+        dia_filas = sorted(por_dia[dia], key=lambda f: (f.hora_inicio or time(0, 0), f.bloque_id))
+        for i in range(0, len(dia_filas), n):
+            sesiones.append(dia_filas[i:i + n])
+    return sesiones
+
+
+def _info_clase_bandeja(leccion, materias, docentes, grupos) -> dict:
+    """Datos de presentación de una clase (comunes a la bandeja)."""
+    materia = materias.get(leccion.materia_id)
+    docente = docentes.get(leccion.docente_id)
+    grupo = grupos.get(leccion.grupo_id)
+    nombre_docente = ""
+    if docente is not None:
+        nombre_docente = f"{getattr(docente, 'apellido', '') or ''}, {getattr(docente, 'nombre', '') or ''}".strip(", ")
+    return {
+        "leccion_id": leccion.id,
+        "materia_id": leccion.materia_id,
+        "materia_nombre": getattr(materia, "nombre", "") or "",
+        "materia_codigo": getattr(materia, "codigo", "") or "",
+        "color_hex": getattr(materia, "color_hex", None) or "#3B82F6",
+        "docente_id": leccion.docente_id,
+        "docente_nombre": nombre_docente,
+        "grupo_id": leccion.grupo_id,
+        "grupo_nombre": getattr(grupo, "nombre", "") or "",
+        "sede_id": leccion.sede_forzada_id or getattr(grupo, "sede_id", None),
+        "division": getattr(grupo, "division", None),
+        "bloques_por_sesion": leccion.bloques_por_sesion or 1,
+        "sesiones_semana": leccion.sesiones_semana or 1,
+    }
+
+
+def get_bandeja_reserva(db: Session, periodo_id: int) -> schemas.BandejaReserva:
+    """
+    E23 — Bandeja de reserva de un periodo:
+      - `sin_colocar`: clases activas del periodo que NO tienen ninguna fila
+        ACTIVO (el solver las omitió o el usuario las sacó de la grilla);
+      - `reservadas`: sesiones apartadas (filas BORRADOR), agrupadas en corridas.
+    No muta nada: es una vista derivada del estado actual.
+    """
+    bandeja = schemas.BandejaReserva(periodo_id=periodo_id)
+
+    lecciones = db.query(models.Leccion).filter(
+        models.Leccion.periodo_id == periodo_id,
+        models.Leccion.activo.is_(True),
+    ).all()
+    if not lecciones:
+        return bandeja
+
+    filas = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.leccion_id.in_([l.id for l in lecciones]),
+    ).all()
+
+    por_leccion: dict = {}
+    for f in filas:
+        por_leccion.setdefault(f.leccion_id, []).append(f)
+
+    ids_aula = {f.aula_id for f in filas if f.aula_id is not None}
+    materias = {m.id: m for m in db.query(models.Materia).filter(
+        models.Materia.id.in_({l.materia_id for l in lecciones})).all()}
+    docentes = {d.id: d for d in db.query(models.Docente).filter(
+        models.Docente.id.in_({l.docente_id for l in lecciones})).all()}
+    grupos = {g.id: g for g in db.query(models.Grupo).filter(
+        models.Grupo.id.in_({l.grupo_id for l in lecciones})).all()}
+    aulas = {a.id: a for a in db.query(models.Aula).filter(
+        models.Aula.id.in_(ids_aula)).all()} if ids_aula else {}
+
+    for leccion in lecciones:
+        lf = por_leccion.get(leccion.id, [])
+        activas = [f for f in lf if f.estado == 'ACTIVO']
+        reservas = [f for f in lf if f.estado == 'BORRADOR']
+        info = _info_clase_bandeja(leccion, materias, docentes, grupos)
+
+        if not activas and not reservas:
+            # Clase nunca colocada: se sugiere el último aula conocida (si la hubo)
+            ultimas = sorted(lf, key=lambda f: f.id)
+            aula_id = ultimas[-1].aula_id if ultimas else None
+            aula = aulas.get(aula_id)
+            bandeja.sin_colocar.append(schemas.ClaseSinColocar(
+                **info,
+                aula_id=aula_id,
+                aula_nombre=getattr(aula, "nombre", "") or "",
+            ))
+
+        for sesion in _agrupar_sesiones(reservas, leccion.bloques_por_sesion or 1):
+            aula_id = sesion[0].aula_id
+            aula = aulas.get(aula_id)
+            bandeja.reservadas.append(schemas.SesionReservada(
+                **info,
+                aula_id=aula_id,
+                aula_nombre=getattr(aula, "nombre", "") or "",
+                bloque_ids=[f.bloque_id for f in sesion],
+                dia_semana=sesion[0].dia_semana or 1,
+                hora_inicio=str(sesion[0].hora_inicio or ""),
+                version_horario=sesion[0].version_horario or 1,
+            ))
+
+    bandeja.sin_colocar.sort(key=lambda c: (c.materia_nombre, c.grupo_nombre))
+    bandeja.reservadas.sort(key=lambda s: (s.dia_semana, s.hora_inicio, s.materia_nombre))
+    return bandeja
+
+
+def reservar_sesion(db: Session, *, periodo_id: int, leccion_id: int,
+                    bloque_ids: Optional[List[int]] = None) -> List[models.HorarioGenerado]:
+    """
+    E23 — Aparta (reserva) una sesión de la grilla: sus filas ACTIVO pasan a
+    BORRADOR. La celda queda libre (solo ACTIVO cuenta como ocupado) y cada
+    fila conserva su bloque para poder devolverla a su sitio.
+    """
+    q = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.leccion_id == leccion_id,
+        models.HorarioGenerado.estado == 'ACTIVO',
+    )
+    if bloque_ids:
+        q = q.filter(models.HorarioGenerado.bloque_id.in_(bloque_ids))
+    filas = q.all()
+    if not filas:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail={"error_code": "NO_HAY_CLASE_ACTIVA",
+                                    "mensaje": "Esa clase no tiene ninguna sesión activa para apartar."})
+    for f in filas:
+        f.estado = 'BORRADOR'
+    db.commit()
+    for f in filas:
+        db.refresh(f)
+    return filas
+
+
+def liberar_reservas(db: Session, *, periodo_id: int, leccion_id: int,
+                     bloque_ids: Optional[List[int]] = None, forzar: bool = False,
+                     advertencias: Optional[List[str]] = None) -> List[models.HorarioGenerado]:
+    """
+    E23 — Devuelve a la grilla las sesiones reservadas: valida cada bloque (y el
+    rango completo de la corrida) y pasa las filas BORRADOR a ACTIVO.
+    Con forzar=True los solapes y la ventana de turno son advertencias, no 409.
+    """
+    from services.validation.schedule_validation import validar_asignacion
+
+    if advertencias is None:
+        advertencias = []
+
+    leccion = db.query(models.Leccion).filter(models.Leccion.id == leccion_id).first()
+    if not leccion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clase no encontrada.")
+
+    q = db.query(models.HorarioGenerado).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.leccion_id == leccion_id,
+        models.HorarioGenerado.estado == 'BORRADOR',
+    )
+    if bloque_ids:
+        q = q.filter(models.HorarioGenerado.bloque_id.in_(bloque_ids))
+    filas = q.all()
+    if not filas:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail={"error_code": "NO_HAY_RESERVA",
+                                    "mensaje": "Esa clase no tiene ninguna sesión reservada."})
+
+    for fila in filas:
+        bloque = db.query(models.BloqueHorario).filter(models.BloqueHorario.id == fila.bloque_id).first()
+        aula = db.query(models.Aula).filter(models.Aula.id == fila.aula_id).first()
+        if not bloque or not aula:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail={"error_code": "OBJETIVO_INVALIDO",
+                                        "mensaje": "La sesión reservada no tiene bloque o aula válidos."})
+        res = validar_asignacion(db, leccion=leccion, bloque_objetivo=bloque,
+                                 aula_objetivo=aula, excluir_leccion_id=leccion_id,
+                                 forzar=forzar)
+        if not res.valido:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail={"error_code": res.error_code or "ASIGNACION_INVALIDA",
+                                        "mensaje": res.mensaje})
+        for adv in res.advertencias:
+            texto = adv["mensaje"] if isinstance(adv, dict) else str(adv)
+            if texto not in advertencias:
+                advertencias.append(texto)
+
+    # R5-B': solape del rango completo de cada corrida reservada
+    for dia in sorted({f.dia_semana for f in filas if f.dia_semana is not None}):
+        del_dia = sorted([f for f in filas if f.dia_semana == dia],
+                         key=lambda f: f.hora_inicio or time(0, 0))
+        rango_ini = del_dia[0].hora_inicio
+        rango_fin = max((f.hora_fin or time(0, 0)) for f in del_dia)
+        for error_code, mensaje in _conflictos_de_rango(
+            db, periodo_id=periodo_id, aula_id=del_dia[0].aula_id, leccion=leccion,
+            dia_semana=dia, rango_ini=rango_ini, rango_fin=rango_fin,
+            excluir_ids={f.id for f in filas},
+        ):
+            if forzar:
+                if mensaje not in advertencias:
+                    advertencias.append(mensaje)
+            else:
+                db.rollback()
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                    detail={"error_code": error_code, "mensaje": mensaje})
+
+    for f in filas:
+        f.estado = 'ACTIVO'
+    db.commit()
+    for f in filas:
+        db.refresh(f)
+    return filas

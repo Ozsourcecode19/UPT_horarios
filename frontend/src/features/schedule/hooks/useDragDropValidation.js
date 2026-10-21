@@ -187,7 +187,9 @@ export const useDragDropValidation = ({
 
   // Guardar desde el modal o drop: reemplazo atómico vía asignar-manual (real)
   // o simulación local (Demo, crea N-1 clones de la sesión).
-  const guardarAsignacionManual = async ({ horario, aulaId, bloqueDestinos, bloquesPrevios }) => {
+  // E23: `forzar` = "modo libre": los solapes y la ventana de turno se avisan
+  // pero no bloquean (el backend los devuelve como advertencias).
+  const guardarAsignacionManual = async ({ horario, aulaId, bloqueDestinos, bloquesPrevios, forzar = false }) => {
     if (!horario || !bloqueDestinos?.length) return false;
 
     if (!puedeEscribir) {
@@ -198,10 +200,13 @@ export const useDragDropValidation = ({
     const evProps = horario.extendedProps ?? horario;
     const divisionEvento = resolverDivisionEvento(evProps, grupos);
     const ventana = resolveVentanaTurno(divisionEvento, configuraciones);
-    for (const destino of bloqueDestinos) {
-      if (ventana && !bloqueDentroVentana(destino, ventana)) {
-        showToast(`El turno ${TURNOS_LABELS[divisionEvento] ?? divisionEvento} solo admite bloques entre ${formatHora12(ventana.inicio.slice(0, 5))} y ${formatHora12(ventana.fin.slice(0, 5))}.`, "error");
-        return false;
+    // En modo libre la ventana de turno no bloquea: el backend la avisa.
+    if (!forzar) {
+      for (const destino of bloqueDestinos) {
+        if (ventana && !bloqueDentroVentana(destino, ventana)) {
+          showToast(`El turno ${TURNOS_LABELS[divisionEvento] ?? divisionEvento} solo admite bloques entre ${formatHora12(ventana.inicio.slice(0, 5))} y ${formatHora12(ventana.fin.slice(0, 5))}.`, "error");
+          return false;
+        }
       }
     }
 
@@ -212,15 +217,23 @@ export const useDragDropValidation = ({
     }
 
     if (demoMode) {
-      const principal = demoHorarios.find(e => String(e.id) === String(horario.id));
+      // E23: una ficha de la bandeja no está en demoHorarios (es una clase
+      // nueva): se crea el evento a partir de la propia ficha.
+      const esBandeja = String(horario.id ?? '').startsWith('bandeja-');
+      const principal = esBandeja
+        ? horario
+        : demoHorarios.find(e => String(e.id) === String(horario.id));
       if (!principal) return false;
-      const res = validateMoveMock({
-        horarioId: Number(horario.id),
-        nuevoBloqueId: bloqueDestinos[0].id,
-        nuevaAulaId: Number(aulaId),
-        eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId,
-      });
-      if (!res.valido) { showToast(res.mensaje, "error"); return false; }
+
+      if (!esBandeja) {
+        const res = validateMoveMock({
+          horarioId: Number(horario.id),
+          nuevoBloqueId: bloqueDestinos[0].id,
+          nuevaAulaId: Number(aulaId),
+          eventosDemo: demoHorarios, aulas, bloques, periodoId: selectedPeriodoId,
+        });
+        if (!res.valido) { showToast(res.mensaje, "error"); return false; }
+      }
 
       const fechaBase = new Date((selectedPeriodo?.fecha_inicio || "2026-06-29") + "T00:00:00");
       const lid = Number(principal.extendedProps?.leccion_id);
@@ -231,12 +244,16 @@ export const useDragDropValidation = ({
       ).get(principal.id);
       const idsQuitar = new Set((infoSesion?.filas ?? [principal]).map(e => String(e.id)));
       nuevos = nuevos.filter(e => !idsQuitar.has(String(e.id)));
-      const movido = { ...recalcularEventoDemo(principal, bloqueDestinos[0], aulaId, fechaBase, aulas) };
+      // Los ids del demo son numéricos: una ficha de bandeja entra con id nuevo.
+      const maxIdActual = Math.max(0, ...nuevos.map(e => Number(e.id) || 0));
+      const movido = {
+        ...recalcularEventoDemo(principal, bloqueDestinos[0], aulaId, fechaBase, aulas),
+        id: esBandeja ? maxIdActual + 1 : principal.id,
+      };
       nuevos.push(movido);
       // N-1 clones para el resto de la sesión (R8: misma lógica real/demo)
       for (let i = 1; i < bloqueDestinos.length; i++) {
-        const maxId = Math.max(...nuevos.map(e => e.id), 0) + 1;
-        const clon = { ...movido, id: maxId };
+        const clon = { ...movido, id: maxIdActual + 1 + i };
         nuevos.push(recalcularEventoDemo(clon, bloqueDestinos[i], aulaId, fechaBase, aulas));
       }
       setDemoHorarios(nuevos);
@@ -245,15 +262,22 @@ export const useDragDropValidation = ({
     }
 
     try {
-      await scheduleService.asignarManual({
+      const respuesta = await scheduleService.asignarManual({
         leccion_id: Number(leccionId),
         aula_id: Number(aulaId),
         bloque_ids: bloqueDestinos.map(b => b.id),
         periodo_id: selectedPeriodoId,
         // R8/R4: reemplazar solo las filas de la sesión clickeada si se conocen
         ...(bloquesPrevios?.length ? { bloques_previos: bloquesPrevios } : {}),
+        // E23: modo libre → el backend avisa en vez de bloquear
+        ...(forzar ? { forzar: true } : {}),
       });
-      showToast("Clase reasignada y sincronizada correctamente");
+      const advertencias = respuesta?.advertencias || [];
+      if (advertencias.length) {
+        showToast(`Clase reasignada con ${advertencias.length} advertencia(s): ${advertencias[0]}`, "warning");
+      } else {
+        showToast("Clase reasignada y sincronizada correctamente");
+      }
       onInvalidate();
       return true;
     } catch (err) {

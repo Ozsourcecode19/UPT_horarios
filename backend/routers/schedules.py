@@ -136,8 +136,57 @@ def get_schedules_fullcalendar(periodo_id: int, db: Session = Depends(get_db)):
     return eventos
 
 
-# Endpoint para validar un movimiento manual (drag & drop) 
-@router.post("/asignar-manual", response_model=List[schemas.HorarioGenerado], summary="Asignación manual desde la grilla (sesión de N bloques)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+# --- E23: bandeja de reserva (edición manual del horario, sin solver) ---
+
+# NOTA: esta ruta debe declararse ANTES de "/{horario_id}": de lo contrario
+# FastAPI la interpretaría como un id y devolvería 422.
+@router.get("/bandeja", response_model=schemas.BandejaReserva, summary="Bandeja de reserva (clases sin colocar y sesiones apartadas)", dependencies=[Depends(get_current_active_user)])
+def get_bandeja_reserva(periodo_id: int, db: Session = Depends(get_db)):
+    """
+    Devuelve la bandeja de reserva del periodo:
+      - `sin_colocar`: clases activas sin ninguna fila ACTIVO (el solver las
+        omitió o el usuario las sacó de la grilla);
+      - `reservadas`: sesiones apartadas (filas BORRADOR) que se pueden
+        devolver a la grilla.
+    Es una vista derivada: no modifica nada.
+    """
+    return crud.get_bandeja_reserva(db, periodo_id=periodo_id)
+
+
+@router.post("/reservar", response_model=schemas.ResultadoReserva, summary="Apartar una sesión a la bandeja de reserva", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def reservar_sesion(req: schemas.ReservarRequest, db: Session = Depends(get_db)):
+    """
+    Aparta (reserva) una sesión de la grilla: sus filas ACTIVO pasan a
+    BORRADOR, la celda queda libre y la clase queda en la bandeja de reserva.
+    """
+    filas = crud.reservar_sesion(
+        db, periodo_id=req.periodo_id, leccion_id=req.leccion_id, bloque_ids=req.bloque_ids)
+    return schemas.ResultadoReserva(
+        filas=filas,
+        mensaje="Clase apartada a la bandeja de reserva.",
+    )
+
+
+@router.post("/reservas/liberar", response_model=schemas.ResultadoReserva, summary="Devolver a la grilla las sesiones reservadas", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def liberar_reservas(req: schemas.LiberarReservaRequest, db: Session = Depends(get_db)):
+    """
+    Devuelve a la grilla las sesiones reservadas (BORRADOR -> ACTIVO) validando
+    que sus celdas sigan libres. Con `forzar=True` los solapes y la ventana de
+    turno se devuelven como advertencias en vez de bloquear.
+    """
+    advertencias: list = []
+    filas = crud.liberar_reservas(
+        db, periodo_id=req.periodo_id, leccion_id=req.leccion_id,
+        bloque_ids=req.bloque_ids, forzar=req.forzar, advertencias=advertencias)
+    return schemas.ResultadoReserva(
+        filas=filas,
+        advertencias=advertencias,
+        mensaje="Clase devuelta a la grilla.",
+    )
+
+
+# Endpoint para validar un movimiento manual (drag & drop)
+@router.post("/asignar-manual", response_model=schemas.ResultadoAsignacionManual, summary="Asignación manual desde la grilla (sesión de N bloques)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def asignar_manual(req: schemas.AsignarManualRequest, db: Session = Depends(get_db)):
     """
     E20 — Crea/reemplaza (transaccional) las filas ACTIVO de una SESIÓN de la
@@ -145,15 +194,22 @@ def asignar_manual(req: schemas.AsignarManualRequest, db: Session = Depends(get_
     que componen la sesión, en el aula indicada. Valida ventana del turno,
     disponibilidad, habilitación, cruces por bloque y solape de rango,
     excluyendo las filas previas reemplazadas de la propia lección.
+
+    E23 — Con `forzar=True` ("modo libre") los solapes y la ventana de turno se
+    devuelven como advertencias en vez de bloquear con 409.
     """
-    return crud.asignar_horario_manual(
+    advertencias: list = []
+    filas = crud.asignar_horario_manual(
         db,
         leccion_id=req.leccion_id,
         aula_id=req.aula_id,
         bloque_ids=req.bloque_ids,
         periodo_id=req.periodo_id,
         bloques_previos=req.bloques_previos,
+        forzar=req.forzar,
+        advertencias=advertencias,
     )
+    return schemas.ResultadoAsignacionManual(filas=filas, advertencias=advertencias)
 
 @router.post("/validate-move", summary="Validar movimiento de horario", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
 def validate_schedule_move(move_request: ScheduleMoveRequest, db: Session = Depends(get_db)): # <-- CORREGIDO: Usar ScheduleMoveRequest directamente

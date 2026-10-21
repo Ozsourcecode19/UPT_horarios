@@ -16,6 +16,7 @@ import { formatHora12 } from '../../../utils/timeFormat';
 import { COLOR_FALLBACK } from '../../../constants';
 import { agruparSesiones } from '../utils/sesiones';
 import { resolverTap, TAP } from '../utils/tapMove';
+import { TIPO_DND_BANDEJA, leerPayloadBandeja } from '../utils/bandeja';
 import useIsTouch from '../../../hooks/useIsTouch';
 
 const DIAS = [
@@ -37,8 +38,9 @@ const GridSemanalBloques = ({
   demoMode = false,
   contextoVista = 'docente', // 'grupo' | 'docente' | 'aula'
   onEventoClick,     // ({id, start:Date, end:Date, extendedProps})
-  onDropEnCelda,     // ({horarioId, esSpan, dia, iniMin})
+  onDropEnCelda,     // ({horarioId, esSpan, dia, iniMin} | {claseBandeja, dia, iniMin})
   onDeleteEvento,    // ({horario, esSpan})
+  modoLibre = false, // E23: los conflictos se avisan pero no bloquean
 }) => {
   const [drag, setDrag] = useState(null); // {id, esSpan}
   const [celdaHover, setCeldaHover] = useState(null);
@@ -150,6 +152,13 @@ const GridSemanalBloques = ({
   const handleDropEnDia = (e, dia, banda) => {
     e.preventDefault();
     setCeldaHover(null);
+    // E23: ficha de la bandeja → la clase se coloca en esta celda.
+    const claseBandeja = leerPayloadBandeja(e.dataTransfer);
+    if (claseBandeja) {
+      setDrag(null);
+      onDropEnCelda?.({ claseBandeja, dia, iniMin: banda.iniMin });
+      return;
+    }
     const meta = drag ?? {
       id: e.dataTransfer.getData('text/plain'),
       esSpan: false,
@@ -157,6 +166,15 @@ const GridSemanalBloques = ({
     setDrag(null);
     if (!meta?.id || !onDropEnCelda) return;
     onDropEnCelda({ horarioId: String(meta.id), esSpan: !!meta.esSpan, sesionTotal: meta.sesionTotal || 1, dia, iniMin: banda.iniMin });
+  };
+
+  // ¿Se está arrastrando algo que la grilla puede recibir? (evento propio o
+  // ficha de la bandeja). `dataTransfer.types` sí se puede leer en dragover.
+  const arrastrableSobreLaGrilla = (e) => {
+    if (drag) return true;
+    const types = e.dataTransfer?.types;
+    if (!types) return false;
+    return Array.from(types).includes(TIPO_DND_BANDEJA);
   };
 
   const enModoMover = isTouch && !!seleccion;
@@ -238,7 +256,9 @@ const GridSemanalBloques = ({
                     }
                   }
 
-                  const claseConflicto = conflicto ? `celda-conflicto-${conflicto.tipo}` : '';
+                  const claseConflicto = conflicto
+                    ? `celda-conflicto-${conflicto.tipo} ${modoLibre ? 'celda-conflicto-libre' : ''}`
+                    : '';
                   return (
                     <td
                       key={dia}
@@ -255,7 +275,7 @@ const GridSemanalBloques = ({
                         }
                       }}
                       onDragOver={(e) => {
-                        if (!drag) return;
+                        if (!arrastrableSobreLaGrilla(e)) return;
                         e.preventDefault();
                         e.dataTransfer.dropEffect = 'move';
                         setCeldaHover(key);
@@ -348,8 +368,8 @@ const GridSemanalBloques = ({
                         );
                       })}
                       {conflicto && (
-                        <span className={`conflicto-badge conflicto-${conflicto.tipo}`}>
-                          {conflicto.etiqueta}
+                        <span className={`conflicto-badge conflicto-${conflicto.tipo} ${modoLibre ? 'conflicto-badge-libre' : ''}`}>
+                          {modoLibre ? `${conflicto.etiqueta} (libre)` : conflicto.etiqueta}
                         </span>
                       )}
                     </td>

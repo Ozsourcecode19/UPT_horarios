@@ -451,9 +451,45 @@ del usuario):
 - Verificación: corrida `39548804053` → **los 3 jobs en verde**; artefactos descargables en
   la corrida (`gh run view 39548804053` o la pestaña Artifacts).
 
-*Última actualización: 2026-10-21 — **documentada la alternativa Windows 7** como estudio de
-viabilidad en `PLAN_DESKTOP_WIN7.md` (**sin ejecutar**; recomendación: enfoque "sin WebView2" con
-navegador local, backend Python 3.8 + OR-Tools cp38 solo en 64 bits). Antes: **migración de
+*Última actualización: 2026-10-21 — **E23: bandeja de reserva + modo libre** (edición manual del
+horario sin solver; funciona en web y escritorio por ser frontend compartido). Ver al final de
+este registro. Antes: **documentada la alternativa Windows 7** como estudio de viabilidad en
+`PLAN_DESKTOP_WIN7.md` (**sin ejecutar**; recomendación: enfoque "sin WebView2" con
+navegador local, backend Python 3.8 + OR-Tools cp38 solo en 64 bits). Y antes: **migración de
 escritorio completa (Fases 0–6)**: backend SQLite + listeners, seed de arranque, sidecar
 PyInstaller, shell Tauri 2 con menú y respaldos, hotfix WebKitGTK/Mesa y CI verde (Linux
 .deb/AppImage + Windows .msi/NSIS). Queda priorizar el roadmap post-migración (§6).*
+
+**2026-10-21 — E23: bandeja de reserva + "modo libre" (edición manual sin solver)**:
+- **Idea:** editar el horario a mano (complementando al solver) moviendo clases fuera de la
+  grilla: una **bandeja lateral** con las clases sin colocar y las "apartadas"; al apartar una
+  sesión su celda queda libre y se puede reutilizar; al devolverla, vuelve a su sitio (o se
+  arrastra a otro hueco).
+- **Backend** (+20 tests → 154): se reaprovecha el estado **`BORRADOR`** de `horario_generado`
+  (ya previsto en el CHECK del esquema y hasta ahora sin uso) para las sesiones **apartadas**:
+  la celda queda libre porque todo el código filtra `estado='ACTIVO'`, y la fila conserva su
+  `bloque_id` para poder devolverla. **Cero cambios de esquema** (nada de alembic ni de
+  `database/actualizaciones/`). La clase "sin colocar" es **derivada** (lección activa con 0
+  filas ACTIVO). Endpoints nuevos: `GET /api/schedules/bandeja` (lectura),
+  `POST /api/schedules/reservar` (ACTIVO→BORRADOR) y `POST /api/schedules/reservas/liberar`
+  (BORRADOR→ACTIVO con validación). `asignar_horario_manual` acepta ahora filas BORRADOR como
+  `bloques_previos` (para **reubicar** una reserva sin dejar filas huérfanas) y admite
+  `forzar=true` ("modo libre"): los solapes y la ventana de turno pasan a **advertencias**; la
+  sede, la extensión de la sesión y la existencia de filas **nunca** se relajan (la sede la
+  rechazan igual los listeners de `core/db_integrity.py`).
+  `get_versiones_horario` excluye BORRADOR (una reserva no es una "versión" del horario).
+- **Frontend** (+29 tests → 498): `features/schedule/components/BandejaReserva.jsx` (panel con
+  "Sin ubicar" y "En reserva", buscador, botón "Devolver"), `features/schedule/hooks/useReservas.js`
+  (query + mutaciones) y `features/schedule/utils/bandeja.js` (payload de drag & drop en el MIME
+  propio `application/x-urd-horario`, porque `text/plain` lo usa la grilla con el id del evento).
+  Arrastre en las dos direcciones (bandeja→grilla y grilla→bandeja). En táctil (sin DnD) un clic
+  en la ficha abre el `EditEventModal` en modo "clase nueva" (mismo camino de colocación, sin
+  tocar el tap-to-move de la grilla). Toggle **"modo libre"** (ADMIN/JEFE-PNF, persistido en
+  `localStorage`) que envía `forzar: true` y muestra los conflictos como aviso.
+- **Alcance:** es una feature **web + escritorio** (el shell Tauri sirve el mismo frontend): no
+  requiere comandos Rust nuevos, todo es HTTP contra el sidecar. En Modo Demo la bandeja se
+  muestra deshabilitada (no hay servidor al que reservar).
+- **Verificación:** backend **154 tests OK** · frontend **498 tests OK** · `pnpm build` OK ·
+  **smoke E2E contra SQLite real** (login → colocar → apartar → la celda queda libre → devolver
+  → la clase vuelve a la grilla → modo estricto 409 vs modo libre con advertencias → permisos
+  LECTOR) todo OK.

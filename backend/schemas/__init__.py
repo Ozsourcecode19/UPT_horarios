@@ -15,6 +15,10 @@ from .bloque_horario import BloqueHorario, BloqueHorarioCreate, BloqueHorarioUpd
 from .leccion import Leccion, LeccionCreate, LeccionUpdate
 from .horario_generado import HorarioGenerado, HorarioGeneradoCreate, HorarioGeneradoUpdate, FullCalendarEvent, GenerationStatus, PreGenerationCheck, TurnoCobertura, HorarioVersion, RestoreRequest, RestoreResult
 from .horario_generado import AsignarManualRequest
+from .horario_generado import (
+    ClaseBandejaBase, ClaseSinColocar, SesionReservada, BandejaReserva,
+    ReservarRequest, LiberarReservaRequest, ResultadoReserva, ResultadoAsignacionManual,
+)
 from .pagination import PaginatedResponse
 
 __all__ = [
@@ -33,5 +37,8 @@ __all__ = [
     "BloqueHorario", "BloqueHorarioCreate", "BloqueHorarioUpdate", "BloqueGenerarRequest", "BloqueGenerarResult",
     "Leccion", "LeccionCreate", "LeccionUpdate",
     "HorarioGenerado", "HorarioGeneradoCreate", "HorarioGeneradoUpdate", "FullCalendarEvent", "GenerationStatus", "PreGenerationCheck", "TurnoCobertura", "HorarioVersion", "RestoreRequest", "RestoreResult",
+    "AsignarManualRequest",
+    "ClaseBandejaBase", "ClaseSinColocar", "SesionReservada", "BandejaReserva",
+    "ReservarRequest", "LiberarReservaRequest", "ResultadoReserva", "ResultadoAsignacionManual",
     "PaginatedResponse",
 ]

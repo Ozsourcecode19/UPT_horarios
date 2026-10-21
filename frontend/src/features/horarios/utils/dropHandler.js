@@ -45,10 +45,21 @@ export function resolverDestinoDrop({ bloques, aulaId, aulas, dia, iniMin, sesio
 
 /**
  * Construye el handler onDropEnCelda para GridSemanalBloques.
+ *
+ * Dos orígenes de arrastre:
+ *  - evento de la grilla → mueve la sesión (comportamiento actual);
+ *  - ficha de la bandeja (E23) → coloca una clase que no está en la grilla.
  */
-export function createDropHandler({ bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios }) {
-  return ({ horarioId, esSpan, sesionTotal = 1, dia, iniMin }) => {
-    const horario = listadoHorarios.find(h => String(h.id) === String(horarioId));
+export function createDropHandler({ bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios, onClaseBandeja }) {
+  return (payload) => {
+    // E23: ficha de la bandeja → la clase se coloca en la celda destino.
+    if (payload?.claseBandeja) {
+      onClaseBandeja?.(payload.claseBandeja, { dia: payload.dia, iniMin: payload.iniMin });
+      return;
+    }
+
+    const { horarioId, esSpan, sesionTotal = 1, dia, iniMin } = payload || {};
+    const horario = (listadoHorarios || []).find(h => String(h.id) === String(horarioId));
     if (!horario) return;
 
     const aulaId = horario.extendedProps?.aula_id
