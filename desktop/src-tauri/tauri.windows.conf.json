@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "targets": ["msi", "nsis"],
-    "resources": ["binarios/horarios-backend.exe"]
+    "targets": ["msi", "nsis"]
   }
 }

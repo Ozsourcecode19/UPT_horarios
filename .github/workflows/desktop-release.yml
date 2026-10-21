@@ -10,8 +10,9 @@
 #     22.04 no tiene. Piso de glibc 2.39; Canaima (glibc 2.42) lo cubre.
 #   * APPIMAGE_EXTRACT_AND_RUN=1: linuxdeploy es un AppImage y en CI no hay
 #     FUSE (igual que en Canaima).
-#   * Windows usa desktop/src-tauri/tauri.windows.conf.json (targets msi/nsis
-#     + recurso horarios-backend.exe), que el CLI mergea sobre tauri.conf.json.
+#   * Windows usa desktop/src-tauri/tauri.windows.conf.json (solo cambia
+#     targets a msi/nsis; el recurso `binarios/horarios-backend` es la carpeta
+#     onedir, que en Windows contiene horarios-backend.exe).
 #   * La imagen de Windows trae WiX (msi) y el CLI de Tauri descarga NSIS
 #     bajo demanda.
 #   * El checkout trae backend/.venv/ y python/ commiteados (legacy): los
