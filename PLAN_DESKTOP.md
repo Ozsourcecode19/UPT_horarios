@@ -400,10 +400,13 @@ del usuario):
 - Verificación en dev: sesión completa (login, 2 restores con reinicio de sidecar, CRUD de
   docentes) y cierre de la ventana → **cero** mensajes `free(): corrupted unsorted` en todo el
   log (antes salía en cada cierre), apagado limpio del sidecar y puerto 17891 libre.
-  `tauri dev` aún reporta código 1 al cerrar: pendiente de confirmar con el **binario release**
-  (sin CLI de por medio) si es peculiaridad del CLI al matar el BeforeDevCommand o residuo del
-  abort; si persistiera, aplicar el escalón `COMPOSITING_MODE`.
+- **Fix confirmado en release + build local instalable**: prueba de cierre del binario release
+  (`target/release/upt-horarios`, sin CLI de por medio) → `EXIT_APP=0` y stderr limpio; el
+  código 1 que reportaba `tauri dev` al cerrar es peculiaridad del CLI (apagado del
+  BeforeDevCommand), **no** de la app. Build con el fix incluido:
+  `APPIMAGE_EXTRACT_AND_RUN=1 pnpm build` → `.deb` **117.26 MiB** + `AppImage` **194.27 MiB**
+  en `desktop/src-tauri/target/release/bundle/`.
 
 *Última actualización: 2026-10-21 — Fase 5 completa (menú nativo, respaldos/restauración de la
 BD con reinicio, persistencia de ventana) + hotfix del abort al cerrar (workaround WebKitGTK/
-Mesa); queda Fase 6 (build/CI Windows) y la prueba de cierre con el binario release).*
+Mesa, verificado en release) + build local instalable; queda Fase 6 (CI Windows+Linux).*
