@@ -1,6 +1,6 @@
 # AGENTS.md — Sistema de Horarios UPT Bolívar
 
-Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `backend/` (FastAPI + Google OR-Tools CP-SAT), `frontend/` (React 18 + Vite + Tailwind), `database/` (PostgreSQL + triggers PL/pgSQL). Documentación: `SDD.md` (arquitectura, fuente de verdad), `frontend/fronted_guia.md` (roadmap + bugs conocidos del frontend), `PLAN_DE_DESARROLLO.md` (ejecuciones E0–E22; se apoya en este AGENTS.md), `PLAN_DESKTOP.md` (migración a escritorio Tauri+SQLite en la rama `feat/desktop-tauri`: fases F0–F6, decisiones y registro de iteraciones — leerlo antes de tocar nada relacionado con desktop).
+Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `backend/` (FastAPI + Google OR-Tools CP-SAT), `frontend/` (React 18 + Vite + Tailwind), `database/` (PostgreSQL + triggers PL/pgSQL). Documentación: `SDD.md` (arquitectura, fuente de verdad), `frontend/fronted_guia.md` (roadmap + bugs conocidos del frontend), `PLAN_DE_DESARROLLO.md` (ejecuciones E0–E22; se apoya en este AGENTS.md), `PLAN_DESKTOP.md` (migración a escritorio Tauri+SQLite en la rama `feat/desktop-tauri`: fases F0–F6, decisiones y registro de iteraciones — leerlo antes de tocar nada relacionado con desktop), `PLAN_DESKTOP_WIN7.md` (alternativa de escritorio para Windows 7: **en estudio, sin ejecutar** — viabilidad, enfoque recomendado y gate de decisión; leerlo antes de planear algo para Win7).
 
 ## Comandos
 
