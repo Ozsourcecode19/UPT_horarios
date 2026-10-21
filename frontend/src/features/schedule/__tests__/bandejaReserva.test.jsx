@@ -1,7 +1,13 @@
 // src/features/schedule/__tests__/bandejaReserva.test.jsx
 // E23 — Componente BandejaReserva: las clases fuera de la grilla.
+// Incluye un test guard de contraste en MODO OSCURO: sin linter en el repo,
+// la única red automática para detectar clases propias de la bandeja sin remap
+// en el shim de styles/index.css (E13) es leer el CSS y compararlo con lo
+// renderizado.
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import BandejaReserva from '../components/BandejaReserva';
 import { TIPO_DND_BANDEJA, TIPO_DND_EVENTO, serializarPayloadBandeja, textoChipBandeja } from '../utils/bandeja';
 
@@ -188,5 +194,84 @@ describe('BandejaReserva — arrastre de la grilla (dragover + drop)', () => {
       dataTransfer: { types: ['text/plain', TIPO_DND_EVENTO], getData: () => '42' },
     });
     expect(onReservarDesdeGrilla).not.toHaveBeenCalled();
+  });
+});
+
+// --- test guard: contraste en modo oscuro (shim E13) ---
+// La bandeja usa CSS propio (`.bandeja-*`), que el shim global NO cubre:
+// sin un remap `.dark` propio el panel aparece como una tarjeta blanca con
+// acentos pastel sobre el fondo oscuro (contraste ~1.3:1).
+describe('BandejaReserva — remap dark en index.css', () => {
+  const cssPath = resolve(process.cwd(), 'src/styles/index.css');
+
+  // Clases que llevan color: necesitan su regla `.dark .<clase>`.
+  const CON_COLOR = [
+    'bandeja-reserva',
+    'bandeja-reserva-sobre',
+    'bandeja-contador',
+    'bandeja-modo-libre',
+    'bandeja-buscador',
+    'bandeja-buscador-input',
+    'bandeja-vacio',
+    'bandeja-seccion-titulo',
+    'bandeja-chip',
+    'bandeja-chip-reservada',
+    'bandeja-chip-titulo',
+    'bandeja-chip-detalle',
+    'bandeja-chip-ubicacion',
+    'bandeja-chip-badge',
+    'bandeja-chip-accion',
+    'bandeja-chip-accion-inerte',
+  ];
+
+  // Clases estructurales (solo layout/cursor): no llevan color, no necesitan remap.
+  const SIN_COLOR = [
+    'bandeja-reserva-header',
+    'bandeja-modo-libre-input',
+    'bandeja-seccion',
+    'bandeja-lista',
+    'bandeja-chip-arrastrable',
+    'bandeja-chip-color',
+  ];
+
+  const clasesRenderizadas = (raiz) => {
+    const tokens = new Set();
+    raiz.querySelectorAll('*').forEach(el => {
+      (el.getAttribute('class') || '').split(/\s+/).forEach(c => {
+        if (c.startsWith('bandeja-')) tokens.add(c);
+      });
+    });
+    return [...tokens];
+  };
+
+  it('toda clase con color de la bandeja tiene su regla `.dark .<clase>`', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    // el selector debe terminar ahí: `.dark .bandeja-chip` NO cubre
+    // `.dark .bandeja-chip-titulo` (y al revés).
+    const sinRemap = CON_COLOR.filter(
+      c => !new RegExp(`\\.dark \\.${c}(?![\\w-])`).test(css)
+    );
+    expect(sinRemap).toEqual([]);
+  });
+
+  it('toda clase que renderiza la bandeja está declarada (con color o estructural)', () => {
+    const { container } = render(<BandejaReserva {...baseProps()} />);
+    const declaradas = new Set([...CON_COLOR, ...SIN_COLOR]);
+    const sinDeclarar = clasesRenderizadas(container).filter(c => !declaradas.has(c));
+    expect(sinDeclarar).toEqual([]);
+  });
+
+  it('el remap oscuro va dentro de `@media screen` (la impresión es siempre clara)', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    const iMedia = css.lastIndexOf('@media screen {');
+    expect(iMedia).toBeGreaterThan(-1);
+    // el bloque @media screen cierra con una llave sola en su línea
+    const fin = css.indexOf('\n}', iMedia);
+    expect(fin).toBeGreaterThan(iMedia);
+    const bloque = css.slice(iMedia, fin);
+
+    expect(bloque).toContain('.dark .bandeja-reserva {');
+    expect(bloque).toContain('.dark .bandeja-chip-reservada {');
+    expect(bloque).toContain('.dark .conflicto-badge-libre {');
   });
 });

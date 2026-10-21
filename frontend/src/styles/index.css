@@ -307,6 +307,9 @@ table.grilla-bloques {
 }
 
 /* ─── E23: bandeja de reserva (edición manual del horario) ────────────── */
+/* Ojo: este bloque es CSS propio (no utilidades Tailwind), así que el shim
+   global de modo oscuro NO lo alcanza. Su remap `.dark` está al final del
+   archivo (sección "3ª pasada dirigida: bandeja de reserva"). */
 
 .horarios-grilla-bandeja {
   display: flex;
@@ -1249,3 +1252,145 @@ table.grilla-bloques {
 
 /* --- Textos --- */
 .dark .text-blue-900 { color: #bfdbfe; }
+
+/* ============================================================
+   MODO OSCURO (E13) — 3ª pasada dirigida: bandeja de reserva
+   (E23) y estados de arrastre de la grilla.
+
+   El bloque `.bandeja-*` es CSS propio (no utilidades Tailwind),
+   así que el shim global no lo alcanza: sin estas reglas el panel
+   aparecía como una tarjeta blanca sobre el fondo slate-950, con
+   los acentos pastel (índigo/ámbar) sin contraste.
+
+   Ratios WCAG verificados (texto ≥ 4.5:1 · UI ≥ 3:1):
+     título chip 13.3:1 · detalle 5.7:1 · ubicación 7.7:1
+     contador/badge 7.7:1 · botón Devolver 8.2:1 · inerte 4.8:1
+     modo libre 11.3:1 · sección/vacío 7.3:1 · buscador 11.9:1
+     borde del chip 3.1:1 (panel) · borde de foco 4.9:1
+     contorno de celda 7:1 · badge de conflicto 9.4:1
+
+   Todo va dentro de `@media screen`: la impresión (E12) SIEMPRE
+   sale clara y no debe heredar estos tintes.
+   ============================================================ */
+@media screen {
+  /* --- Panel --- */
+  .dark .bandeja-reserva {
+    background-color: #0b1220;
+    border-color: #334155;
+  }
+
+  .dark .bandeja-reserva-sobre {
+    border-color: #818cf8;
+    background-color: rgb(99 102 241 / .14);
+    box-shadow: 0 0 0 2px rgb(129 140 248 / .35);
+  }
+
+  /* --- Cabecera y contador --- */
+  .dark .bandeja-contador {
+    background-color: #312e81;
+    color: #c7d2fe;
+  }
+
+  /* --- Modo libre --- */
+  .dark .bandeja-modo-libre {
+    background-color: rgb(245 158 11 / .10);
+    border-color: #f59e0b;
+    color: #fcd34d;
+  }
+
+  /* --- Buscador --- */
+  .dark .bandeja-buscador {
+    background-color: #1e293b;
+    border-color: #52637d;
+  }
+
+  .dark .bandeja-buscador-input {
+    color: #e2e8f0;
+  }
+
+  .dark .bandeja-buscador-input::placeholder {
+    color: #94a3b8;
+  }
+
+  /* --- Textos auxiliares --- */
+  .dark .bandeja-vacio {
+    color: #94a3b8;
+  }
+
+  .dark .bandeja-seccion-titulo {
+    color: #94a3b8;
+  }
+
+  /* --- Chips --- */
+  .dark .bandeja-chip {
+    background-color: #1e293b;
+    border-color: #52637d;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .35);
+  }
+
+  .dark .bandeja-chip:hover {
+    border-color: #818cf8;
+    box-shadow: 0 4px 12px rgb(0 0 0 / .45);
+  }
+
+  .dark .bandeja-chip-reservada {
+    background-color: rgb(245 158 11 / .08);
+    border-color: #f59e0b;
+  }
+
+  .dark .bandeja-chip-titulo {
+    color: #f1f5f9;
+  }
+
+  .dark .bandeja-chip-detalle {
+    color: #94a3b8;
+  }
+
+  .dark .bandeja-chip-ubicacion {
+    color: #fbbf24;
+  }
+
+  .dark .bandeja-chip-badge {
+    background-color: #312e81;
+    color: #c7d2fe;
+  }
+
+  .dark .bandeja-chip-accion {
+    background-color: rgb(99 102 241 / .16);
+    /* borde con box-shadow: no altera el tamaño del botón */
+    box-shadow: inset 0 0 0 1px rgb(129 140 248 / .45);
+    color: #c7d2fe;
+  }
+
+  .dark .bandeja-chip-accion:hover:not(:disabled) {
+    background-color: rgb(99 102 241 / .28);
+  }
+
+  .dark .bandeja-chip-accion-inerte {
+    background-color: #293548;
+    color: #94a3b8;
+  }
+
+  /* --- Grilla: arrastre (tap-to-move / DnD) y aviso del modo libre --- */
+  .dark .grilla-bloques td.celda-origen {
+    background-color: rgb(59 130 246 / .22) !important;
+    outline: 2px solid #60a5fa;
+    outline-offset: -2px;
+  }
+
+  .dark .grilla-bloques td.celda-destino {
+    background-color: rgb(59 130 246 / .10);
+    outline: 1px dashed #60a5fa;
+    outline-offset: -3px;
+  }
+
+  .dark .grilla-bloques td.celda-conflicto-libre {
+    background-color: rgb(245 158 11 / .16) !important;
+    outline-color: #fbbf24;
+  }
+
+  .dark .conflicto-badge-libre {
+    background-color: rgb(245 158 11 / .16) !important;
+    color: #fcd34d !important;
+  }
+}
