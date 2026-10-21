@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "UPT Horarios",
+  "version": "0.1.0",
+  "identifier": "ve.edu.uptbolivar.horarios",
+  "build": {
+    "beforeDevCommand": "pnpm -C ../frontend dev:desktop",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "pnpm -C ../frontend build:desktop",
+    "frontendDist": "../../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "UPT Horarios — Sistema de Gestión de Horarios",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:17891; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "resources": ["binarios/horarios-backend"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "category": "Education",
+    "publisher": "Universidad Politécnica Territorial Bolívar",
+    "shortDescription": "Sistema de gestión y generación de horarios académicos (PNF)",
+    "longDescription": "Aplicación de escritorio 100% local del Sistema de Horarios UPT Bolívar: gestión académica y generación de horarios con Google OR-Tools sobre SQLite, sin servidor ni red obligatoria."
+  }
+}

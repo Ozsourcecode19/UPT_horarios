@@ -130,7 +130,7 @@ doble seguridad). Módulo nuevo dedicado (p. ej. `backend/core/db_integrity.py` 
 - [x] Fase 1 — Triggers → listeners Python (+ tests) ✅ (2026-10-20)
 - [x] Fase 2 — Esquema + seed SQLite ✅ (2026-10-20)
 - [x] Fase 3 — PyInstaller ✅ (2026-10-20)
-- [ ] Fase 4 — Shell Tauri
+- [x] Fase 4 — Shell Tauri ✅ (2026-10-20)
 - [ ] Fase 5 — UX escritorio
 - [ ] Fase 6 — Build/CI
 - [ ] Roadmap post-migración (pendiente de priorizar)
@@ -231,5 +231,68 @@ del usuario):
 - Docs: AGENTS.md (comando de build + gotcha del shared), SDD.md (árbol §5.1), este archivo.
 - Verificación: **backend 121 tests OK** · `import main`/`run_server` OK · smoke del binario OK.
 
-*Última actualización: 2026-10-20 — Fase 3 completa (binario de escritorio funcionando); sigue
-Fase 4 (Shell Tauri) — el sidecar backend ya está listo para `externalBin`.*
+**2026-10-20 — Fase 4 completa** (rama `feat/desktop-tauri`):
+- **Backend** (+4 tests → 125): `GET /api/database/ping` sin auth (`{"estado": "ok"}`) en
+  `routers/database.py` — readiness real del sidecar: el socket de uvicorn escucha ANTES de que el
+  lifespan termine esquema+seed, así que un TCP check no basta. CORS configurable:
+  `_origenes_cors()` en `main.py` lee `CORS_ORIGINS` (coma-separada), default
+  `http://localhost:3000` (la web no cambia); Tauri inyecta `tauri://localhost` (Linux/macOS) y
+  `http://tauri.localhost` (Windows). Tests en `tests/test_ping_y_cors.py`.
+- **Frontend**: `vite.config.js` gatea la meta CSP vía `configResolved` (con variable de cierre;
+  `ctx.serverConfig` NO existe en fase de build, solo en dev — primer intento falló por eso). En
+  `vite build --mode desktop` no se inyecta: la CSP del desktop la gestiona `tauri.conf.json`
+  (necesita `connect-src` al sidecar y a los orígenes IPC). Scripts `dev:desktop`/`build:desktop`;
+  `frontend/.env.desktop` con `VITE_ENTORNO=desktop` y `VITE_API_BASE_URL=http://127.0.0.1:17891/api`
+  (el desktop no usa el proxy de vite). Verificado: build web con meta CSP, build desktop sin ella.
+- **`desktop/`** (Tauri 2.12, Rust 1.99.1 vía rustup): `package.json` (scripts `dev`/`build` corren
+  primero `scripts/preparar-sidecar.mjs`, que copia `backend/dist/horarios-backend` →
+  `src-tauri/binarios/` y **avisa si el binario es más viejo que el código del backend**);
+  `src-tauri/` completo: `Cargo.toml` (tauri 2 + serde, sin dependencias HTTP: el readiness usa
+  HTTP/1.0 crudo con `TcpStream`), `capabilities/default.json` (`core:default`), iconos generados
+  desde el logo (`pnpm iconos`), `main.rs` (comentado en español):
+  - Spawn del sidecar con `PORT=17891`, `DATABASE_URL=sqlite://<app-data>/horarios.db` (Rust crea
+    el dir), `CORS_ORIGINS` con los 3 orígenes; logs a consola (dev) o `<app-log>/sidecar.log` (prod).
+  - `visible: false` + `show()` solo tras responder `/api/database/ping` (hasta 30 s); kill del
+    hijo en `RunEvent::ExitRequested` (sin huérfanos con la BD abierta).
+  - La ventana quedó funcional de entrada: el usuario creó periodo, sede, aulas, docentes, bloques
+    estándar y editó configuraciones contra la BD del app-data (log de requests del sidecar).
+- **Bugs encontrados y resueltos**:
+  1. *Binario stale*: el bundle de F3 no tenía el nuevo `/api/ping` → 404 en el readiness → la app
+     moría sin ventana a los 30 s. Fix: reconstruir PyInstaller + guard de obsolescencia en el
+     script de staging (era exactamente este escenario).
+  2. *Ruta del readiness*: `main.rs` sondeaba `/api/ping`; el endpoint es `/api/database/ping`.
+  3. *AppImage*: linuxdeploy aborta con la cadena binaria de psycopg2
+     (libpq→gssapi_krb5→krb5→k5crypto, nombres hasheados que no resuelve:
+     "Could not find dependency: libk5crypto-*.so"). Fix en `horarios_backend.spec`:
+     `excludedimports=["psycopg2"]` **no basta** (el hook de SQLAlchemy lo re-agrega como
+     hiddenimport) → además filtro de `a.binaries` **y** `a.datas` (PyInstaller 6 reparte la cadena
+     entre ambas listas; filtrar solo una la deja intacta) **resolviendo symlinks**: PyInstaller
+     enlaza `libcrypto-*.so`/`libssl-*.so` hacia `psycopg2_binary.libs/` y al excluir psycopg2 el
+     destino desaparece (symlink colgado ⇒ tauri-build aborta con "resource path ... doesn't
+     exist" — solo se ve revisando el tipo de archivo, `ls -la`). Al final, la cadena reaparecía
+     en el AppDir por **cuatro capas de copia incremental** que nadie limpiaba (todas cubiertas
+     ahora en `preparar-sidecar.mjs`): `src-tauri/binarios/` (staging del sidecar), la lista de
+     recursos **embebida al compilar** `upt-horarios` (tauri-codegen la congela y no trackea
+     `binarios/` ⇒ se fuerza recompile con `utimes` sobre `main.rs`), `target/<perfil>/binarios/`
+     (copia interna de tauri-build) y `bundle/appimage_deb/data/` + el `AppDir` (el .deb
+     intermedio del que nutre el AppImage). El sidecar es SQLite-only: psycopg2
+     nunca corre, y `crud/horarios_generados.py` ahora importa `psycopg2.errors` con
+     try/except (stubs que nunca casan en `isinstance`; la web, que sí tiene psycopg2, no cambia).
+  4. *Email del admin*: el seed de F2 creaba `admin@localhost`, que no pasa el validador de
+     `schemas/usuario.py` (exige TLD con punto) → `GET /api/usuarios/` devolvía **500**
+     (ResponseValidationError) — destapado por el testeo manual del usuario en la app. Fix:
+     `admin@uptbolivar.edu.ve` + reparación en sitio de BDs antiguas en `_seed_admin` (conserva el
+     hash) + tests (+1 → 126).
+- **Artefactos finales** en `desktop/src-tauri/target/release/bundle/`: `.deb` **118 MB** y
+  `AppImage` **195 MB** (ambos con el sidecar completo en `usr/lib/UPT Horarios/binarios/`).
+  **E2E del AppImage empaquetado**: arranca → readiness en 6 s → login `admin/admin123` con
+  `Origin: tauri://localhost` → `sidecar.log` en el app-log (`~/.local/share/ve.edu.uptbolivar.horarios/logs/`).
+  Nota: en Canaima linuxdeploy requiere `APPIMAGE_EXTRACT_AND_RUN=1` (los scripts `dev`/`build`
+  de `desktop/` no lo fijan; documentarlo para CI en Fase 6).
+- Docs: AGENTS.md (comandos de escritorio, 126 tests, §9.6), SDD.md (§5.3 ping, §8 CORS, §9.4
+  `CORS_ORIGINS`/`PORT`, §9.5 escritorio, §9.6 migraciones), este archivo.
+- Verificación: **backend 126 tests OK** · **frontend 450 tests OK** · smoke del binario
+  (login/health/configs) OK · dev end-to-end OK (ventana + login + CRUD real).
+
+*Última actualización: 2026-10-20 — Fase 4 completa (app de escritorio Tauri funcionando, `.deb` +
+AppImage); quedan Fase 5 (UX escritorio) y Fase 6 (build/CI Windows).*

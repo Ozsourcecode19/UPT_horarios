@@ -1,0 +1,15 @@
+{
+  "name": "upt-horarios-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shell de escritorio (Tauri) del Sistema de Horarios UPT Bolívar",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/preparar-sidecar.mjs && tauri dev",
+    "build": "node scripts/preparar-sidecar.mjs && tauri build",
+    "iconos": "tauri icon ../frontend/public/img/Logo-circular-uptbolivar.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

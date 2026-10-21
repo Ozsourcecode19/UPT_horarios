@@ -8,6 +8,19 @@ from schemas.database import DatabaseHealth, TableStats
 
 router = APIRouter(prefix="/database", tags=["Base de Datos"])
 
+
+@router.get("/ping")
+def ping():
+    """
+    Sonda de disponibilidad SIN autenticación (Fase 4 desktop — PLAN_DESKTOP.md).
+
+    El shell Tauri espera a que responda antes de mostrar la ventana: el
+    socket de uvicorn escucha antes de que el lifespan termine (esquema +
+    seed), así que el readiness real requiere un endpoint HTTP. En web sirve
+    como health-check básico para monitoreo/reverse-proxy.
+    """
+    return {"estado": "ok"}
+
 TABLES_TO_COUNT = [
     "usuarios",
     "sedes",

@@ -4,18 +4,22 @@
 `config/startup.py` crea el esquema desde los modelos y siembra admin y
 configuración solo en SQLite; en PostgreSQL es no-op (ahí gestiona `database/`).
 """
+import re
+
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 import models
 from config.database import create_db_engine
 from config.startup import (
+    EMAIL_ADMIN_POR_DEFECTO,
     PASSWORD_ADMIN_POR_DEFECTO,
     USUARIO_ADMIN_POR_DEFECTO,
     _CONFIG_SEED,
     inicializar_base,
 )
 from core.security import verify_password
+from schemas.usuario import EMAIL_PATTERN, UsuarioBase
 
 
 def _sesion(engine):
@@ -43,6 +47,13 @@ def test_primer_arranque_crea_esquema_y_seed(tmp_path):
         assert admin.rol == "ADMIN"
         assert admin.activo is True
         assert verify_password(PASSWORD_ADMIN_POR_DEFECTO, admin.password_hash)
+        # El email debe pasar el validador del schema: `admin@localhost` (seed
+        # antiguo) devolvía 500 en GET /api/usuarios/ (bug F4 destapado al
+        # probar la app de escritorio).
+        assert admin.email == EMAIL_ADMIN_POR_DEFECTO
+        assert re.match(EMAIL_PATTERN, admin.email)
+        UsuarioBase(username=admin.username, email=admin.email,
+                    rol=admin.rol, activo=admin.activo)  # sin ValidationError
 
         config = {c.clave: c.valor for c in db.query(models.Configuracion)}
         assert len(config) == len(_CONFIG_SEED)
@@ -103,3 +114,35 @@ def test_postgres_es_no_op_sin_conectar():
         assert inicializar_base(engine) is False
     finally:
         engine.dispose()
+
+
+def test_repara_email_invalido_de_bd_antigua(tmp_path):
+    # BDs de prueba creadas antes del fix F4 tienen admin@localhost (rompía
+    # GET /api/usuarios/ con 500): el arranque lo repara en sitio, conservando
+    # la contraseña y sin duplicar usuarios.
+    engine = create_db_engine(f"sqlite:///{tmp_path / 'app.db'}")
+    inicializar_base(engine)
+
+    db = _sesion(engine)
+    try:
+        admin = (
+            db.query(models.Usuario)
+            .filter(models.Usuario.username == USUARIO_ADMIN_POR_DEFECTO)
+            .one()
+        )
+        admin.email = "admin@localhost"
+        db.commit()
+        hash_original = admin.password_hash
+
+        inicializar_base(engine)
+        db.expire_all()
+        admin = (
+            db.query(models.Usuario)
+            .filter(models.Usuario.username == USUARIO_ADMIN_POR_DEFECTO)
+            .one()
+        )
+        assert admin.email == EMAIL_ADMIN_POR_DEFECTO
+        assert admin.password_hash == hash_original
+        assert db.query(models.Usuario).count() == 1
+    finally:
+        db.close()

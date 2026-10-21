@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Capacidad por defecto de la ventana principal (solo UI; la app no expone comandos IPC propios)",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -18,6 +18,7 @@ Idempotente: se puede ejecutar en cada arranque (lo hace el lifespan de
 ``main.py``).
 """
 import logging
+import re
 
 from sqlalchemy.orm import sessionmaker
 
@@ -25,6 +26,7 @@ import models
 from config.database import Base, engine as engine_por_defecto
 from core.security import get_password_hash
 from crud.horarios_generados import VENTANAS_TURNO_DEFAULT
+from schemas.usuario import EMAIL_PATTERN
 from services.validation.schedule_validation import TURNOS_LABELS
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,10 @@ logger = logging.getLogger(__name__)
 # el primer arranque; debe cambiarse desde la UI.
 PASSWORD_ADMIN_POR_DEFECTO = "admin123"
 USUARIO_ADMIN_POR_DEFECTO = "admin"
+# Email inicial: debe pasar EMAIL_PATTERN de schemas/usuario.py (exige un TLD
+# con punto — "admin@localhost" hacía fallar GET /api/usuarios/ con un 500 de
+# serialización; bug de esta línea destapado al probar la app de escritorio).
+EMAIL_ADMIN_POR_DEFECTO = "admin@uptbolivar.edu.ve"
 
 # Claves fijas sembradas: (clave, valor, tipo_dato, descripción).
 _CONFIG_SEED = [
@@ -70,12 +76,27 @@ def _seed_configuracion(db) -> int:
 
 
 def _seed_admin(db) -> bool:
-    """Crea el usuario admin solo si la tabla está vacía (primer arranque)."""
+    """Crea el usuario admin solo si la tabla está vacía (primer arranque).
+
+    El email debe pasar el validador de `schemas/usuario.py` (exige un punto
+    en el dominio): `admin@localhost` rompía `GET /api/usuarios/` con un 500
+    de serialización (ResponseValidationError) — bug destapado probando la
+    app de escritorio (Fase 4). También repara en sitio BDs de prueba
+    antiguas que quedaron con el email inválido.
+    """
+    admin = db.query(models.Usuario).filter(
+        models.Usuario.username == USUARIO_ADMIN_POR_DEFECTO
+    ).first()
+    if admin is not None:
+        if not re.match(EMAIL_PATTERN, admin.email or ""):
+            admin.email = EMAIL_ADMIN_POR_DEFECTO
+            return False
+        return False
     if db.query(models.Usuario).count() > 0:
         return False
     db.add(models.Usuario(
         username=USUARIO_ADMIN_POR_DEFECTO,
-        email="admin@localhost",
+        email=EMAIL_ADMIN_POR_DEFECTO,
         password_hash=get_password_hash(PASSWORD_ADMIN_POR_DEFECTO),
         rol="ADMIN",
         activo=True,

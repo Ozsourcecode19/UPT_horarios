@@ -10,6 +10,7 @@
 #     logs para diagnóstico.
 #   * uvloop se excluye solo en Windows (allí uvicorn usa asyncio; uvloop es
 #     POSIX). En Linux se empaqueta si está instalado (rendimiento).
+import os
 import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
@@ -52,10 +53,53 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=excludes,
+    # El sidecar es SQLite-only (el shell Tauri fija DATABASE_URL=sqlite://):
+    # psycopg2 nunca debe ejecutarse, pero el hook de SQLAlchemy lo añade como
+    # hiddenimport y trae su cadena binaria libpq→gssapi_krb5→krb5→k5crypto
+    # (nombres hasheados que linuxdeploy no sabe resolver → el bundling de
+    # AppImage aborta en "Could not find dependency: libk5crypto-*.so", Fase
+    # 4). excludedimports solo evita imports implícitos (el hiddenimport del
+    # hook lo anula), así que además se filtran los binarios más abajo. En el
+    # bundle, el import de psycopg2.errors de crud/horarios_generados.py está
+    # protegido (ImportError → stubs). En web psycopg2 vive en requirements.txt
+    # y no usa PyInstaller.
+    excludedimports=["psycopg2"],
     noarchive=False,
 )
 
 pyz = PYZ(a.pure)
+
+# Quitar del bundle la cadena binaria de psycopg2 (Fase 4 — PLAN_DESKTOP.md):
+# libpq y las librerías hasheadas de gssapi/krb5 que PyInstaller empaqueta con
+# él. linuxdeploy (AppImage) resuelve DT_NEEDED de TODOS los .so del AppDir y
+# no puede encontrar los nombres hasheados entre sí; el .so de psycopg2 mismo
+# tampoco debe quedar (su DT_NEEDED apunta a libpq excluido). El sidecar es
+# SQLite-only: la BD de escritorio nunca carga esta cadena, y el import de
+# psycopg2 en el código está protegido (ver excludedimports arriba).
+_NOMBRES_EXCLUIDOS = ("krb5", "k5crypto", "com_err", "gssapi", "libpq", "psycopg2")
+
+
+def _excluir_entrada(entrada):
+    """True si la entrada (destino, origen, ...) pertenece a la cadena de
+    psycopg2. La cadena aparece en AMBAS listas (PyInstaller 6 la reparte
+    entre binaries y datas): filtrar solo una de las dos la deja intacta.
+    Ojo con los **symlinks**: PyInstaller enlaza `libcrypto-*.so` y
+    `libssl-*.so` hacia `psycopg2_binary.libs/`; al excluir psycopg2 ese
+    directorio desaparece y el symlink queda colgado — tauri-build aborta el
+    bundle con "resource path ... doesn't exist" (Fase 4). Se resuelve el
+    enlace y se compara también el destino."""
+    nombre = entrada[0].lower()
+    if any(n in nombre for n in _NOMBRES_EXCLUIDOS):
+        return True
+    try:
+        resuelto = os.path.realpath(entrada[1]).lower()
+    except OSError:
+        return False
+    return resuelto != nombre and any(n in resuelto for n in _NOMBRES_EXCLUIDOS)
+
+
+a.binaries = [b for b in a.binaries if not _excluir_entrada(b)]
+a.datas = [d for d in a.datas if not _excluir_entrada(d)]
 
 exe = EXE(
     pyz,

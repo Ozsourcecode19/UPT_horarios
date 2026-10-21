@@ -33,10 +33,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="API de Horarios UPT", version="2.1.1", lifespan=lifespan)
 
+def _origenes_cors() -> list:
+    """Orígenes permitidos por CORS.
+
+    Por defecto, solo el frontend de desarrollo (comportamiento histórico de
+    la web). La app de escritorio (Tauri) inyecta además los orígenes del
+    WebView del SO — `tauri://localhost` (Linux/macOS) y
+    `http://tauri.localhost` (Windows) — vía la variable `CORS_ORIGINS`
+    (coma-separada; Fase 4 desktop — PLAN_DESKTOP.md).
+    """
+    crudo = os.environ.get("CORS_ORIGINS", "http://localhost:3000")
+    return [origen.strip() for origen in crudo.split(",") if origen.strip()]
+
+
 # Configurar CORS para permitir solicitudes desde el frontend React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Ajustar según dominio del frontend
+    allow_origins=_origenes_cors(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

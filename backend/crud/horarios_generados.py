@@ -7,7 +7,18 @@ from typing import List, Optional
 from datetime import date, time, timedelta, datetime
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DBAPIError 
 from fastapi import HTTPException, status 
-from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
+try:
+    from psycopg2.errors import RaiseException, ForeignKeyViolation, UniqueViolation
+except ImportError:
+    # Bundle de escritorio (PLAN_DESKTOP.md F4): el sidecar PyInstaller excluye
+    # psycopg2 (la app es SQLite-only). Estos tipos solo existen con
+    # PostgreSQL; en SQLite los `isinstance(...)` de más abajo (sobre e.orig,
+    # una excepción de sqlite3) nunca casan con los stubs. En web, psycopg2
+    # está en requirements.txt y el comportamiento no cambia.
+    class _ErrorPostgresQueNuncaOcurre(Exception):
+        pass
+
+    RaiseException = ForeignKeyViolation = UniqueViolation = _ErrorPostgresQueNuncaOcurre
 import logging
 
 # ─── Cobertura de bloques por turno (división) ──────────────────────────────

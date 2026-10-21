@@ -24,3 +24,4 @@ database/bakup/*.sql
 # (dist/ ya está cubierto arriba; cubre backend/dist y desktop/dist.)
 backend/build/
 desktop/src-tauri/target/
+desktop/src-tauri/binarios/

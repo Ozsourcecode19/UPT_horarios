@@ -410,6 +410,7 @@ sequenceDiagram
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | POST | `/token` | Público | Autenticación, devuelve JWT. |
+| GET | `/database/ping` | Público | Sonda de disponibilidad sin auth (`{"estado": "ok"}`): readiness real del sidecar de escritorio (el socket de uvicorn escucha antes de que el lifespan termine esquema+seed) y health-check para monitoreo/reverse-proxy. |
 | CRUD | `/usuarios/` | Público (endpoints sin dependencia de rol) | Gestión de usuarios. |
 | CRUD | `/sedes/`, `/carreras/`, `/trayectos-academicos/`, `/periodos-academicos/` | Escritura: ADMIN (algunos ADMIN/JEFE-PNF); Lectura: autenticados | Datos maestros académicos. |
 | DELETE | `/periodos-academicos/{id}` | ADMIN | **Barrera 409 `PERIODO_EN_USO`**: solo elimina periodos sin carga académica (**lecciones** o **horarios generados**); con carga responde 409 con desglose `referencias` (el esquema los borraría `ON DELETE CASCADE` de forma irreversible). Las **secciones (grupos) vacías y los vínculos `carrera_periodo` NO bloquean**: son entidades propias del periodo y se eliminan en cascada con él (`carrera_periodo` lo siembra el esquema y no se gestiona desde la UI; contarlo volvería indeletables a los periodos sembrados). El listado (`GET /`) adjunta `registros_asociados` (= lecciones + horarios) y el frontend habilita el botón Eliminar solo cuando es 0 (y el rol es ADMIN). |
@@ -635,7 +636,7 @@ sequenceDiagram
 | Almacenamiento de contraseñas | `bcrypt` vía `passlib` (`pwd_context`). |
 | Autorización | Dependencia `require_role([...])` en cada endpoint de escritura; 403 si el rol no corresponde. |
 | Sesión en cliente | Token en `localStorage`; interceptor Axios inyecta `Authorization: Bearer`. |
-| CORS | `allow_origins=["http://localhost:3000"]` (frontend). |
+| CORS | `allow_origins` desde la variable `CORS_ORIGINS` (coma-separada), default `http://localhost:3000` (frontend web). La app de escritorio (Tauri) inyecta además `tauri://localhost` (Linux/macOS) y `http://tauri.localhost` (Windows) — orígenes del WebView. |
 | Validación de entrada | Schemas Pydantic v2 (`model_dump()`), `zod` + `react-hook-form` en el frontend. |
 | Protección de datos | Parámetros del solver y claves del sistema centralizados en tabla `configuracion`. |
 
@@ -697,8 +698,19 @@ npm run dev    # http://localhost:3000
 | `DATABASE_URL` | `postgresql://postgres:postgresUPT@localhost:5432/horarios_upt` | Conexión a BD. |
 | `SECRET_KEY` | (ninguna) | Firma de tokens JWT. **Obligatoria en producción** (`ENTORNO=production` sin ella ⇒ `RuntimeError` al arrancar). Generar con `openssl rand -hex 32`. |
 | `ENTORNO` | `development` | `production` activa validaciones estrictas de arranque. |
+| `CORS_ORIGINS` | `http://localhost:3000` | Orígenes permitidos por CORS (coma-separada). La app de escritorio añade `tauri://localhost,http://tauri.localhost`. |
+| `PORT` | `8000` | Puerto de uvicorn en el binario de escritorio (`run_server.py`); Tauri fija `17891`. |
 
-### 9.5 Migraciones
+### 9.5 App de escritorio (Tauri)
+
+Shell de escritorio 100% local (rama `feat/desktop-tauri`): **Tauri 2** envuelve el frontend compilado
+en modo desktop (`vite build --mode desktop`, sin meta CSP; `VITE_API_BASE_URL` apunta a
+`http://127.0.0.1:17891/api`) y hace spawn del backend PyInstaller (bundle onedir empaquetado como
+recurso) con `DATABASE_URL=sqlite://<app-data>/horarios.db`. El shell espera `GET /api/database/ping`
+antes de mostrar la ventana y mata el sidecar al cerrar. Build: `cd desktop && pnpm build` →
+`.deb`/AppImage. **Documentación completa: `PLAN_DESKTOP.md`** (fuente de verdad de esta iniciativa).
+
+### 9.6 Migraciones
 
 - **Alembic:** `backend/alembic/` con migración inicial (`d1d643e25c8e_initial_migration`).
 - **Scripts SQL versionados:** `database/schema_horarios_v2.1.1.sql`, `database/actualizaciones/upgrade_to_v2.1.1.1.sql`, backups en `database/bakup/`, utilidades en `database/operaciones/`.
