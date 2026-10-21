@@ -183,6 +183,27 @@ const Horarios = () => {
     }).filter(s => s.eventos.length > 0);
   }, [exceedsSinglePage, itemSeleccionado, filterType, filterValue, listadoHorarios, bloques, configuraciones, docentes, grupos]);
 
+  // E23 — Bandeja de reserva y "modo libre" (edición manual sin solver).
+  // Va ANTES de useDragDropValidation porque la colocación de una ficha debe
+  // refrescar también la bandeja (si no, el chip queda obsoleto y la clase se
+  // ve a la vez en la grilla y en la bandeja).
+  const {
+    sinColocar, reservadas, reservar, liberar, isLoading: isLoadingBandeja,
+    invalidarBandeja,
+  } = useReservas({
+    periodoId: selectedPeriodoId,
+    demoMode,
+    onInvalidate: invalidateHorarios,
+    showToast,
+  });
+
+  // Invalidación combinada: la grilla Y la bandeja (colocar/mover/eliminar
+  // una clase cambia ambas vistas).
+  const refrescarHorarioYBandeja = useCallback(() => {
+    invalidateHorarios();
+    invalidarBandeja();
+  }, [invalidateHorarios, invalidarBandeja]);
+
   const {
     selectedEvent, isEditModalOpen, setIsEditModalOpen,
     editAulaId, setEditAulaId, editBloqueId, setEditBloqueId,
@@ -194,7 +215,7 @@ const Horarios = () => {
     aulas, bloques, configuraciones, grupos,
     selectedPeriodo, selectedPeriodoId, puedeEscribir,
     showToast,
-    onInvalidate: invalidateHorarios,
+    onInvalidate: refrescarHorarioYBandeja,
   });
 
   const [editAbarca, setEditAbarca] = useState(1);
@@ -211,15 +232,6 @@ const Horarios = () => {
   useEffect(() => {
     localStorage.setItem('horarios_modo_libre', modoLibre ? '1' : '0');
   }, [modoLibre]);
-
-  const {
-    sinColocar, reservadas, reservar, liberar, isLoading: isLoadingBandeja,
-  } = useReservas({
-    periodoId: selectedPeriodoId,
-    demoMode,
-    onInvalidate: invalidateHorarios,
-    showToast,
-  });
 
   // Evento sintético de la clase que se está colocando desde la bandeja.
   const eventoBandeja = useMemo(() => {

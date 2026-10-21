@@ -7,7 +7,7 @@
 // Reservar = poner la sesión en BORRADOR (la celda queda libre); liberar =
 // devolverla a ACTIVO validando que la celda siga libre.
 
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ScheduleService from '../../../api/schedule';
 import { MSG_BACKEND_DESACTUALIZADO_BANDEJA } from '../../../constants/messages';
@@ -17,15 +17,25 @@ const BANDEJA_VACIA = { sin_colocar: [], reservadas: [] };
 /**
  * ¿El error indica que el backend no conoce la bandeja de reserva?
  *
- * Un 404/405 en estos endpoints significa backend desactualizado (típico: el
- * sidecar del escritorio con un build anterior al código). En ese caso el
- * `detail` que devuelve FastAPI ("Not Found" / "Method Not Allowed") no le
- * dice nada útil al usuario.
+ * Un 405 (el path cae sobre otro método) o un 404 "Not Found" (la ruta no
+ * existe) significan backend desactualizado (típico: el sidecar del
+ * escritorio con un build anterior al código).
+ *
+ * ⚠️ Ojo: la bandeja tiene 404 de NEGOCIO (NO_HAY_RESERVA,
+ * NO_HAY_CLASE_ACTIVA) que también son 404, pero su mensaje es correcto y no
+ * significan "backend viejo": se distinguen porque traen `detail.error_code`
+ * o un mensaje propio, mientras que FastAPI responde `{"detail":"Not Found"}`
+ * cuando la ruta no existe.
  */
 const esBackendDesactualizado = (err) => {
   const status = err?.response?.status;
-  return status === 404 || status === 405;
+  if (status === 405) return true;
+  if (status === 404) return err?.response?.data?.detail === 'Not Found';
+  return false;
 };
+
+/** Código de error de negocio del backend (NO_HAY_RESERVA, etc.), si lo hay. */
+const codigoError = (err) => err?.response?.data?.detail?.error_code ?? null;
 
 /**
  * Hook de la bandeja de reserva.
@@ -69,8 +79,13 @@ export const useReservas = ({
     retry: 0,
   });
 
-  const _invalidar = () => {
+  // Invalidar SOLO la bandeja (la grilla se refresca aparte).
+  const invalidarBandeja = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['bandeja-reserva', periodoId] });
+  }, [queryClient, periodoId]);
+
+  const _invalidar = () => {
+    invalidarBandeja();
     queryClient.invalidateQueries({ queryKey: ['horarios', periodoId] });
     onInvalidate();
   };
@@ -88,6 +103,13 @@ export const useReservas = ({
     onError: (err) => {
       if (esBackendDesactualizado(err)) {
         _avisarDesactualizado();
+        return;
+      }
+      // La clase ya no está en la grilla (p. ej. se colocó desde la bandeja):
+      // el chip quedó obsoleto, así que se refresca la bandeja para quitarlo.
+      if (codigoError(err) === 'NO_HAY_CLASE_ACTIVA') {
+        showToast('Esa clase ya no tiene sesiones activas en la grilla. Se actualizó la bandeja.', 'info');
+        _invalidar();
         return;
       }
       const detail = err?.response?.data?.detail;
@@ -116,6 +138,14 @@ export const useReservas = ({
         _avisarDesactualizado();
         return;
       }
+      // La sesión ya no está reservada (p. ej. se colocó arrastrándola a la
+      // grilla): el chip quedó obsoleto y "Devolver" ya no aplica, así que se
+      // refresca la bandeja para quitarlo.
+      if (codigoError(err) === 'NO_HAY_RESERVA') {
+        showToast('Esa clase ya no está en reserva (cambió en la grilla). Se actualizó la bandeja.', 'info');
+        _invalidar();
+        return;
+      }
       const detail = err?.response?.data?.detail;
       const mensaje = typeof detail === 'string' ? detail : (detail?.mensaje || 'No se pudo devolver la clase a la grilla.');
       showToast(mensaje, 'error');
@@ -130,6 +160,10 @@ export const useReservas = ({
     liberar: liberarMutation.mutateAsync,
     isReservando: reservarMutation.isPending,
     isLiberando: liberarMutation.isPending,
+    // E23-fix: colocar una ficha (drop o modal) debe refrescar la bandeja; si
+    // no, el chip queda obsoleto y la clase se ve a la vez en la grilla y en
+    // la bandeja.
+    invalidarBandeja,
   };
 };
 
