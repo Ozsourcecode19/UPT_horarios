@@ -1254,6 +1254,45 @@ table.grilla-bloques {
 .dark .text-blue-900 { color: #bfdbfe; }
 
 /* ============================================================
+   MODO OSCURO (E13) — 4ª pasada dirigida: panel de entidades
+   y barra de pestañas (E24).
+
+   Estas clases son utilidades Tailwind, así que las cubre el
+   shim general; pero faltaban cuatro combinaciones concretas
+   que usa el layout nuevo. Se remapean aquí para que en oscuro
+   no queden con el color claro original:
+
+     · text-slate-300   → #94a3b8 (contadores y separadores)
+     · border-blue-600/30 → azul-400 al 45% (borde de la
+       pestaña activa; el de slate-200 ya lo cubre el shim)
+     · hover:border-slate-300 → #52637d (3.1:1 sobre el panel)
+     · hover:text-red-500 → #f87171 (botón cerrar pestaña)
+
+   El placeholder del buscador (placeholder:text-slate-400) y
+   el foco (focus:ring-blue-500/20, focus:border-blue-500) no
+   necesitan remap: en oscuro el azul de foco ya contrasta
+   sobre el fondo slate-900 y el gris del placeholder es el
+   mismo que ya remapea .text-slate-400.
+   ============================================================ */
+@media screen {
+  .dark .text-slate-300 {
+    color: #94a3b8;
+  }
+
+  .dark .border-blue-600\/30 {
+    border-color: rgb(96 165 250 / .45);
+  }
+
+  .dark .hover\:border-slate-300:hover {
+    border-color: #52637d;
+  }
+
+  .dark .hover\:text-red-500:hover {
+    color: #f87171;
+  }
+}
+
+/* ============================================================
    MODO OSCURO (E13) — 3ª pasada dirigida: bandeja de reserva
    (E23) y estados de arrastre de la grilla.
 

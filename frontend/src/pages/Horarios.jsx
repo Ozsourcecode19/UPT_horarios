@@ -7,9 +7,10 @@ import { DeleteConfirmModal } from '../features/planning';
 import {
   filterEvents, resolveVentanaGrilla, resolveVentanaTurno, construirBandasEje, horaAMinutos,
   ventanaDinamicaDeEventos, agruparBandasPorTurno, calcularAltoBandaPrint, contarDescansosVisibles,
-  useScheduleGeneration, useDragDropValidation, useReservas,
+  useScheduleGeneration, useDragDropValidation, useReservas, usePestanasHorario,
   FlowStepper, ChecklistPanel,
   GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana, BandejaReserva,
+  PanelEntidades, PestanasHorario,
   agruparSesiones, resolverRun, resolverBloqueDeCelda, construirEventoDesdeClase,
 } from '../features/schedule';
 import {
@@ -43,6 +44,41 @@ const Horarios = () => {
   } = useHorariosData();
 
   const puedeEscribir = useCanWrite();
+
+  // E24 — Pestañas de horarios abiertos (aSc: "related timetables"). La
+  // pestaña activa ES el filtro real (filterType + filterValue): al abrir o
+  // cerrar una pestaña se cambia ese filtro y la grilla reacciona.
+  const seleccionarEntidad = useCallback((tipo, id) => {
+    setFilterType(tipo);
+    setFilterValue(String(id));
+  }, [setFilterType, setFilterValue]);
+
+  const {
+    pestanas, pestanaActiva,
+    abrir: abrirPestana, activar: activarPestana, cerrar: cerrarPestana, renombrar: renombrarPestana,
+  } = usePestanasHorario({
+    tipoActivo: filterType,
+    valorActivo: filterValue,
+    onSeleccionar: seleccionarEntidad,
+  });
+
+  // La etiqueta de la pestaña activa se refresca con el nombre real de la
+  // entidad (puede haber cambiado desde que se abrió).
+  useEffect(() => {
+    if (!pestanaActiva) return;
+    const entidad = pestanaActiva.tipo === 'grupo'
+      ? grupos.find(g => String(g.id) === String(pestanaActiva.id))
+      : pestanaActiva.tipo === 'docente'
+        ? docentes.find(d => String(d.id) === String(pestanaActiva.id))
+        : aulas.find(a => String(a.id) === String(pestanaActiva.id));
+    if (!entidad) return;
+    const texto = pestanaActiva.tipo === 'docente'
+      ? `${entidad.apellido}, ${entidad.nombre}`
+      : entidad.nombre;
+    if (texto && texto !== pestanaActiva.etiqueta) {
+      renombrarPestana(pestanaActiva.tipo, pestanaActiva.id, texto);
+    }
+  }, [pestanaActiva, grupos, docentes, aulas, renombrarPestana]);
 
   const listadoHorariosRaw = demoMode
     ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId))
@@ -426,7 +462,7 @@ const Horarios = () => {
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
   return (
-    <div className="horarios-page max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+    <div className="horarios-page max-w-7xl 2xl:max-w-[1700px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       {demoMode && <DemoBanner onReconnect={() => { setDemoMode(false); refetchHorarios(); showToast("Intentando conectar con API real...", "info"); }} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
       <Toast toast={toast} />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
@@ -511,7 +547,7 @@ const Horarios = () => {
               ))}
             </div>
           </div>
-          <div className="space-y-1.5 min-w-0 flex-1 animate-in slide-in-from-left-4 duration-300">
+          <div className="space-y-1.5 min-w-0 flex-1 animate-in slide-in-from-left-4 duration-300 lg:hidden">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
               {filterType === 'grupo' ? 'Seleccionar Sección' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
             </label>
@@ -561,8 +597,32 @@ const Horarios = () => {
         </div>
       )}
 
+      {/* E24: barra de pestañas de horarios abiertos (aSc: "related timetables") */}
+      {pestanas.length > 0 && (
+        <PestanasHorario
+          pestanas={pestanas}
+          pestanaActiva={pestanaActiva}
+          onActivar={activarPestana}
+          onCerrar={cerrarPestana}
+          className="no-print mb-3"
+        />
+      )}
+
       {/* E23: bandeja de reserva (clases fuera de la grilla) + grilla */}
       <div className="horarios-grilla-bandeja">
+        {/* E24: panel de entidades (aSc: panel de datos). En escritorio va a la
+            izquierda de la grilla; en móvil se oculta y sigue el <select>. */}
+        <PanelEntidades
+          tipoActivo={filterType}
+          grupos={grupos}
+          docentes={docentes}
+          aulas={aulas}
+          sedeMap={sedeMap}
+          valorActivo={filterValue}
+          onSeleccionar={abrirPestana}
+          className="hidden lg:flex lg:w-64 xl:w-72 shrink-0 self-start bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-2 sticky top-1 max-h-[calc(100vh-6rem)]"
+        />
+
         {!exceedsSinglePage && (
           <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
             <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />

@@ -27,6 +27,13 @@ export { default as useScheduleGeneration } from './hooks/useScheduleGeneration'
 export { default as useDragDropValidation } from './hooks/useDragDropValidation';
 export { default as useGenerationPolling } from './hooks/useGenerationPolling';
 export { default as useReservas } from './hooks/useReservas';
+// E24 — pestañas de horarios abiertos (aSc: "related timetables")
+export {
+  default as usePestanasHorario,
+  MAX_PESTANAS, CLAVE_PESTANAS,
+  indiceDePestana, agregarPestana, quitarPestana,
+  serializarPestanas, leerPestanasGuardadas,
+} from './hooks/usePestanasHorario';
 
 // Componentes
 export { default as FlowStepper } from './components/FlowStepper';
@@ -36,6 +43,9 @@ export { default as AvisoCoberturaVentana } from './components/AvisoCoberturaVen
 export { default as VersionPanel } from './components/VersionPanel';
 export { default as EditEventModal } from './components/EditEventModal';
 export { default as BandejaReserva } from './components/BandejaReserva';
+// E24 — panel de entidades (aSc: panel de datos) y barra de pestañas
+export { default as PanelEntidades, etiquetaDeEntidad, ICONO_TIPO, NOMBRE_TIPO } from './components/PanelEntidades';
+export { default as PestanasHorario } from './components/PestanasHorario';
 
 // Datos demo (Modo Demo)
 export {
