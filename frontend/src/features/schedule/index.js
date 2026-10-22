@@ -50,6 +50,7 @@ export { default as PestanasHorario } from './components/PestanasHorario';
 export { default as DockHorario, useEstadoDock } from './components/DockHorario';
 export { default as AulasLibres } from './components/AulasLibres';
 export { default as PanelVerificacion } from './components/PanelVerificacion';
+export { default as ToolbarHorarios } from './components/ToolbarHorarios';
 export {
   claveCelda, minutosDe,
   aulasOcupadasEnCelda, aulasLibresEnCelda, detectarConflictos,

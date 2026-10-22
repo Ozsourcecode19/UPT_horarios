@@ -162,6 +162,8 @@ export const useEstadoDock = () => {
     setPestana: (pestana) => setEstado(e => ({ ...e, pestana })),
     /** Abre el dock en la pestaña de la bandeja (al entrar un arrastre). */
     abrirBandeja: () => setEstado(e => (e.pestana === 'bandeja' && e.abierto ? e : { ...e, pestana: 'bandeja', abierto: true })),
+    /** Abre el dock en la pestaña de verificación (botón "Verificar"). */
+    abrirVerificacion: () => setEstado(e => (e.pestana === 'verificacion' && e.abierto ? e : { ...e, pestana: 'verificacion', abierto: true })),
   };
 };
 

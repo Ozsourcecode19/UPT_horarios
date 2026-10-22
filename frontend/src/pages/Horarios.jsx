@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Calendar, Sparkles, Clock, Users, Download, Printer, FileText } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import useCanWrite from '../hooks/useCanWrite';
 import { formatHora12 } from '../utils/timeFormat';
 import { TURNOS_LABELS } from '../constants';
@@ -11,6 +11,7 @@ import {
   FlowStepper, ChecklistPanel,
   GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana, BandejaReserva,
   PanelEntidades, PestanasHorario, DockHorario, useEstadoDock, AulasLibres, PanelVerificacion,
+  ToolbarHorarios,
   aulasLibresEnCelda, detectarConflictos,
   agruparSesiones, resolverRun, resolverBloqueDeCelda, construirEventoDesdeClase,
 } from '../features/schedule';
@@ -121,8 +122,10 @@ const Horarios = () => {
     [listadoHorariosRaw, bloques]
   );
 
-  const listadoHorarios = useMemo(
-    () => filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos }),
+  // Entidades que ofrece el <select> de la toolbar (solo móvil: en escritorio
+  // las elige el panel lateral). Se define más abajo, cuando ya existe
+  // `sedeMap` (que usa para nombrar las aulas).
+  const listadoHorarios = useMemo(    () => filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos }),
     [listadoHorariosRaw, filterType, filterValue, docentes, grupos]
   );
 
@@ -149,6 +152,21 @@ const Horarios = () => {
     if (!sedes?.length) return {};
     return Object.fromEntries(sedes.map(s => [s.id, s.nombre]));
   }, [sedes]);
+
+  // Entidades que ofrece el <select> de la toolbar (solo móvil: en escritorio
+  // las elige el panel lateral).
+  const entidadesParaToolbar = useMemo(() => {
+    if (filterType === 'docente') {
+      return docentes.map(d => ({ id: d.id, etiqueta: `${d.apellido}, ${d.nombre}` }));
+    }
+    if (filterType === 'aula') {
+      return aulas.map(a => ({ id: a.id, etiqueta: sedeMap[a.sede_id] ? `${a.nombre} — ${sedeMap[a.sede_id]}` : a.nombre }));
+    }
+    return grupos.map(g => ({
+      id: g.id,
+      etiqueta: g.division ? `${g.nombre} · ${TURNOS_LABELS[g.division] ?? g.division}` : g.nombre,
+    }));
+  }, [filterType, grupos, docentes, aulas, sedeMap]);
 
   const ventanaGrilla = useMemo(() => {
     if (filterType === 'docente') {
@@ -504,104 +522,60 @@ const Horarios = () => {
       <Toast toast={toast} />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
 
-      <div className="no-print flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-blue-600" />
-            <span>Gestor de Horarios</span>
-          </h2>
-          <p className="text-slate-500">Planificador de clases semanal con soporte drag-and-drop y detección de colisiones.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <button onClick={exportarICalActual} disabled={listadoHorarios.length === 0} title="Descarga el horario visible como archivo .ics" className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
-              <Download className="w-4 h-4" /><span>Exportar iCal</span>
-            </button>
-            <button onClick={() => window.print()} disabled={listadoHorarios.length === 0} title="Imprimir o guardar como PDF" className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
-              <Printer className="w-4 h-4" /><span>Imprimir / PDF</span>
-            </button>
-            <div
-              className="relative"
-              onMouseEnter={handlePrintMenuEnter}
-              onMouseLeave={handlePrintMenuLeave}
-            >
-              <button disabled={listadoHorarios.length === 0} title="Imprimir todas las entidades del tipo seleccionado" className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
-                <FileText className="w-4 h-4" /><span>Imprimir Todos</span>
-              </button>
-              {printMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 min-w-[180px]">
-                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('grupo'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-500" />
-                    <span>Todas las Secciones</span>
-                  </button>
-                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('docente'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-green-500" />
-                    <span>Todos los Docentes</span>
-                  </button>
-                  <button onClick={() => { setPrintMenuOpen(false); handlePrintMultiEntity('aula'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-purple-500" />
-                    <span>Todas las Aulas</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          <button onClick={triggerAutoGeneration} disabled={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir} title={!canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.' : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)} className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none">
-            <Sparkles className="w-5 h-5 animate-pulse" /><span>Generación Inteligente</span>
-          </button>
-        </div>
-      </div>
+      {/* E24: la toolbar del área de trabajo. Reemplaza al bloque grande de
+          botones y a la tarjeta de filtros (periodo/sede/ver por/entidad),
+          dejandole el alto a la grilla. */}
+      <ToolbarHorarios
+        periodos={periodos}
+        selectedPeriodoId={selectedPeriodoId}
+        onPeriodoChange={setSelectedPeriodoId}
+        sedes={sedes}
+        selectedSedeId={selectedSedeId}
+        onSedeChange={setSelectedSedeId}
+        mostrarSede={sedes.length > 1}
+        tiposVista={TIPOS_VISTA}
+        tipoVista={filterType}
+        onTipoVistaChange={setFilterType}
+        entidades={entidadesParaToolbar}
+        entidadValor={filterValue}
+        onEntidadChange={setFilterValue}
+        entidadPlaceholder={
+          filterType === 'grupo' ? 'Seleccionar Sección'
+            : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'
+        }
+        onGenerar={triggerAutoGeneration}
+        generarDeshabilitado={!selectedPeriodoId || isGenerating || !canGenerate || !puedeEscribir}
+        generarTitulo={
+          !canGenerate ? 'Faltan prerequisitos para generar. Revisa el checklist.'
+            : (!puedeEscribir ? 'Requiere rol ADMIN o JEFE-PNF' : undefined)
+        }
+        onVerificar={dock.abrirVerificacion}
+        conflictos={conflictos.length}
+        onExportar={exportarICalActual}
+        exportarDeshabilitado={listadoHorarios.length === 0}
+        onImprimir={() => window.print()}
+        imprimirDeshabilitado={listadoHorarios.length === 0}
+        onImprimirTodos={(tipo) => {
+          if (tipo) {
+            setPrintMenuOpen(false);
+            handlePrintMultiEntity(tipo);
+            return;
+          }
+          setPrintMenuOpen(o => !o);
+        }}
+        printMenuOpen={printMenuOpen}
+        onPrintMenuEnter={handlePrintMenuEnter}
+        onPrintMenuLeave={handlePrintMenuLeave}
+      />
 
       <div className="no-print"><FlowStepper preCheck={preCheck} demoMode={demoMode} /></div>
 
-      <div className="no-print bg-white rounded-3xl p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col md:flex-row items-center gap-6 justify-between">
-        <div className={`w-full flex flex-col sm:flex-row gap-4 sm:gap-6 ${sedes.length > 1 ? 'md:w-auto md:flex-1' : 'md:w-auto md:flex-1 md:max-w-sm'}`}>
-          <div className={`space-y-1.5 min-w-0 ${sedes.length > 1 ? 'flex-1' : 'w-full'}`}>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Periodo Académico</label>
-            <select value={selectedPeriodoId || ''} onChange={(e) => setSelectedPeriodoId(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
-              {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.estado})</option>)}
-            </select>
-          </div>
-          {sedes.length > 1 && (
-            <div className="space-y-1.5 min-w-0 flex-1">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Sede</label>
-              <select value={selectedSedeId || ''} onChange={(e) => setSelectedSedeId(e.target.value ? Number(e.target.value) : null)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
-                <option value="">Todas las Sedes</option>
-                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="w-full min-w-0 md:w-auto flex flex-col sm:flex-row gap-4 flex-[2] flex-1">
-          <div className="space-y-1.5 flex-1 min-w-0">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">Ver Por</label>
-            <div className="flex items-center gap-1 min-w-0 overflow-x-auto bg-slate-100 p-1 rounded-2xl sm:gap-2">
-              {TIPOS_VISTA.map(({ valor, etiqueta, Icono }) => (
-                <button key={valor} onClick={() => setFilterType(valor)} title={etiqueta} className={`flex items-center gap-1 min-w-0 px-2 sm:px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${filterType === valor ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <Icono className={`w-4 h-4 shrink-0 ${filterType === valor ? 'mx-auto' : ''}`} />
-                  <span className={`truncate min-w-0 ${filterType === valor ? '' : 'max-[480px]:hidden'}`}>{etiqueta}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1.5 min-w-0 flex-1 animate-in slide-in-from-left-4 duration-300 lg:hidden">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-              {filterType === 'grupo' ? 'Seleccionar Sección' : filterType === 'docente' ? 'Seleccionar Docente' : 'Seleccionar Aula'}
-            </label>
-            <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700">
-              {filterType === 'grupo' && grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}{g.division ? ` · ${TURNOS_LABELS[g.division] ?? g.division}` : ''}</option>)}
-              {filterType === 'docente' && docentes.map(d => <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>)}
-              {filterType === 'aula' && aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}{sedeMap[a.sede_id] ? ` — ${sedeMap[a.sede_id]}` : ''}</option>)}
-            </select>
-            {filterType === 'grupo' && itemSeleccionado?.division && (
-              <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                Turno {TURNOS_LABELS[itemSeleccionado.division] ?? itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
+      {filterType === 'grupo' && itemSeleccionado?.division && (
+        <p className="no-print -mt-1 text-[11px] text-slate-400 flex items-center gap-1 px-1">
+          <Clock className="w-3 h-3" />
+          Turno {TURNOS_LABELS[itemSeleccionado.division] ?? itemSeleccionado.division} · grilla {formatHora12(ventanaGrilla.inicio.substring(0, 5))}–{formatHora12(ventanaGrilla.fin.substring(0, 5))}
+        </p>
+      )}
 
       {!demoMode && preCheck && <div className="no-print"><ChecklistPanel preCheck={preCheck} onRevalidar={refetchPreCheck} /></div>}
       {!demoMode && (
