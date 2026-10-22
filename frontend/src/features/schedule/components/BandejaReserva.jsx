@@ -88,6 +88,7 @@ const BandejaReserva = ({
   onLiberar,
   onReservarDesdeGrilla,
   isLoading = false,
+  className = '',
 }) => {
   const [filtro, setFiltro] = useState('');
   const [sobre, setSobre] = useState(false); // hay un arrastre válido sobre el panel
@@ -131,7 +132,7 @@ const BandejaReserva = ({
 
   return (
     <aside
-      className={`bandeja-reserva no-print ${sobre ? 'bandeja-reserva-sobre' : ''}`}
+      className={`bandeja-reserva no-print ${sobre ? 'bandeja-reserva-sobre' : ''} ${className}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

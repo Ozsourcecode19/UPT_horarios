@@ -41,6 +41,7 @@ const GridSemanalBloques = ({
   onDropEnCelda,     // ({horarioId, esSpan, dia, iniMin} | {claseBandeja, dia, iniMin})
   onDeleteEvento,    // ({horario, esSpan})
   modoLibre = false, // E23: los conflictos se avisan pero no bloquean
+  onCeldaActiva,  // E24: ({dia, iniMin} | null) celda bajo el puntero (aulas libres)
 }) => {
   const [drag, setDrag] = useState(null); // {id, esSpan}
   const [celdaHover, setCeldaHover] = useState(null);
@@ -286,8 +287,12 @@ const GridSemanalBloques = ({
                         e.preventDefault();
                         e.dataTransfer.dropEffect = 'move';
                         setCeldaHover(key);
+                        onCeldaActiva?.({ dia, iniMin: fila.banda.iniMin });
                       }}
-                      onDragLeave={() => setCeldaHover(h => (h === key ? null : h))}
+                      onDragLeave={() => {
+                        setCeldaHover(h => (h === key ? null : h));
+                        onCeldaActiva?.(null);
+                      }}
                       onDrop={(e) => handleDropEnDia(e, dia, fila.banda)}
                     >
                       {puntoConflicto && (

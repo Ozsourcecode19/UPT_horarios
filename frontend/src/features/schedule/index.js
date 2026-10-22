@@ -46,6 +46,14 @@ export { default as BandejaReserva } from './components/BandejaReserva';
 // E24 — panel de entidades (aSc: panel de datos) y barra de pestañas
 export { default as PanelEntidades, etiquetaDeEntidad, ICONO_TIPO, NOMBRE_TIPO } from './components/PanelEntidades';
 export { default as PestanasHorario } from './components/PestanasHorario';
+// E24 — dock inferior (aSc: control panel) con bandeja, aulas libres y verificación
+export { default as DockHorario, useEstadoDock } from './components/DockHorario';
+export { default as AulasLibres } from './components/AulasLibres';
+export { default as PanelVerificacion } from './components/PanelVerificacion';
+export {
+  claveCelda, minutosDe,
+  aulasOcupadasEnCelda, aulasLibresEnCelda, detectarConflictos,
+} from './utils/aulasLibres';
 
 // Datos demo (Modo Demo)
 export {

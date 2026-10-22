@@ -10,7 +10,8 @@ import {
   useScheduleGeneration, useDragDropValidation, useReservas, usePestanasHorario,
   FlowStepper, ChecklistPanel,
   GridSemanalBloques, VersionPanel, EditEventModal, AvisoCoberturaVentana, BandejaReserva,
-  PanelEntidades, PestanasHorario,
+  PanelEntidades, PestanasHorario, DockHorario, useEstadoDock, AulasLibres, PanelVerificacion,
+  aulasLibresEnCelda, detectarConflictos,
   agruparSesiones, resolverRun, resolverBloqueDeCelda, construirEventoDesdeClase,
 } from '../features/schedule';
 import {
@@ -80,9 +81,45 @@ const Horarios = () => {
     }
   }, [pestanaActiva, grupos, docentes, aulas, renombrarPestana]);
 
+  // E24 — Dock inferior (aSc: "control panel"): bandeja de reserva, aulas
+  // libres de la celda activa y verificación del horario.
+  const dock = useEstadoDock();
+  const [celdaActiva, setCeldaActiva] = useState(null); // { dia, iniMin }
+
   const listadoHorariosRaw = demoMode
     ? demoHorarios.filter(h => h.extendedProps?.periodo_id === Number(selectedPeriodoId))
     : horariosReal;
+
+  // Sede de la celda activa: la del bloque de esa posición. Se usa para
+  // listar solo las aulas de esa sede (los "free rooms" de aSc).
+  const sedeDeCeldaActiva = useMemo(() => {
+    if (!celdaActiva) return null;
+    const bloque = bloques.find(b =>
+      b.activo !== false &&
+      Number(b.dia_semana) === Number(celdaActiva.dia) &&
+      horaAMinutos(b.hora_inicio) === Number(celdaActiva.iniMin)
+    );
+    return bloque ? bloque.sede_id : null;
+  }, [celdaActiva, bloques]);
+
+  // Aulas libres en la celda bajo el puntero (o en la seleccionada).
+  const aulasLibres = useMemo(() => {
+    if (!celdaActiva) return [];
+    return aulasLibresEnCelda({
+      eventos: listadoHorariosRaw,
+      bloques,
+      aulas,
+      dia: celdaActiva.dia,
+      iniMin: celdaActiva.iniMin,
+      sedeId: sedeDeCeldaActiva,
+    });
+  }, [celdaActiva, sedeDeCeldaActiva, listadoHorariosRaw, bloques, aulas]);
+
+  // Conflictos del horario (el "advisor" de aSc), calculados en cliente.
+  const conflictos = useMemo(
+    () => detectarConflictos({ eventos: listadoHorariosRaw, bloques }),
+    [listadoHorariosRaw, bloques]
+  );
 
   const listadoHorarios = useMemo(
     () => filterEvents(listadoHorariosRaw, { filterType, filterValue, docentes, grupos }),
@@ -679,20 +716,58 @@ const Horarios = () => {
             </div>
           </div>
         )}
-
-        <BandejaReserva
-          sinColocar={sinColocar}
-          reservadas={reservadas}
-          puedeEscribir={puedeEscribir}
-          modoLibre={modoLibre}
-          demoMode={demoMode}
-          onToggleModoLibre={setModoLibre}
-          onSeleccionar={(clase) => abrirDesdeBandeja(clase)}
-          onLiberar={onLiberarReserva}
-          onReservarDesdeGrilla={onReservarDesdeGrilla}
-          isLoading={isLoadingBandeja}
-        />
       </div>
+
+      {/* E24: dock inferior con bandeja, aulas libres y verificación.
+          La bandeja de reserva vive aquí (el "control panel" de aSc): el
+          arrastre "grilla → bandeja" lo resuelve el propio dock. */}
+      <DockHorario
+        abierto={dock.abierto}
+        onToggle={dock.toggle}
+        pestana={dock.pestana}
+        onCambiarPestana={dock.setPestana}
+        onAbrirBandeja={dock.abrirBandeja}
+        contadorBandeja={sinColocar.length + reservadas.length}
+        contadorConflictos={conflictos.length}
+        puedeReservar={puedeEscribir}
+        onReservarDesdeGrilla={onReservarDesdeGrilla}
+      >
+        {dock.pestana === 'bandeja' && (
+          <div className="px-2 pb-2">
+            <BandejaReserva
+              sinColocar={sinColocar}
+              reservadas={reservadas}
+              puedeEscribir={puedeEscribir}
+              modoLibre={modoLibre}
+              demoMode={demoMode}
+              onToggleModoLibre={setModoLibre}
+              onSeleccionar={(clase) => abrirDesdeBandeja(clase)}
+              onLiberar={onLiberarReserva}
+              onReservarDesdeGrilla={onReservarDesdeGrilla}
+              isLoading={isLoadingBandeja}
+              className="bandeja-en-dock"
+            />
+          </div>
+        )}
+        {dock.pestana === 'aulas' && (
+          <AulasLibres
+            aulas={aulasLibres}
+            celda={celdaActiva}
+            onElegirAula={(aula) => {
+              setCeldaActiva(null);
+              showToast(`Aula ${aula.nombre} seleccionada. Arrastra la clase a la celda destino.`, 'info');
+            }}
+          />
+        )}
+        {dock.pestana === 'verificacion' && (
+          <PanelVerificacion
+            conflictos={conflictos}
+            sinColocar={sinColocar.length}
+            reservadas={reservadas.length}
+            turnosSinCobertura={preCheck?.turnos_sin_cobertura || []}
+          />
+        )}
+      </DockHorario>
 
       {((isEditModalOpen && selectedEvent) || nuevaDesdeBandeja) && (
         <EditEventModal

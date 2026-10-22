@@ -339,6 +339,31 @@ table.grilla-bloques {
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 
+/* E24: la bandeja dentro del dock inferior (aSc: "control panel").
+   En vez de una columna estrecha, se reparte en dos columnas (sin colocar /
+   en reserva) para aprovechar el ancho de la franja inferior. */
+.bandeja-en-dock {
+  max-height: 18rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .bandeja-en-dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  /* la cabecera, el modo libre y el buscador ocupan el ancho completo */
+  .bandeja-en-dock .bandeja-reserva-header,
+  .bandeja-en-dock .bandeja-modo-libre,
+  .bandeja-en-dock .bandeja-buscador,
+  .bandeja-en-dock .bandeja-vacio {
+    grid-column: 1 / -1;
+  }
+}
+
 .bandeja-reserva-header {
   display: flex;
   align-items: center;
@@ -1289,6 +1314,92 @@ table.grilla-bloques {
 
   .dark .hover\:text-red-500:hover {
     color: #f87171;
+  }
+
+  /* --- E24: dock inferior, aulas libres y verificación --- */
+  /* El dock es una tarjeta: en oscuro su fondo no puede ser blanco. */
+  .dark .dock-horario {
+    background-color: #0f172a;
+    border-color: #2b3a52;
+  }
+
+  .dark .dock-horario .bg-slate-100 {
+    background-color: #1e293b;
+  }
+
+  .dark .dock-horario .bg-white {
+    background-color: #0b1220;
+  }
+
+  .dark .dock-horario .text-slate-700 {
+    color: #cbd5e1;
+  }
+
+  .dark .dock-horario .text-slate-600 {
+    color: #aebccd;
+  }
+
+  .dark .dock-horario .text-blue-700 {
+    color: #93c5fd;
+  }
+
+  /* realce del arrastre sobre el dock */
+  .dark .dock-horario-sobre {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgb(129 140 248 / .3);
+  }
+
+  .dark .dock-horario-sobre .bg-indigo-50 {
+    background-color: rgb(99 102 241 / .16);
+  }
+
+  .dark .dock-horario-sobre .text-indigo-600 {
+    color: #a5b4fc;
+  }
+
+  /* contadores de las pestañas del dock */
+  .dark .dock-contador-ambar {
+    background-color: rgb(245 158 11 / .18);
+    color: #fcd34d;
+  }
+
+  .dark .dock-contador-rojo {
+    background-color: rgb(239 68 68 / .18);
+    color: #fca5a5;
+  }
+
+  /* panel de verificación: avisos en rojo y ámbar sobre fondo oscuro */
+  .dark .panel-verificacion .bg-red-50 {
+    background-color: rgb(239 68 68 / .12);
+  }
+
+  .dark .panel-verificacion .text-red-700 {
+    color: #fca5a5;
+  }
+
+  .dark .panel-verificacion .text-red-600 {
+    color: #f87171;
+  }
+
+  .dark .panel-verificacion .bg-amber-50 {
+    background-color: rgb(245 158 11 / .12);
+  }
+
+  .dark .panel-verificacion .text-amber-700 {
+    color: #fcd34d;
+  }
+
+  .dark .panel-verificacion .text-amber-600 {
+    color: #fbbf24;
+  }
+
+  /* aulas libres: verde sobre fondo oscuro */
+  .dark .aulas-libres .text-emerald-700 {
+    color: #6ee7b7;
+  }
+
+  .dark .aulas-libres .hover\:bg-emerald-50:hover {
+    background-color: rgb(16 185 129 / .14);
   }
 }
 
