@@ -5,7 +5,7 @@
   "identifier": "ve.edu.uptbolivar.horarios",
   "build": {
     "beforeDevCommand": "pnpm -C ../frontend dev:desktop",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:3001",
     "beforeBuildCommand": "pnpm -C ../frontend build:desktop",
     "frontendDist": "../../frontend/dist"
   },

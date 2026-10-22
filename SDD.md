@@ -643,7 +643,7 @@ sequenceDiagram
 | Almacenamiento de contraseñas | `bcrypt` vía `passlib` (`pwd_context`). |
 | Autorización | Dependencia `require_role([...])` en cada endpoint de escritura; 403 si el rol no corresponde. |
 | Sesión en cliente | Token en `localStorage`; interceptor Axios inyecta `Authorization: Bearer`. |
-| CORS | `allow_origins` desde la variable `CORS_ORIGINS` (coma-separada), default `http://localhost:3000` (frontend web). La app de escritorio (Tauri) inyecta además `tauri://localhost` (Linux/macOS) y `http://tauri.localhost` (Windows) — orígenes del WebView. |
+| CORS | `allow_origins` desde la variable `CORS_ORIGINS` (coma-separada), default `http://localhost:3000` (frontend web). La app de escritorio (Tauri) inyecta además `http://localhost:3001` (dev del shell, puerto propio), `tauri://localhost` (Linux/macOS) y `http://tauri.localhost` (Windows) — orígenes del WebView. |
 | Validación de entrada | Schemas Pydantic v2 (`model_dump()`), `zod` + `react-hook-form` en el frontend. |
 | Protección de datos | Parámetros del solver y claves del sistema centralizados en tabla `configuracion`. |
 
@@ -695,7 +695,8 @@ uvicorn app.main:app --reload   # http://localhost:8000
 ```bash
 cd frontend
 npm install
-npm run dev    # http://localhost:3000
+npm run dev    # http://localhost:3000 (web)
+npm run dev:desktop   # http://localhost:3001 (modo escritorio; puerto propio)
 ```
 
 ### 9.4 Variables de entorno
@@ -705,7 +706,7 @@ npm run dev    # http://localhost:3000
 | `DATABASE_URL` | `postgresql://postgres:postgresUPT@localhost:5432/horarios_upt` | Conexión a BD. |
 | `SECRET_KEY` | (ninguna) | Firma de tokens JWT. **Obligatoria en producción** (`ENTORNO=production` sin ella ⇒ `RuntimeError` al arrancar). Generar con `openssl rand -hex 32`. |
 | `ENTORNO` | `development` | `production` activa validaciones estrictas de arranque. |
-| `CORS_ORIGINS` | `http://localhost:3000` | Orígenes permitidos por CORS (coma-separada). La app de escritorio añade `tauri://localhost,http://tauri.localhost`. |
+| `CORS_ORIGINS` | `http://localhost:3000` | Orígenes permitidos por CORS (coma-separada). La app de escritorio añade `http://localhost:3001,tauri://localhost,http://tauri.localhost`. |
 | `PORT` | `8000` | Puerto de uvicorn en el binario de escritorio (`run_server.py`); Tauri fija `17891`. |
 
 ### 9.5 App de escritorio (Tauri)

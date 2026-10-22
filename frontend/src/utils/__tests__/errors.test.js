@@ -1,7 +1,7 @@
 // src/utils/__tests__/errors.test.js
 // Tests de la clasificación de errores que activa el Modo Demo.
 import { describe, it, expect } from 'vitest';
-import { esErrorDeServidor } from '../errors';
+import { esErrorDeServidor, clasificarErrorLogin } from '../errors';
 import { marcarReinicioBD, limpiarReinicioBD } from '../reinicioBd';
 
 describe('esErrorDeServidor', () => {
@@ -45,5 +45,31 @@ describe('esErrorDeServidor durante un reinicio de BD (escritorio)', () => {
     expect(esErrorDeServidor({ response: { status: 401 } })).toBe(false);
     limpiarReinicioBD();
     expect(esErrorDeServidor({ response: { status: 401 } })).toBe(false);
+  });
+});
+
+describe('clasificarErrorLogin', () => {
+  it('CREDENCIALES solo ante 401 (credenciales incorrectas)', () => {
+    expect(clasificarErrorLogin({ response: { status: 401 } })).toBe('CREDENCIALES');
+  });
+
+  it('SIN_BACKEND cuando el backend no responde (red caída, CORS, puerto equivocado)', () => {
+    // Es el caso del bug del 21-oct-2026: la ventana de escritorio cargaba el
+    // frontend web y el POST /token moría sin respuesta. No son credenciales.
+    expect(clasificarErrorLogin(new Error('Network Error'))).toBe('SIN_BACKEND');
+    expect(clasificarErrorLogin({})).toBe('SIN_BACKEND');
+    expect(clasificarErrorLogin({ request: {} })).toBe('SIN_BACKEND');
+  });
+
+  it('SERVIDOR ante 5xx', () => {
+    expect(clasificarErrorLogin({ response: { status: 500 } })).toBe('SERVIDOR');
+    expect(clasificarErrorLogin({ response: { status: 503 } })).toBe('SERVIDOR');
+  });
+
+  it('DESCONOCIDO ante otros 4xx y valores nulos', () => {
+    expect(clasificarErrorLogin({ response: { status: 403 } })).toBe('DESCONOCIDO');
+    expect(clasificarErrorLogin({ response: { status: 422 } })).toBe('DESCONOCIDO');
+    expect(clasificarErrorLogin(null)).toBe('DESCONOCIDO');
+    expect(clasificarErrorLogin(undefined)).toBe('DESCONOCIDO');
   });
 });

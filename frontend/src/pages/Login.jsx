@@ -5,12 +5,33 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import {
+  MSG_BACKEND_NO_DISPONIBLE,
+  MSG_CREDENCIALES_INVALIDAS,
+  MSG_ERROR_SERVIDOR_LOGIN,
+} from '../constants/messages';
 
 // Esquema de validación
 const loginSchema = z.object({
   username: z.string().min(1, "El usuario es requerido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
+
+// Traduce el código de fallo del login a un mensaje para el usuario.
+// Distingue "credenciales incorrectas" de "no se pudo contactar con el
+// backend": este último es un problema del entorno (servicio apagado,
+// puerto equivocado, CORS) y no debe presentarse como un error del usuario.
+const mensajePorCodigo = (codigo) => {
+  switch (codigo) {
+    case 'SIN_BACKEND':
+      return MSG_BACKEND_NO_DISPONIBLE;
+    case 'SERVIDOR':
+      return MSG_ERROR_SERVIDOR_LOGIN;
+    case 'CREDENCIALES':
+    default:
+      return MSG_CREDENCIALES_INVALIDAS;
+  }
+};
 
 const Login = () => {
   const [error, setError] = useState('');
@@ -23,8 +44,8 @@ const Login = () => {
 
   const onSubmit = async (data) => {
     setError('');
-    const success = await login(data.username, data.password);
-    if (success) {
+    const resultado = await login(data.username, data.password);
+    if (resultado?.ok) {
       // Restaurar la ruta a la que el usuario intentaba acceder antes del 401 (si existe).
       let returnUrl = null;
       try {
@@ -33,7 +54,7 @@ const Login = () => {
       } catch (e) { /* sessionStorage no disponible */ }
       navigate(returnUrl || '/dashboard', { replace: true });
     } else {
-      setError('Credenciales inválidas o error del servidor');
+      setError(mensajePorCodigo(resultado?.codigo));
     }
   };
 

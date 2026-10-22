@@ -542,3 +542,46 @@ PyInstaller, shell Tauri 2 con menú y respaldos, hotfix WebKitGTK/Mesa y CI ver
   3. **Frontend:** `useReservas` traduce 404/405 de la bandeja a un mensaje propio
      (`MSG_BACKEND_DESACTUALIZADO_BANDEJA`) en vez de mostrar el `detail` crudo.
 - **Verificación:** frontend **512 tests OK** · `pnpm build` OK · smoke HTTP del binario OK.
+
+**2026-10-21 — Bugfix: el escritorio no aceptaba las credenciales del admin**:
+- **Síntoma (reportado en `pnpm dev` de escritorio):** al abrir la app y entrar con
+  `admin`/`admin123`, el login siempre fallaba con "Credenciales inválidas o error del
+  servidor". Las credenciales eran correctas: la BD del escritorio
+  (`~/.local/share/ve.edu.uptbolivar.horarios/horarios.db`) tiene el usuario `admin` con rol
+  `ADMIN` y su hash verifica `admin123`; el `sidecar.log` mostraba `POST /api/token 200 OK`
+  en arranques anteriores.
+- **Causa (dos capas):**
+  1. **La ventana cargaba el frontend WEB, no el de escritorio.** El `beforeDevCommand` del
+     shell lanza `vite --mode desktop`, pero si el puerto 3000 ya lo ocupaba un `pnpm dev`
+     web, Vite **caía en silencio** al 3001 mientras el `devUrl` del shell seguía apuntando
+     a `http://localhost:3000` → la ventana servía el build **web**, que no trae
+     `VITE_API_BASE_URL` → sus peticiones iban a `/api` → proxy de Vite → `localhost:8000`
+     (sin backend) → el `POST /api/token` moría **sin respuesta**.
+  2. **El mensaje no distinguía el fallo.** `Login.jsx` mostraba un único texto para
+     cualquier error, así que un backend inaccesible se reportaba como "credenciales
+     inválidas": la UI culpaba al usuario de un problema del entorno.
+- **Corrección:**
+  1. **Puerto propio para el modo desktop: 3001, con `strictPort: true`**
+     (`frontend/vite.config.js`). El shell apunta por `devUrl` a un puerto fijo, así que:
+     - con puerto **distinto** al de la web, ambas dev servers **coexisten** (el flujo real:
+       trabajar en la web y probar el escritorio a la vez);
+     - con **`strictPort`**, si el 3001 está ocupado el arranque **muerre ruidosamente**
+     ("Port 3001 is already in use") en vez de abrir una ventana con el build equivocado.
+     `tauri.conf.json` → `devUrl: http://localhost:3001`; `main.rs` → `CORS_ORIGINS` suma
+     `http://localhost:3001` (el dev del shell habla directo al sidecar, sin proxy: su
+     origen debe estar permitido).
+  2. **El login dice la verdad:** `AuthContext.login` devuelve `{ ok, codigo }` con
+     `clasificarErrorLogin` (`src/utils/errors.ts`): `CREDENCIALES` (401) · `SIN_BACKEND`
+     (sin respuesta) · `SERVIDOR` (5xx) · `DESCONOCIDO`. `Login.jsx` mapea cada uno a un
+     mensaje propio (`MSG_CREDENCIALES_INVALIDAS`, `MSG_BACKEND_NO_DISPONIBLE`,
+     `MSG_ERROR_SERVIDOR_LOGIN`): un backend inaccesible ya no se presenta como un error
+     del usuario.
+  3. **Guard que congela la tríada** `vite.config.js` (puerto) ↔ `tauri.conf.json`
+     (`devUrl`) ↔ `main.rs` (`CORS_ORIGINS`): `src/config/__tests__/desktopPuertos.test.js`.
+- **Verificación:** frontend **635 tests OK** (50 archivos) · `pnpm build` y `build:desktop`
+  OK · `cargo check` OK · **smoke real con `pnpm dev` de escritorio**: la ventana levanta en
+  el 3001 con `VITE_API_BASE_URL=http://127.0.0.1:17891/api`, `POST /api/token` con
+  `Origin: http://localhost:3001` → **200** con `admin/admin123` (y **401** con clave
+  incorrecta), preflight CORS correcto · **coexistencia verificada**: web en el 3000 +
+  escritorio en el 3001 + sidecar en el 17891, los tres a la vez · **prueba negativa**:
+  con el 3001 ocupado, `pnpm dev:desktop` falla con "Port 3001 is already in use".

@@ -41,22 +41,35 @@ const cspProd = () => {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), cspProd()],
-  server: {
-    port: 3000,
-    host: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
+//
+// El modo `desktop` (dev del shell Tauri) usa un PUERTO PROPIO (3001) y
+// `strictPort`: el shell apunta por `devUrl` a un puerto fijo, así que si
+// Vite cayera silenciosamente a otro puerto (porque el 3000 ya lo ocupa un
+// `pnpm dev` web) la ventana abriría el build equivocado —el frontend web,
+// sin `VITE_API_BASE_URL`— y el login fallaría siempre blaming a las
+// credenciales (bug del 21-oct-2026). Con `strictPort` el arranque MUERE con
+// un error claro en vez de abrir una ventana rota; y como el puerto es
+// distinto al de la web, ambas dev servers pueden coexistir.
+export default defineConfig(({ mode }) => {
+  const esDesktop = mode === 'desktop';
+  return {
+    plugins: [react(), cspProd()],
+    server: {
+      port: esDesktop ? 3001 : 3000,
+      strictPort: esDesktop,
+      host: true,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+        }
       }
-    }
-  },
-  envDir: '.', // Lee .env de la raíz
-  build: {
-    outDir: 'dist',
-    sourcemap: false, // No exponer el código fuente en producción
-  },
-})
+    },
+    envDir: '.', // Lee .env de la raíz
+    build: {
+      outDir: 'dist',
+      sourcemap: false, // No exponer el código fuente en producción
+    },
+  };
+});

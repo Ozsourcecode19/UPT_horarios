@@ -1126,3 +1126,32 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 - Sin PWA/manifest/service worker (no offline).
 - La impresión sigue orientada a escritorio (A4 apaisado); `.touch-bar` y `.ev-del` se ocultan con `no-print`.
 - `hidden md:table-cell` no se valida en jsdom (sin CSS): los tests no detectan desalineaciones th/td — revisar en QA visual.
+
+## 8. Escritorio: puerto propio del dev y login con diagnóstico real (2026-10-21)
+
+### El modo `desktop` usa el puerto 3001, no el 3000
+
+- La web (`pnpm dev`) sirve en el **3000**; el shell Tauri (`cd desktop && pnpm dev`) lanza
+  `vite --mode desktop` en el **3001** (`frontend/vite.config.js`), y `tauri.conf.json`
+  apunta su `devUrl` a `http://localhost:3001`.
+- Motivo: el shell abre **siempre** lo que hay en su `devUrl`. Antes, si un `pnpm dev` web
+  ocupaba el 3000, Vite caía en silencio al 3001 y la ventana terminaba sirviendo el build
+  **web** (sin `VITE_API_BASE_URL`) → el login moría sin respuesta y la UI culpaba a las
+  credenciales. Con `strictPort: true` en modo desktop, si el 3001 está ocupado el arranque
+  **falla ruidosamente** ("Port 3001 is already in use") en vez de abrir una ventana rota.
+- Beneficio operativo: **web y escritorio conviven** (3000 + 3001 + sidecar 17891 a la vez).
+- El dev del shell habla directo al sidecar (sin proxy de Vite), así que su origen
+  (`http://localhost:3001`) está en `CORS_ORIGINS` (`desktop/src-tauri/src/main.rs`).
+- Guard: `src/config/__tests__/desktopPuertos.test.js` congela la tríada puerto ↔ `devUrl` ↔
+  `CORS_ORIGINS`.
+
+### El login distingue "credenciales malas" de "no hay backend"
+
+- `AuthContext.login` devuelve `{ ok, codigo }`; el código sale de `clasificarErrorLogin`
+  (`src/utils/errors.ts`): `CREDENCIALES` (401) · `SIN_BACKEND` (axios sin `response`: red
+  caída, CORS, backend apagado, puerto equivocado) · `SERVIDOR` (5xx) · `DESCONOCIDO`.
+- `Login.jsx` mapea cada código a su mensaje (`constants/messages.js`):
+  `MSG_CREDENCIALES_INVALIDAS`, `MSG_BACKEND_NO_DISPONIBLE`, `MSG_ERROR_SERVIDOR_LOGIN`.
+- Antes había un único mensaje para todo, y un backend inaccesible se reportaba como
+  "credenciales inválidas": el usuario perseguía la contraseña equivocada.
+- Tests: `src/context/__tests__/AuthContext.test.jsx` y `src/pages/__tests__/login.test.jsx`.

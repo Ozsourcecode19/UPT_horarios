@@ -95,7 +95,10 @@ fn crear_comando(app: &tauri::AppHandle, config: &ConfigSidecar) -> std::io::Res
         .env("DATABASE_URL", &config.db_url)
         .env(
             "CORS_ORIGINS",
-            "http://localhost:3000,tauri://localhost,http://tauri.localhost",
+            // El dev del shell sirve el frontend en el puerto 3001 (el 3000 es
+            // del `pnpm dev` web; ver frontend/vite.config.js) y en producción
+            // el WebView usa los orígenes `tauri://` / `http://tauri.localhost`.
+            "http://localhost:3000,http://localhost:3001,tauri://localhost,http://tauri.localhost",
         );
     if cfg!(debug_assertions) {
         // En `tauri dev` los logs del backend van a la terminal.

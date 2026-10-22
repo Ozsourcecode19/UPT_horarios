@@ -91,7 +91,15 @@ export const MSG_TURNO_RESTRICCION = (division) =>
 
 export const MSG_USUARIO_REQUERIDO = 'El usuario es requerido';
 export const MSG_PASSWORD_MINIMO = 'La contraseña debe tener al menos 6 caracteres';
-export const MSG_CREDENCIALES_INVALIDAS = 'Credenciales inválidas o error del servidor';
+export const MSG_CREDENCIALES_INVALIDAS = 'Credenciales inválidas';
+// Login: el backend no respondió (apagado, puerto equivocado, CORS bloqueado).
+// Es un fallo de infraestructura, NO de credenciales: decirlo aparte evita que
+// se culpe al usuario por un problema del entorno.
+export const MSG_BACKEND_NO_DISPONIBLE =
+  'No se pudo conectar con el backend. Verifica que el servicio esté activo (en escritorio, que la aplicación interna esté arrancada).';
+// Login: el backend respondió con un error 5xx.
+export const MSG_ERROR_SERVIDOR_LOGIN =
+  'El backend respondió con un error al iniciar sesión. Verifica que el servicio esté activo y sea la versión correcta.';
 
 // ─── Respaldo de la base de datos (escritorio) ──────────────
 

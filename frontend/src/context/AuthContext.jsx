@@ -3,6 +3,7 @@ import { createContext, useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../api/auth.service';
 import { decodeJwt, isTokenExpired } from '../utils/jwt';
+import { clasificarErrorLogin } from '../utils/errors';
 import { LS_KEYS } from '../constants';
 import { setNavigate } from '../api/redirect';
 
@@ -56,11 +57,16 @@ export const AuthProvider = ({ children }) => {
 
       setToken(data.access_token);
       setUser(userInfo);
-      return true;
+      return { ok: true, codigo: null };
     } catch (error) {
-      // Log sanitizado: solo el código de estado, sin volcar la respuesta completa.
-      console.error("Login failed:", error?.response?.status ?? error?.message);
-      return false;
+      // Se clasifica el fallo para no culpar al usuario de un problema de
+      // infraestructura: un 401 (credenciales) y un backend inaccesible
+      // (sin respuesta) son fallos distintos y merecen mensajes distintos
+      // (ver `clasificarErrorLogin`).
+      const codigo = clasificarErrorLogin(error);
+      // Log sanitizado: solo el código y el estado, sin volcar la respuesta.
+      console.error("Login failed:", codigo, error?.response?.status ?? error?.message);
+      return { ok: false, codigo };
     }
   };
 
