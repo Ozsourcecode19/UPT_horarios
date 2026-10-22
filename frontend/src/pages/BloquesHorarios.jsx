@@ -48,7 +48,7 @@ const BloquesHorarios = () => {
             </div>
           </div>
           <button
-            onClick={() => { bloques.setDemoMode(false); bloques.showToast('Intentando conectar con API real...', 'info'); }}
+            onClick={bloques.reconnectDemo}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5" />

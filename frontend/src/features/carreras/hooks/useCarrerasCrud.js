@@ -6,10 +6,10 @@ import TrayectosService from '../../../api/trayectos';
 import useCanWrite from '../../../hooks/useCanWrite';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_CARRERAS, MOCK_TRAYECTOS } from '../demoData';
 import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
-import { MSG_SERVIDOR_DESCONECTADO, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO_API, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 export function useCarrerasCrud() {
   const queryClient = useQueryClient();
@@ -48,6 +48,8 @@ export function useCarrerasCrud() {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchCarreras,
   } = usePaginatedQuery(
     ['carreras'],
     (skip, limit, search) => CarrerasService.getCarreras(skip, limit, search),
@@ -71,12 +73,11 @@ export function useCarrerasCrud() {
     ? trayectosResponse.items
     : Array.isArray(trayectosResponse) ? trayectosResponse : [];
 
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const items = demoMode ? demoCarreras : carrerasReal;
   const total = demoMode ? demoCarreras.length : (totalCarrerasReal ?? 0);
@@ -169,6 +170,12 @@ export function useCarrerasCrud() {
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchCarreras],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     searchTerm, setSearchTerm,
     isModalOpen, editingCarrera, openModal, closeModal,
@@ -179,5 +186,6 @@ export function useCarrerasCrud() {
     statsSource: demoMode ? demoCarreras : allCarrerasStats,
     puedeEscribir,
     handleSave, handleDelete,
+    reconnectDemo,
   };
 }

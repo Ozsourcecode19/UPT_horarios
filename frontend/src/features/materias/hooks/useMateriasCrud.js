@@ -5,9 +5,9 @@ import SubjectsService from '../../../api/subjects';
 import useCanWrite from '../../../hooks/useCanWrite';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_MATERIAS } from '../demoData';
-import { MSG_SERVIDOR_DESCONECTADO, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO_API, MSG_SIN_PERMISO_CREAR, MSG_SIN_PERMISO_ELIMINAR, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
 
 export function useMateriasCrud() {
@@ -47,18 +47,19 @@ export function useMateriasCrud() {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchMaterias,
   } = usePaginatedQuery(
     ['subjects'],
     (skip, limit, search) => SubjectsService.getSubjects(skip, limit, search),
     { searchTerm: demoMode ? '' : searchTerm, enabled: !demoMode }
   );
 
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const items = demoMode ? demoMaterias : materiasReal;
   const total = demoMode ? demoMaterias.length : (totalMateriasReal ?? 0);
@@ -140,6 +141,12 @@ export function useMateriasCrud() {
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchMaterias],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     searchTerm, setSearchTerm,
     isModalOpen, editingMateria, openModal, closeModal,
@@ -149,5 +156,6 @@ export function useMateriasCrud() {
     statsSource: demoMode ? demoMaterias : allMateriasStats,
     puedeEscribir,
     handleSave, handleDelete,
+    reconnectDemo,
   };
 }

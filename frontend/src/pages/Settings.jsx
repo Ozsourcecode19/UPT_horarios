@@ -20,13 +20,13 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState('algoritmo');
 
   const {
-    demoMode, setDemoMode, toast, showToast,
+    demoMode, toast, showToast,
     configs, setDemoConfigs,
     isConfigsLoading,
     usuarios, isUsuariosLoading, refetchUsuarios,
     dbHealth, isDbHealthLoading, refetchDbHealth,
     notifConfigs, isNotifLoading, refetchNotifConfigs,
-    refetchConfigs, queryClient,
+    refetchConfigs, reconectarApi, queryClient,
   } = useSettingsData();
 
   const { handleSaveUser, handleDeleteUser } = useUsuariosCrud({ showToast, refetchUsuarios });
@@ -118,7 +118,7 @@ const Settings = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 py-6 relative">
-      {demoMode && <DemoBanner onReconnect={() => { setDemoMode(false); refetchConfigs(); showToast("Intentando conectar con API real...", "info"); }} description="Operando con la configuración de prueba en almacenamiento local." />}
+      {demoMode && <DemoBanner onReconnect={reconectarApi} description="Operando con la configuración de prueba en almacenamiento local." />}
       <Toast toast={toast} />
 
       <div className="flex flex-col gap-2">

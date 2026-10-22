@@ -222,8 +222,17 @@ frontend/src/
 - **Backend (complemento):** `SECRET_KEY` obligatoria en producción (`ENTORNO=production` sin clave ⇒ `RuntimeError` al arrancar); ver `SDD.md §9.4`.
 
 **Activación del Modo Demo (regla vigente):**
-- Todas las páginas activan el demo SOLO ante fallos de infraestructura usando `esErrorDeServidor(error)` (`src/utils/errors.js`): sin `response` (red caída) o HTTP >= 500
+- Todas las páginas activan el demo SOLO ante fallos de infraestructura usando `esErrorDeServidor(error)` (`src/utils/errors.ts`): sin `response` (red caída) o HTTP >= 500
 - Un 401/403 ya NO activa el demo ni simula escrituras locales
+- **Se usa el hook central `useActivarDemoPorError` (`src/hooks/useActivarDemoPorError.js`), no un `useEffect` propio por página.** Ver "Bug del Modo Demo" más abajo.
+
+**Bug del Modo Demo — "se activa y no se logra reconectar con la API" (corregido el 22-oct-2026):**
+- **Síntoma:** el Modo Demo se activaba y, al pulsar "Reconectar API", volvía al demo al instante: había que pulsar el botón dos veces.
+- **Causa raíz:** el efecto de activación era `useEffect(() => { if (isError && esErrorDeServidor(error) && !demoMode) setDemoMode(true); }, [isError, error, demoMode])`. Como `demoMode` estaba en las dependencias, al hacer `setDemoMode(false)` el efecto se re-ejecutaba en ese mismo render. TanStack Query (5.101.0) conserva el error **residual** en la caché: su resultado optimista mantiene `isError=true` y el error viejo cuando la query ya tiene datos (solo lo limpia si `data === undefined`). El efecto veía el error viejo con `!demoMode` y **volvía a encender el demo antes de que el refetch resolviera**.
+- **Segundo defecto:** varias páginas reconectaban con `queryClient.invalidateQueries(...)` sobre una query con `enabled: false`. Una query deshabilitada no es "active", así que `invalidateQueries` solo la marca como stale: **no la vuelve a pedir**.
+- **Fix:** `useActivarDemoPorError` solo reacciona a errores **nuevos** (compara la identidad del error y `errorUpdatedAt`), de modo que un error residual no puede re-encender el demo; si el refetch falla de nuevo, el error es nuevo y el demo vuelve a activarse (que es lo correcto: la API sigue caída). La reconexión usa `useReconectarDemo` (mismo archivo), que hace `setDemoMode(false)` + **`refetch()`** explícito. `usePaginatedQuery` expone ahora `refetch` y `errorUpdatedAt` para eso.
+- **Extra:** `usePeriodosCrud` y `useBloquesCrud` activaban el demo con `isError` a secas (sin `esErrorDeServidor`): un 401/403 (token expirado) los activaba. Ahora usan el hook central y un 401/403 nunca activa el demo.
+- **Cobertura:** `src/hooks/__tests__/useActivarDemoPorError.test.jsx` (incluye la regresión exacta: datos en caché + error de fondo → reconectar con la API viva sale del demo con **un** clic) y `src/api/__tests__/demoReset.test.jsx` + `client401.test.jsx` (el 401 apaga el estado React del demo, no solo el localStorage).
 
 **Posibles mejoras:**
 - Agregar refresh token para no forzar re-login cada 30 minutos
@@ -319,6 +328,14 @@ HorarioGenerado + Leccion + Materia + Docente + Grupo + Aula + Sede + PeriodoAca
 ---
 
 ## 4. Bugs Conocidos y Plan de Corrección
+
+### ✅ RESUELTO (22-oct-2026): El Modo Demo se activa y no se logra reconectar con la API
+
+**Síntoma:** el Modo Demo se activaba (backend caído) y, al pulsar "Reconectar API" con la API ya viva, la app volvía al demo al instante: había que pulsar el botón dos veces.
+
+**Causa raíz:** el efecto de activación de cada página era `useEffect(() => { if (isError && esErrorDeServidor(error) && !demoMode) setDemoMode(true); }, [isError, error, demoMode])`. Al hacer `setDemoMode(false)`, `demoMode` cambiaba → el efecto se re-ejecutaba en ese mismo render. TanStack Query conserva el error **residual** en la caché (su resultado optimista mantiene `isError` y el error viejo cuando la query ya tiene datos), así que el efecto volvía a encender el demo antes de que el refetch resolviera. Además, varias páginas reconectaban con `invalidateQueries` sobre una query con `enabled: false`, que no se vuelve a pedir (no es "active").
+
+**Fix aplicado:** hook central `useActivarDemoPorError` + `useReconectarDemo` (`src/hooks/useActivarDemoPorError.js`); solo reaccionan a errores **nuevos** (identidad del error + `errorUpdatedAt`) y reconectan con `refetch()` explícito. Además `usePeriodosCrud`/`useBloquesCrud` ya filtran por `esErrorDeServidor` (un 401/403 jamás activa el demo) y el 401 ahora apaga también el estado React del demo (`api/demoReset.js`). Cobertura: `src/hooks/__tests__/useActivarDemoPorError.test.jsx`, `src/api/__tests__/demoReset.test.jsx`, `src/api/__tests__/client401.test.jsx`.
 
 ### 🔴 BUG CRÍTICO: Los horarios generados no se muestran en el calendario
 
@@ -558,7 +575,13 @@ Esta sección documenta patrones, convenciones y gotchas específicos del proyec
 ### Patrones Establecidos
 
 **Modo Demo / Fallback:**  
-Todos los componentes de página siguen este patrón: si el `useQuery` falla (`isError`), se activa `demoMode` (estado local), se cargan datos de `MOCK_*` hardcodeados y se persiste en `localStorage`. El banner de "Modo Demo Activado" muestra un botón para reconectar. Este patrón **debe mantenerse** en cualquier componente nuevo.
+Todos los componentes de página siguen este patrón: si el `useQuery` falla por **infraestructura** (sin respuesta o HTTP ≥ 500), se activa `demoMode` (estado **global** en `context/DemoContext.jsx`), se cargan datos de `MOCK_*` hardcodeados y se persiste en `localStorage`. El banner de "Modo Demo Activado" muestra un botón para reconectar. Este patrón **debe mantenerse** en cualquier componente nuevo.
+
+**Implementación (obligatoria, no copiar el patrón viejo):**
+- **Activar el demo:** usar el hook `useActivarDemoPorError` (`src/hooks/useActivarDemoPorError.js`) con `sondas: [{ isError, error, errorUpdatedAt }]`. **No escribir un `useEffect` propio** con `demoMode` en las dependencias: rompe la reconexión (ver §4). El hook solo reacciona a errores nuevos (identidad del error + `errorUpdatedAt`).
+- **Reconectar:** usar `useReconectarDemo` (`refetches: [refetchX]`, `showToast`). **No usar `invalidateQueries`**: una query con `enabled: false` no es "active" y no se vuelve a pedir.
+- **Nunca activar el demo ante 401/403** (token expirado / permisos): el hook central ya filtra con `esErrorDeServidor`.
+- `usePaginatedQuery` expone `refetch` y `errorUpdatedAt` para esto.
 
 **Estructura de Queries (no paginadas):**  
 ```javascript

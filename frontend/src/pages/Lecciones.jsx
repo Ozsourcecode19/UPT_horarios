@@ -22,12 +22,12 @@ const Lecciones = () => {
   const [deleteConfirmLeccion, setDeleteConfirmLeccion] = useState(null);
 
   const {
-    demoMode, setDemoMode, toast, showToast,
+    demoMode, toast, showToast,
     demoGrupos, setDemoGrupos, demoLecciones, setDemoLecciones,
     listadoGrupos, listadoLecciones,
     docentes, sedes, materias, trayectos, periodos,
     isGruposLoading, isLeccionesLoading,
-    refetchGrupos, refetchLecciones, queryClient,
+    refetchGrupos, refetchLecciones, reconectarApi, queryClient,
   } = usePlanningData();
 
   const puedeEscribir = true;
@@ -57,7 +57,7 @@ const Lecciones = () => {
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
 
       {demoMode && (
-        <DemoBanner onReconnect={() => { setDemoMode(false); refetchGrupos(); refetchLecciones(); showToast("Intentando reconectar con API real...", "info"); }} title="Modo Demo de Planificación Activado" description="Operando localmente en el navegador. Ideal para simulaciones de carga académica y configuraciones de secciones." />
+        <DemoBanner onReconnect={reconectarApi} title="Modo Demo de Planificación Activado" description="Operando localmente en el navegador. Ideal para simulaciones de carga académica y configuraciones de secciones." />
       )}
 
       <Toast toast={toast} />

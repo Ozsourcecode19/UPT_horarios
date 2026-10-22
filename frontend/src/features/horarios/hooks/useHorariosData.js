@@ -12,12 +12,13 @@ import ConfiguracionesService from '../../../api/configuraciones';
 import ScheduleService from '../../../api/schedule';
 import { useAuth } from '../../../context/AuthContext';
 import { useDemo } from '../../../context/DemoContext';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { FETCH_ALL_LIMIT } from '../../../constants';
 import { ROLES_ESCRITURA } from '../../../constants';
-import { esErrorDeServidor } from '../../../utils/errors';
 import { MOCK_PERIODOS, MOCK_AULAS, MOCK_DOCENTES, MOCK_GRUPOS, MOCK_BLOQUES, MOCK_HORARIOS_INICIALES } from '../../schedule';
 import { Users, GraduationCap, MapPin } from 'lucide-react';
 import { TOAST_DURATION, TOAST_DURATION_ERROR } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO_HORARIOS, MSG_RECONECTANDO_API } from '../../../constants/messages';
 
 const TIPOS_VISTA = [
   { valor: 'grupo', etiqueta: 'Secciones', Icono: Users },
@@ -155,7 +156,7 @@ export default function useHorariosData() {
     retry: 0,
   });
 
-  const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, error: horariosError, refetch: refetchHorarios } = useQuery({
+  const { data: horariosReal = [], isLoading: isHorariosLoading, isError: isHorariosError, error: horariosError, errorUpdatedAt: horariosErrorUpdatedAt, refetch: refetchHorarios } = useQuery({
     queryKey: ['horarios', selectedPeriodoId],
     queryFn: async () => {
       if (!selectedPeriodoId) return [];
@@ -224,12 +225,11 @@ export default function useHorariosData() {
     },
   });
 
-  useEffect(() => {
-    if (isHorariosError && esErrorDeServidor(horariosError) && !demoMode) {
-      setDemoMode(true);
-      showToast("API del servidor desconectada. Modo Demo activado con persistencia local.", "warning");
-    }
-  }, [isHorariosError, horariosError, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError: isHorariosError, error: horariosError, errorUpdatedAt: horariosErrorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO_HORARIOS,
+  });
 
   // Auto-seleccionar entidad del filtro
   useEffect(() => {
@@ -245,6 +245,12 @@ export default function useHorariosData() {
 
   const invalidateHorarios = () => queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
 
+  const reconectarApi = useReconectarDemo({
+    refetches: [refetchHorarios],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     canRestore,
     selectedPeriodoId, setSelectedPeriodoId,
@@ -259,7 +265,7 @@ export default function useHorariosData() {
     periodos, selectedPeriodo,
     aulas, docentes, grupos, bloques, configuraciones,
     horariosReal: horariosFiltradosPorSede, isHorariosLoading, refetchHorarios,
-    invalidateHorarios,
+    invalidateHorarios, reconectarApi,
     preCheck, refetchPreCheck, canGenerate,
     versiones, refetchVersiones, restoreVersionMutation,
     TIPOS_VISTA,

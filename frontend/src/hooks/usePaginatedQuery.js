@@ -20,6 +20,9 @@ import { PAGE_SIZE } from '../constants';
  *   setPage: (p: number) => void,
  *   isLoading: boolean,
  *   isError: boolean,
+ *   error: unknown,
+ *   errorUpdatedAt: number,
+ *   refetch: () => Promise<unknown>,
  * }}
  */
 export default function usePaginatedQuery(queryKey, fetchFn, { pageSize = PAGE_SIZE, searchTerm = '', enabled = true, resetOn = [] } = {}) {
@@ -30,7 +33,7 @@ export default function usePaginatedQuery(queryKey, fetchFn, { pageSize = PAGE_S
     setPage(1);
   }, [searchTerm, ...resetOn]);
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, errorUpdatedAt, refetch } = useQuery({
     queryKey: [...queryKey, skip, pageSize, searchTerm],
     queryFn: () => fetchFn(skip, pageSize, searchTerm || undefined),
     placeholderData: keepPreviousData,
@@ -56,5 +59,11 @@ export default function usePaginatedQuery(queryKey, fetchFn, { pageSize = PAGE_S
     isLoading,
     isError,
     error,
+    // `errorUpdatedAt` permite distinguir un error NUEVO de uno residual en
+    // cache (ver hooks/useActivarDemoPorError.js). `refetch` se usa para
+    // reconectar con la API real: `invalidateQueries` no refetchea queries
+    // con `enabled: false` (el caso normal mientras el demo esta activo).
+    errorUpdatedAt,
+    refetch,
   };
 }

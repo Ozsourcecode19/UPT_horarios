@@ -4,6 +4,7 @@
 // useState(false) duplicado en 14+ hooks.
 
 import { createContext, useState, useCallback, useContext, useEffect } from 'react';
+import { setLimpiarDemoExterno } from '../api/demoReset';
 
 const LS_KEY = 'global_demo_mode';
 const DemoContext = createContext(null);
@@ -24,6 +25,12 @@ export const DemoProvider = ({ children }) => {
       }
     } catch { /* sin localStorage */ }
   }, [demoMode]);
+
+  // Permitir que la capa HTTP apague el demo (interceptor 401).
+  useEffect(() => {
+    setLimpiarDemoExterno(() => setDemoModeState(false));
+    return () => setLimpiarDemoExterno(null);
+  }, []);
 
   const setDemoMode = useCallback((value) => {
     setDemoModeState((prev) => {

@@ -33,13 +33,14 @@ const Horarios = () => {
     sedes,
     filterType, setFilterType,
     filterValue, setFilterValue,
-    demoMode, setDemoMode,
+    demoMode,
     selectedVersion, setSelectedVersion,
     toast, showToast,
     demoHorarios, setDemoHorarios,
     periodos, selectedPeriodo,
     aulas, docentes, grupos, bloques, configuraciones,
     horariosReal, isHorariosLoading, refetchHorarios, invalidateHorarios,
+    reconectarApi,
     preCheck, refetchPreCheck, canGenerate,
     versiones, refetchVersiones, restoreVersionMutation,
     TIPOS_VISTA,
@@ -518,7 +519,7 @@ const Horarios = () => {
 
   return (
     <div className="horarios-page max-w-7xl 2xl:max-w-[1700px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      {demoMode && <DemoBanner onReconnect={() => { setDemoMode(false); refetchHorarios(); showToast("Intentando conectar con API real...", "info"); }} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
+      {demoMode && <DemoBanner onReconnect={reconectarApi} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
       <Toast toast={toast} />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
 

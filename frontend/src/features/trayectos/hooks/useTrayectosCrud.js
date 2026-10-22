@@ -8,14 +8,14 @@ import CarrerasService from '../../../api/carreras';
 import GruposService from '../../../api/grupos';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_TRAYECTOS, MOCK_CARRERAS, MOCK_GRUPOS } from '../demoData';
 import { TOAST_DURATION, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
 import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
-  const { demoMode, setDemoMode } = useDemo();
+  const { demoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrayecto, setEditingTrayecto] = useState(null);
@@ -49,6 +49,8 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchTrayectos,
   } = usePaginatedQuery(
     ['trayectos'],
     (skip, limit, search) => TrayectosService.getTrayectos(skip, limit, search),
@@ -84,12 +86,11 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
   });
 
   // Activar modo demo si el backend cae
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const listadoCarreras = demoMode ? MOCK_CARRERAS : carrerasReal;
   const listadoGrupos = demoMode ? MOCK_GRUPOS : gruposReal;
@@ -186,11 +187,11 @@ const useTrayectosCrud = ({ searchTerm, debouncedSearch }) => {
     }
   };
 
-  const reconnectDemo = () => {
-    setDemoMode(false);
-    queryClient.invalidateQueries({ queryKey: ['trayectos'] });
-    showToast(MSG_RECONECTANDO, "info");
-  };
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchTrayectos],
+    showToast,
+    mensaje: MSG_RECONECTANDO,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

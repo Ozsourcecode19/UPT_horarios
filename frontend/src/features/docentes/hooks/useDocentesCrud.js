@@ -8,14 +8,14 @@ import DocentsService from '../../../api/docents';
 import SedesService from '../../../api/sedes';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_DOCENTES, MOCK_SEDES } from '../demoData';
 import { TOAST_DURATION, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
 import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR, MSG_ELIMINADO_ERROR } from '../../../constants/messages';
 
 const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
-  const { demoMode, setDemoMode } = useDemo();
+  const { demoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDocente, setEditingDocente] = useState(null);
@@ -66,19 +66,19 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchDocentes,
   } = usePaginatedQuery(
     ['docents'],
     (skip, limit, search) => DocentsService.getDocents(skip, limit, search),
     { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
-  // Activar modo demo si el backend cae
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   // Demo: filtrar localmente
   const demoFiltered = demoMode ? demoDocentes.filter(d => {
@@ -172,11 +172,11 @@ const useDocentesCrud = ({ searchTerm, debouncedSearch }) => {
     }
   };
 
-  const reconnectDemo = () => {
-    setDemoMode(false);
-    queryClient.invalidateQueries({ queryKey: ['docents'] });
-    showToast(MSG_RECONECTANDO, "info");
-  };
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchDocentes],
+    showToast,
+    mensaje: MSG_RECONECTANDO,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

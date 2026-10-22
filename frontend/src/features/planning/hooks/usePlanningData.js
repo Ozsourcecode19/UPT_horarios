@@ -10,10 +10,10 @@ import DocentsService from '../../../api/docents';
 import SedesService from '../../../api/sedes';
 import SubjectsService from '../../../api/subjects';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_TRAYECTOS, MOCK_PERIODOS, MOCK_GRUPOS, MOCK_LECCIONES, MOCK_DOCENTES, MOCK_SEDES, MOCK_MATERIAS } from '../demoData';
 import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
-import { MSG_SERVIDOR_DESCONECTADO } from '../../../constants/messages';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO_API } from '../../../constants/messages';
 
 export function usePlanningData() {
   const queryClient = useQueryClient();
@@ -44,14 +44,14 @@ export function usePlanningData() {
   useEffect(() => { localStorage.setItem('demo_grupos', JSON.stringify(demoGrupos)); }, [demoGrupos]);
   useEffect(() => { localStorage.setItem('demo_lecciones', JSON.stringify(demoLecciones)); }, [demoLecciones]);
 
-  const { data: gruposResponse = [], isLoading: isGruposLoading, isError: isGruposError, error: gruposError, refetch: refetchGrupos } = useQuery({
+  const { data: gruposResponse = [], isLoading: isGruposLoading, isError: isGruposError, error: gruposError, errorUpdatedAt: gruposErrorUpdatedAt, refetch: refetchGrupos } = useQuery({
     queryKey: ['grupos'],
     queryFn: async () => { try { const res = await GruposService.getGrupos(0, FETCH_ALL_LIMIT); return res.items || res || []; } catch { return []; } },
     enabled: !demoMode, retry: 0,
   });
   const gruposReal = Array.isArray(gruposResponse) ? gruposResponse : [];
 
-  const { data: leccionesResponse = [], isLoading: isLeccionesLoading, isError: isLeccionesError, error: leccionesError, refetch: refetchLecciones } = useQuery({
+  const { data: leccionesResponse = [], isLoading: isLeccionesLoading, isError: isLeccionesError, error: leccionesError, errorUpdatedAt: leccionesErrorUpdatedAt, refetch: refetchLecciones } = useQuery({
     queryKey: ['lecciones'],
     queryFn: async () => { try { const res = await LeccionesService.getLecciones(0, FETCH_ALL_LIMIT); return res.items || res || []; } catch { return []; } },
     enabled: !demoMode, retry: 0,
@@ -93,13 +93,20 @@ export function usePlanningData() {
   });
   const materiasReal = Array.isArray(materiasResponse) ? materiasResponse : [];
 
-  useEffect(() => {
-    const falloServidor = esErrorDeServidor(gruposError) || esErrorDeServidor(leccionesError);
-    if ((isGruposError || isLeccionesError) && falloServidor && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isGruposError, isLeccionesError, gruposError, leccionesError, demoMode]);
+  useActivarDemoPorError({
+    sondas: [
+      { isError: isGruposError, error: gruposError, errorUpdatedAt: gruposErrorUpdatedAt },
+      { isError: isLeccionesError, error: leccionesError, errorUpdatedAt: leccionesErrorUpdatedAt },
+    ],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
+
+  const reconectarApi = useReconectarDemo({
+    refetches: [refetchGrupos, refetchLecciones],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
@@ -116,6 +123,7 @@ export function usePlanningData() {
     periodos: demoMode || isPeriodosError ? MOCK_PERIODOS : periodosReal,
     isGruposLoading, isLeccionesLoading,
     refetchGrupos, refetchLecciones,
+    reconectarApi,
     queryClient,
   };
 }

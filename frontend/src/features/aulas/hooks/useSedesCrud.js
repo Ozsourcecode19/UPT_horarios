@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import SedesService from '../../../api/sedes';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_SEDES } from '../demoData';
 import { TOAST_DURATION } from '../../../constants';
 import { MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, MSG_RECONECTANDO_API } from '../../../constants/messages';
@@ -47,18 +47,19 @@ const useSedesCrud = ({ searchTerm, debouncedSearch }) => {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchSedes,
   } = usePaginatedQuery(
     ['sedes'],
     (skip, limit, search) => SedesService.getSedes(skip, limit, search),
     { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA,
+  });
 
   const demoFiltered = demoMode ? demoSedes.filter(s => {
     const str = `${s.nombre} ${s.codigo} ${s.direccion || ''}`.toLowerCase();
@@ -138,11 +139,11 @@ const useSedesCrud = ({ searchTerm, debouncedSearch }) => {
     }
   };
 
-  const reconnectDemo = () => {
-    setDemoMode(false);
-    queryClient.invalidateQueries({ queryKey: ['sedes'] });
-    showToast(MSG_RECONECTANDO_API, "info");
-  };
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchSedes],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

@@ -6,13 +6,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import PeriodosService from '../../../api/periodos';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_PERIODOS } from '../demoData';
 import { TOAST_DURATION, PAGE_SIZE } from '../../../constants';
 import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO, MSG_GUARDADO_ERROR } from '../../../constants/messages';
 
 const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
   const queryClient = useQueryClient();
-  const { demoMode, setDemoMode } = useDemo();
+  const { demoMode } = useDemo();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPeriodo, setEditingPeriodo] = useState(null);
@@ -44,18 +45,20 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
     setPage,
     isLoading,
     isError,
+    error,
+    errorUpdatedAt,
+    refetch: refetchPeriodos,
   } = usePaginatedQuery(
     ['periodos'],
     (skip, limit, search) => PeriodosService.getPeriodos(skip, limit, search),
     { searchTerm: demoMode ? '' : debouncedSearch }
   );
 
-  useEffect(() => {
-    if (isError && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isError, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const demoFiltered = demoMode ? demoPeriodos.filter(p => {
     const s = `${p.nombre} ${p.tipo_corte} ${p.anio_academico} ${p.estado}`.toLowerCase();
@@ -166,11 +169,11 @@ const usePeriodosCrud = ({ searchTerm, debouncedSearch }) => {
     return handleToggleEstado();
   };
 
-  const reconnectDemo = () => {
-    setDemoMode(false);
-    queryClient.invalidateQueries({ queryKey: ['periodos'] });
-    showToast(MSG_RECONECTANDO, "info");
-  };
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchPeriodos],
+    showToast,
+    mensaje: MSG_RECONECTANDO,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

@@ -222,6 +222,14 @@ Hoja de ruta de trabajo por **ejecuciones reducidas**, cada una dimensionada par
 - Tipado de clientes API (`src/api/`) y funciones puras de mapeo de eventos.
 - ✅ Criterio: `pnpm build` OK sin errores y mejor DX con autocompletado en la IDE.
 
+### ✅ E25 — Corrección del Modo Demo: "se activa y no se logra reconectar con la API" (completada 2026-10-22)
+- **Síntoma:** al caer el backend se activaba el Modo Demo y, al pulsar "Reconectar API" con la API ya viva, la app volvía al demo al instante (había que pulsar el botón dos veces).
+- **Causa raíz:** el efecto de activación repetido en 14 sitios (`if (isError && esErrorDeServidor(error) && !demoMode) setDemoMode(true)` con `demoMode` en las dependencias) se re-ejecutaba al hacer `setDemoMode(false)`: TanStack Query conserva el error **residual** en la caché (su resultado optimista mantiene `isError` y el error viejo cuando la query ya tiene datos) y el efecto volvía a encender el demo antes de que el refetch resolviera. Segundo defecto: varias páginas reconectaban con `invalidateQueries` sobre una query con `enabled: false`, que no se vuelve a pedir (no es "active").
+- **Solución:** hook central `src/hooks/useActivarDemoPorError.js` (`useActivarDemoPorError` + `useReconectarDemo`): solo se reacciona a errores **nuevos** (identidad del error + `errorUpdatedAt`) y la reconexión usa `refetch()` explícito. `usePaginatedQuery` expone `refetch` y `errorUpdatedAt`. Migrados los 14 sitios (CRUD de aulas/sedes/docentes/materias/carreras/trayectos/periodos/bloques, dashboard, planning, settings, horarios y las 2 sub-rutas de docente).
+- **Extras del mismo fix:** `usePeriodosCrud`/`useBloquesCrud` ya exigen `esErrorDeServidor` (antes un 401/403 activaba el demo); `Materias`/`Carreras`/`BloquesHorarios` usan el `reconnectDemo` de su hook (antes solo `setDemoMode(false)` sin refetch); el 401 apaga también el **estado React** del demo vía `api/demoReset.js` (antes solo borraba el localStorage y al re-loguearse la app volvía en demo).
+- **Tests:** `src/hooks/__tests__/useActivarDemoPorError.test.jsx` (regresión exacta del bug + reglas del hook), `src/api/__tests__/demoReset.test.jsx` y `client401.test.jsx` (el 401 apaga el demo).
+- ✅ Criterio: `pnpm test` → **648 passed** (53 archivos), `pnpm build` OK, backend **154 passed** (sin cambios). **Smoke real verificado**: backend FastAPI vivo → apagado → la app entra en demo → backend encendido → **un solo click** en "Reconectar API" sale del demo (el mismo smoke falla con el código previo).
+
 ---
 
 ## Riesgos a vigilar

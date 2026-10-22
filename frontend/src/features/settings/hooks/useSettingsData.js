@@ -6,9 +6,9 @@ import ConfiguracionesService from '../../../api/configuraciones';
 import UsuariosService from '../../../api/usuarios';
 import DatabaseService from '../../../api/database';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_CONFIGURACIONES } from '../demoData';
-import { MSG_SERVIDOR_DESCONECTADO } from '../../../constants/messages';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO_API } from '../../../constants/messages';
 import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
 
 export function useSettingsData() {
@@ -32,18 +32,17 @@ export function useSettingsData() {
 
   useEffect(() => { localStorage.setItem('demo_configuraciones', JSON.stringify(demoConfigs)); }, [demoConfigs]);
 
-  const { data: configsReal = [], isLoading: isConfigsLoading, isError: isConfigsError, error: configsError, refetch: refetchConfigs } = useQuery({
+  const { data: configsReal = [], isLoading: isConfigsLoading, isError: isConfigsError, error: configsError, errorUpdatedAt: configsErrorUpdatedAt, refetch: refetchConfigs } = useQuery({
     queryKey: ['configuraciones'],
     queryFn: async () => { const res = await ConfiguracionesService.getConfiguraciones(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
   });
 
-  useEffect(() => {
-    if (isConfigsError && esErrorDeServidor(configsError) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isConfigsError, configsError, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError: isConfigsError, error: configsError, errorUpdatedAt: configsErrorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
@@ -69,6 +68,12 @@ export function useSettingsData() {
     enabled: !demoMode, retry: 0,
   });
 
+  const reconectarApi = useReconectarDemo({
+    refetches: [refetchConfigs, refetchUsuarios, refetchDbHealth, refetchNotifConfigs],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     demoMode, setDemoMode, toast, showToast,
     configs: demoMode ? demoConfigs : configsReal,
@@ -78,6 +83,6 @@ export function useSettingsData() {
     isUsuariosLoading, refetchUsuarios,
     dbHealth, isDbHealthLoading, refetchDbHealth,
     notifConfigs, isNotifLoading, refetchNotifConfigs,
-    refetchConfigs, queryClient,
+    refetchConfigs, reconectarApi, queryClient,
   };
 }

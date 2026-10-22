@@ -14,10 +14,11 @@ const Materias = () => {
     searchTerm, setSearchTerm,
     isModalOpen, editingMateria, openModal, closeModal,
     deleteConfirmMateria, setDeleteConfirmMateria,
-    demoMode, setDemoMode, toast, showToast,
+    demoMode, toast, showToast,
     items, total, isLoading,
     statsSource,
     handleSave, handleDelete,
+    reconnectDemo,
   } = useMateriasCrud();
 
   return (
@@ -39,10 +40,7 @@ const Materias = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              setDemoMode(false);
-              showToast("Intentando conectar con API real...", "info");
-            }}
+            onClick={reconnectDemo}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5" />

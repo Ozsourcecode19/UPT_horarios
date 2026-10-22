@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { LS_KEYS } from '../constants';
 import { redirectToLogin } from './redirect';
+import { limpiarDemo } from './demoReset';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -35,7 +36,10 @@ apiClient.interceptors.response.use(
         isRedirecting = true;
         localStorage.removeItem(LS_KEYS.token);
         localStorage.removeItem(LS_KEYS.user);
-        localStorage.removeItem('global_demo_mode');
+        // Apaga el Modo Demo (estado React + localStorage): si no, el estado
+        // React seguiria en `true` y al re-loguearse la app volveria en demo
+        // sin que el usuario lo pidiera.
+        limpiarDemo();
         try {
           sessionStorage.setItem(LS_KEYS.authReturnUrl, window.location.pathname + window.location.search);
         } catch (e) { /* sessionStorage no disponible */ }

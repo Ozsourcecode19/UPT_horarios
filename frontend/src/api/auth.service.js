@@ -1,6 +1,7 @@
 // src/api/auth.service.js
 import apiClient from './client';
 import { LS_KEYS } from '../constants';
+import { limpiarDemo } from './demoReset';
 
 const AuthService = {
   /**
@@ -28,7 +29,8 @@ const AuthService = {
   logout: () => {
     localStorage.removeItem(LS_KEYS.token);
     localStorage.removeItem(LS_KEYS.user);
-    localStorage.removeItem('global_demo_mode');
+    // Apaga el Modo Demo (estado React + localStorage).
+    limpiarDemo();
     Object.keys(localStorage)
       .filter((k) => k.startsWith('demo_'))
       .forEach((k) => localStorage.removeItem(k));

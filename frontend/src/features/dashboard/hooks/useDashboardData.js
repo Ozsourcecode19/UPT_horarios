@@ -8,7 +8,7 @@ import AulasService from '../../../api/aulas';
 import PeriodosService from '../../../api/periodos';
 import ScheduleService from '../../../api/schedule';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { cargaHorariaPorDocente, distribucionPorMateria, resumenConflictos } from '../../../utils/dashboardStats';
 import { MOCK_STATS } from '../demoData';
 import { TOAST_DURATION, FETCH_ALL_LIMIT } from '../../../constants';
@@ -35,25 +35,25 @@ export function useDashboardData() {
 
   useEffect(() => { localStorage.setItem('demo_dashboard_stats', JSON.stringify(mockStats)); }, [mockStats]);
 
-  const { data: docentesReal = [], isPending: isDocentesPending, isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
+  const { data: docentesReal = [], isPending: isDocentesPending, isError: isDocentesError, error: docentesError, errorUpdatedAt: docentesErrorUpdatedAt, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => { const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
   });
 
-  const { data: materiasReal = [], isPending: isMateriasPending, isError: isMateriasError, error: materiasError, refetch: refetchMaterias } = useQuery({
+  const { data: materiasReal = [], isPending: isMateriasPending, isError: isMateriasError, error: materiasError, errorUpdatedAt: materiasErrorUpdatedAt, refetch: refetchMaterias } = useQuery({
     queryKey: ['subjects'],
     queryFn: async () => { const res = await SubjectsService.getSubjects(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
   });
 
-  const { data: aulasReal = [], isPending: isAulasPending, isError: isAulasError, error: aulasError, refetch: refetchAulas } = useQuery({
+  const { data: aulasReal = [], isPending: isAulasPending, isError: isAulasError, error: aulasError, errorUpdatedAt: aulasErrorUpdatedAt, refetch: refetchAulas } = useQuery({
     queryKey: ['aulas'],
     queryFn: async () => { const res = await AulasService.getAulas(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
   });
 
-  const { data: periodosReal = [], isPending: isPeriodosPending, isError: isPeriodosError, error: periodosError, refetch: refetchPeriodos } = useQuery({
+  const { data: periodosReal = [], isPending: isPeriodosPending, isError: isPeriodosError, error: periodosError, errorUpdatedAt: periodosErrorUpdatedAt, refetch: refetchPeriodos } = useQuery({
     queryKey: ['periodos'],
     queryFn: async () => { const res = await PeriodosService.getPeriodos(0, FETCH_ALL_LIMIT); return res.items || res || []; },
     enabled: !demoMode, retry: 0,
@@ -61,7 +61,7 @@ export function useDashboardData() {
 
   const periodoVigente = periodosReal.find(p => p.estado === 'ACTIVO') || periodosReal[0] || null;
 
-  const { data: horariosReal = [], isPending: isHorariosPending, isError: isHorariosError, error: horariosError, refetch: refetchHorarios } = useQuery({
+  const { data: horariosReal = [], isPending: isHorariosPending, isError: isHorariosError, error: horariosError, errorUpdatedAt: horariosErrorUpdatedAt, refetch: refetchHorarios } = useQuery({
     queryKey: ['dashboard-horarios', periodoVigente?.id],
     queryFn: async () => {
       if (!periodoVigente) return [];
@@ -88,13 +88,17 @@ export function useDashboardData() {
     enabled: !demoMode && !!periodoVigente, retry: 0,
   });
 
-  useEffect(() => {
-    const falloServidor = esErrorDeServidor(docentesError) || esErrorDeServidor(materiasError) || esErrorDeServidor(aulasError) || esErrorDeServidor(periodosError) || esErrorDeServidor(horariosError);
-    if ((isDocentesError || isMateriasError || isAulasError || isPeriodosError || isHorariosError) && falloServidor && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO);
-    }
-  }, [isDocentesError, isMateriasError, isAulasError, isPeriodosError, isHorariosError, docentesError, materiasError, aulasError, periodosError, horariosError]);
+  useActivarDemoPorError({
+    sondas: [
+      { isError: isDocentesError, error: docentesError, errorUpdatedAt: docentesErrorUpdatedAt },
+      { isError: isMateriasError, error: materiasError, errorUpdatedAt: materiasErrorUpdatedAt },
+      { isError: isAulasError, error: aulasError, errorUpdatedAt: aulasErrorUpdatedAt },
+      { isError: isPeriodosError, error: periodosError, errorUpdatedAt: periodosErrorUpdatedAt },
+      { isError: isHorariosError, error: horariosError, errorUpdatedAt: horariosErrorUpdatedAt },
+    ],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const stats = useMemo(() => ({
     docentesActivos: demoMode ? mockStats.docentes : docentesReal.filter(d => d.activo).length,
@@ -109,16 +113,23 @@ export function useDashboardData() {
   const distribucionMaterias = useMemo(() => distribucionPorMateria(horariosReal), [horariosReal]);
   const saludPeriodo = useMemo(() => resumenConflictos(preCheck, generationStatus), [preCheck, generationStatus]);
 
+  const reconectarApi = useReconectarDemo({
+    refetches: [
+      refetchDocentes,
+      refetchMaterias,
+      refetchAulas,
+      refetchPeriodos,
+      ...(periodoVigente ? [refetchHorarios] : []),
+    ],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     demoMode, setDemoMode, toast, showToast,
     stats, cargaPorDocente, distribucionMaterias, saludPeriodo,
     isDocentesPending, isMateriasPending, isAulasPending, isPeriodosPending, isHorariosPending,
     periodoVigente,
-    reconectarApi: () => {
-      showToast(MSG_RECONECTANDO_API, 'info');
-      setDemoMode(false);
-      refetchDocentes(); refetchMaterias(); refetchAulas(); refetchPeriodos();
-      if (periodoVigente) refetchHorarios();
-    },
+    reconectarApi,
   };
 }

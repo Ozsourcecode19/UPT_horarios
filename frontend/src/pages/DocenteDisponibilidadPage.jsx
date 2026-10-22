@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, RefreshCw, Sparkles, Database, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
 import DocentsService from '../api/docents';
 import SedesService from '../api/sedes';
-import { esErrorDeServidor } from '../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../hooks/useActivarDemoPorError';
 import DocenteDisponibilidad from '../components/docentes/DocenteDisponibilidad';
 import DocenteTabs from '../components/docentes/DocenteTabs';
 import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO } from '../constants/messages';
@@ -50,7 +50,7 @@ const DocenteDisponibilidadPage = () => {
   });
 
   // --- QUERY DE DOCENTES (API) ---
-  const { data: docentesReal = [], isError: isDocentesError, error: docentesError, refetch: refetchDocentes } = useQuery({
+  const { data: docentesReal = [], isError: isDocentesError, error: docentesError, errorUpdatedAt: docentesErrorUpdatedAt, refetch: refetchDocentes } = useQuery({
     queryKey: ['docents'],
     queryFn: async () => {
       const res = await DocentsService.getDocents(0, FETCH_ALL_LIMIT);
@@ -61,12 +61,17 @@ const DocenteDisponibilidadPage = () => {
   });
 
   // Activar modo demo automáticamente SOLO si el backend cae (red/5xx), no ante 401/403
-  useEffect(() => {
-    if (isDocentesError && esErrorDeServidor(docentesError) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO, "warning");
-    }
-  }, [isDocentesError, docentesError, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError: isDocentesError, error: docentesError, errorUpdatedAt: docentesErrorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
+
+  const reconectarApi = useReconectarDemo({
+    refetches: [refetchDocentes],
+    showToast,
+    mensaje: MSG_RECONECTANDO,
+  });
 
   const docentes = demoMode || isDocentesError ? MOCK_DOCENTES : docentesReal;
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
@@ -91,11 +96,7 @@ const DocenteDisponibilidadPage = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              setDemoMode(false);
-              refetchDocentes();
-              showToast(MSG_RECONECTANDO, "info");
-            }}
+            onClick={reconectarApi}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5" />

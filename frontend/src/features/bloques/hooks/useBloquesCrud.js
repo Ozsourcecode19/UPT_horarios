@@ -10,8 +10,10 @@ import ConfiguracionesService from '../../../api/configuraciones';
 import useDebounce from '../../../hooks/useDebounce';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { DURACIONES_VALIDAS } from '../schemas';
 import { TOAST_DURATION, DEBOUNCE_DELAY, FETCH_ALL_LIMIT, PAGE_SIZE } from '../../../constants';
+import { MSG_SERVIDOR_DESCONECTADO, MSG_RECONECTANDO_API } from '../../../constants/messages';
 import { MOCK_SEDES, MOCK_BLOQUES } from '../demoData';
 import { horaCompleta, generarSimulacionDemo } from '../utils/bloques';
 
@@ -69,6 +71,9 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
     setPage,
     isLoading: isBloquesLoading,
     isError: isBloquesError,
+    error: bloquesError,
+    errorUpdatedAt: bloquesErrorUpdatedAt,
+    refetch: refetchBloques,
   } = usePaginatedQuery(
     ['bloques', selectedSedeId],
     (skip, limit, search) => BloquesService.getBloques(skip, limit, search, selectedSedeId ? Number(selectedSedeId) : null),
@@ -92,13 +97,13 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
     retry: 0,
   });
 
-  // Activar modo demo automáticamente si el backend cae
-  useEffect(() => {
-    if (isBloquesError && !demoMode) {
-      setDemoMode(true);
-      showToast('Servidor API desconectado. Se activó el Modo Demo interactivo automáticamente.', 'warning');
-    }
-  }, [isBloquesError, demoMode]);
+  // Activar modo demo automáticamente si el backend cae (solo fallos de
+  // infraestructura: un 401/403 jamás activa el demo).
+  useActivarDemoPorError({
+    sondas: [{ isError: isBloquesError, error: bloquesError, errorUpdatedAt: bloquesErrorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO,
+  });
 
   const sedes = demoMode || isSedesError ? MOCK_SEDES : sedesReal;
   const sedeActual = sedes.find(s => s.id === Number(selectedSedeId));
@@ -293,6 +298,12 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchBloques],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
+
   return {
     // State
     searchTerm, setSearchTerm,
@@ -322,6 +333,7 @@ const useBloquesCrud = ({ selectedSedeId, setSelectedSedeId }) => {
     openGenerarModal,
     handleGenerarEstandar,
     getDetailError,
+    reconnectDemo,
   };
 };
 

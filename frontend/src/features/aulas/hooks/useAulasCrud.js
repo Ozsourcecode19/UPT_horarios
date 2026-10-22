@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import AulasService from '../../../api/aulas';
 import usePaginatedQuery from '../../../hooks/usePaginatedQuery';
 import { useDemo } from '../../../context/DemoContext';
-import { esErrorDeServidor } from '../../../utils/errors';
+import { useActivarDemoPorError, useReconectarDemo } from '../../../hooks/useActivarDemoPorError';
 import { MOCK_AULAS } from '../demoData';
 import { TOAST_DURATION } from '../../../constants';
 import { MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, MSG_RECONECTANDO_API } from '../../../constants/messages';
@@ -47,18 +47,19 @@ const useAulasCrud = ({ searchTerm, debouncedSearch, sedes = [] }) => {
     isLoading,
     isError,
     error,
+    errorUpdatedAt,
+    refetch: refetchAulas,
   } = usePaginatedQuery(
     ['aulas'],
     (skip, limit, search) => AulasService.getAulas(skip, limit, search),
     { searchTerm: demoMode ? '' : debouncedSearch, enabled: !demoMode }
   );
 
-  useEffect(() => {
-    if (isError && esErrorDeServidor(error) && !demoMode) {
-      setDemoMode(true);
-      showToast(MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA, "warning");
-    }
-  }, [isError, error, demoMode]);
+  useActivarDemoPorError({
+    sondas: [{ isError, error, errorUpdatedAt }],
+    showToast,
+    mensajeDesconectado: MSG_SERVIDOR_DESCONECTADO_INFRAESTRUCTURA,
+  });
 
   const demoFiltered = demoMode ? demoAulas.filter(a => {
     const sedeNombre = sedes.find(s => s.id === a.sede_id)?.nombre || '';
@@ -140,11 +141,11 @@ const useAulasCrud = ({ searchTerm, debouncedSearch, sedes = [] }) => {
     }
   };
 
-  const reconnectDemo = () => {
-    setDemoMode(false);
-    queryClient.invalidateQueries({ queryKey: ['aulas'] });
-    showToast(MSG_RECONECTANDO_API, "info");
-  };
+  const reconnectDemo = useReconectarDemo({
+    refetches: [refetchAulas],
+    showToast,
+    mensaje: MSG_RECONECTANDO_API,
+  });
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

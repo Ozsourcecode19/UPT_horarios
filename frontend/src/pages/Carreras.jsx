@@ -14,11 +14,12 @@ const Carreras = () => {
     searchTerm, setSearchTerm,
     isModalOpen, editingCarrera, openModal, closeModal,
     deleteConfirmCarrera, setDeleteConfirmCarrera,
-    demoMode, setDemoMode, toast, showToast,
+    demoMode, toast, showToast,
     items, total, isLoading,
     listadoTrayectos,
     statsSource,
     handleSave, handleDelete,
+    reconnectDemo,
   } = useCarrerasCrud();
 
   return (
@@ -40,10 +41,7 @@ const Carreras = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              setDemoMode(false);
-              showToast("Intentando conectar con API real...", "info");
-            }}
+            onClick={reconnectDemo}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5" />
