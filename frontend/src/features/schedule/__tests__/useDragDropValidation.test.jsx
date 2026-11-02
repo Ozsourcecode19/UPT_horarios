@@ -234,6 +234,39 @@ describe('useDragDropValidation', () => {
     expect(result.current.editBloqueId).toBe(10);
   });
 
+  it('handleEventClick en sesion multibloque usa el rango completo de la sesion y el primer bloque', () => {
+    const bloques = [
+      { id: 10, sede_id: 1, dia_semana: 1, hora_inicio: '07:00:00', duracion_minutos: 45 },
+      { id: 11, sede_id: 1, dia_semana: 1, hora_inicio: '07:45:00', duracion_minutos: 45 },
+    ];
+    const ev1 = {
+      id: '101',
+      title: 'Programacion I',
+      start: lunes(7, 0),
+      end: lunes(7, 45),
+      extendedProps: { leccion_id: 7, aula_id: 1, bloque_id: 10, materia: 'Programacion I' },
+    };
+    const ev2 = {
+      id: '102',
+      title: 'Programacion I',
+      start: lunes(7, 45),
+      end: lunes(8, 30),
+      extendedProps: { leccion_id: 7, aula_id: 1, bloque_id: 11, materia: 'Programacion I' },
+    };
+    const setup = baseProps({ bloques, listadoHorarios: [ev1, ev2] });
+    const { result } = render(setup);
+
+    // Aunque se haga click sobre el segundo bloque (.cont.), el modal muestra
+    // el inicio/fin de toda la sesion (07:00 - 08:30) y preselecciona el bloque 10
+    act(() => {
+      result.current.handleEventClick(ev2);
+    });
+
+    expect(result.current.selectedEvent.start).toEqual(lunes(7, 0));
+    expect(result.current.selectedEvent.end).toEqual(lunes(8, 30));
+    expect(result.current.editBloqueId).toBe(10);
+  });
+
   it('handleSaveChangesModal en Modo Demo valido guarda y cierra el modal', async () => {
     const setup = baseProps({ demoMode: true });
     const { result } = render(setup);

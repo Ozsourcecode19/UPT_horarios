@@ -111,7 +111,10 @@ export function useDashboardData() {
 
   const cargaPorDocente = useMemo(() => cargaHorariaPorDocente(horariosReal), [horariosReal]);
   const distribucionMaterias = useMemo(() => distribucionPorMateria(horariosReal), [horariosReal]);
-  const saludPeriodo = useMemo(() => resumenConflictos(preCheck, generationStatus), [preCheck, generationStatus]);
+  const saludPeriodo = useMemo(
+    () => resumenConflictos(preCheck, generationStatus, horariosReal.length),
+    [preCheck, generationStatus, horariosReal.length]
+  );
 
   const reconectarApi = useReconectarDemo({
     refetches: [

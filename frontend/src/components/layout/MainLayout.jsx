@@ -114,7 +114,7 @@ const MainLayout = () => {
   const sectionLabel = routeMeta?.seccion || 'INICIO';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="h-screen overflow-hidden print:h-auto print:overflow-visible bg-slate-50 flex">
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -256,7 +256,7 @@ const MainLayout = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="no-print h-20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/60 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-30">
+        <header className="no-print h-20 shrink-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/60 flex items-center justify-between px-6 lg:px-10 z-30">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -283,7 +283,7 @@ const MainLayout = () => {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-10">
+        <div className="flex-1 min-h-0 overflow-auto print:overflow-visible p-4 sm:p-6 lg:p-8">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

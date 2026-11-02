@@ -180,4 +180,11 @@ describe('resumenConflictos', () => {
     const sinCheck = resumenConflictos(null, { status: 'NONE' });
     expect(sinCheck.nivel).toBe('sin-datos');
   });
+
+  it('si el tracker en memoria está en NONE/null pero ya existen horarios activos en el periodo, reporta Horario generado (ok)', () => {
+    const res = resumenConflictos(preCheckListo, { status: 'NONE' }, 4);
+    expect(res.nivel).toBe('ok');
+    expect(res.items.some(i => i.label === 'No se ha generado')).toBe(false);
+    expect(res.items.some(i => i.label === 'Horario generado' && i.mensaje.includes('4 horarios activos'))).toBe(true);
+  });
 });

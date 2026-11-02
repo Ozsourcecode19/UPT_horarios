@@ -20,7 +20,7 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
   if (!preCheck) return null;
 
   return (
-    <div className={`rounded-3xl p-5 border shadow-[0_8px_30px_rgb(0,0,0,0.02)] ${
+    <div className={`rounded-3xl p-4 border shadow-[0_8px_30px_rgb(0,0,0,0.02)] ${
       preCheck.listo
         ? 'bg-emerald-50/50 border-emerald-200/70'
         : 'bg-amber-50/50 border-amber-200/70'
@@ -43,7 +43,7 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {[
           { label: 'Clases activas', value: preCheck.lecciones_activas, critico: preCheck.lecciones_activas === 0 },
           { label: 'Aulas activas', value: preCheck.aulas, critico: preCheck.aulas === 0 },
@@ -52,18 +52,18 @@ const ChecklistPanel = ({ preCheck, onRevalidar }) => {
           { label: 'Docentes con disponibilidad', value: preCheck.docentes_con_disponibilidad, critico: false },
           { label: 'Clases sin candidatos', value: preCheck.lecciones_sin_candidatos, critico: false }
         ].map(item => (
-          <div key={item.label} className={`rounded-2xl p-3 border ${
+          <div key={item.label} className={`rounded-2xl p-2.5 border ${
             item.value === 0
               ? item.critico ? 'bg-red-50 border-red-200/70' : 'bg-amber-50 border-amber-200/70'
               : 'bg-white border-slate-100'
           }`}>
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">{item.label}</p>
               {item.value > 0
-                ? <CheckCircle className="w-4 h-4 text-emerald-500" />
-                : <X className="w-4 h-4 text-amber-500" />}
+                ? <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                : <X className="w-3.5 h-3.5 shrink-0 text-amber-500" />}
             </div>
-            <p className={`mt-1 text-2xl font-extrabold ${item.value === 0 ? 'text-amber-600' : 'text-slate-800'}`}>{item.value}</p>
+            <p className={`mt-1 text-xl font-extrabold ${item.value === 0 ? 'text-amber-600' : 'text-slate-800'}`}>{item.value}</p>
           </div>
         ))}
       </div>

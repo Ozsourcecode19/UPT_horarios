@@ -63,7 +63,8 @@ export const distribucionPorMateria = (eventos: FullCalendarEvent[]): Distribuci
  */
 export const resumenConflictos = (
   preCheck: PreGenerationCheck | null,
-  generationStatus: GenerationStatus | null
+  generationStatus: GenerationStatus | null,
+  horariosActivos = 0
 ): ResumenConflictos => {
   const items: Array<{ clave: string; label: string; nivel: NivelObservacion; mensaje: string }> = [];
   let nivel: NivelObservacion = 'sin-datos';
@@ -119,6 +120,8 @@ export const resumenConflictos = (
     }
   } else if (!preCheck) {
     add('sin-datos', 'Sin datos de análisis', 'Consulta el checklist y genera el horario del periodo para ver su salud.');
+  } else if (horariosActivos > 0) {
+    add('ok', 'Horario generado', `${horariosActivos} horarios activos.`);
   } else {
     add('warn', 'No se ha generado', 'El periodo aún no tiene un horario generado.');
   }

@@ -760,23 +760,33 @@ def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optio
     """
     from sqlalchemy import func
 
-    # Verificar que la versión objetivo exista en el periodo
+    # Verificar que la versión objetivo exista en el periodo (solo ACTIVO/HISTORICO;
+    # las filas ELIMINADO son soft-deletes de movimientos previos y las BORRADOR
+    # viven en la bandeja de reserva, jamás deben revivirse al restaurar).
     target_count = db.query(
         func.count(models.HorarioGenerado.id)
     ).filter(
         models.HorarioGenerado.periodo_id == periodo_id,
-        models.HorarioGenerado.version_horario == version
+        models.HorarioGenerado.version_horario == version,
+        models.HorarioGenerado.estado.in_(['ACTIVO', 'HISTORICO']),
     ).scalar() or 0
 
     if target_count == 0:
         return None
 
-    # Si la versión objetivo ya es la ACTIVA actual, no se necesita cambiar nada
-    activo_version = db.query(models.HorarioGenerado.version_horario).filter(
+    # Si la versión objetivo ya es la única ACTIVA actual y no tiene filas en
+    # HISTORICO pendientes de activar, no se necesita cambiar nada.
+    otras_activas = db.query(func.count(models.HorarioGenerado.id)).filter(
         models.HorarioGenerado.periodo_id == periodo_id,
-        models.HorarioGenerado.estado == 'ACTIVO'
-    ).first()
-    if activo_version is not None and activo_version[0] == version:
+        models.HorarioGenerado.estado == 'ACTIVO',
+        models.HorarioGenerado.version_horario != version,
+    ).scalar() or 0
+    historicas_objetivo = db.query(func.count(models.HorarioGenerado.id)).filter(
+        models.HorarioGenerado.periodo_id == periodo_id,
+        models.HorarioGenerado.version_horario == version,
+        models.HorarioGenerado.estado == 'HISTORICO',
+    ).scalar() or 0
+    if otras_activas == 0 and historicas_objetivo == 0:
         total_activos = db.query(func.count(models.HorarioGenerado.id)).filter(
             models.HorarioGenerado.periodo_id == periodo_id,
             models.HorarioGenerado.estado == 'ACTIVO'
@@ -788,16 +798,19 @@ def restore_version_horario(db: Session, periodo_id: int, version: int) -> Optio
         )
 
     try:
-        # La versión ACTIVO actual pasa a HISTORICO
+        # Las filas ACTIVO de otras versiones pasan a HISTORICO
         db.query(models.HorarioGenerado).filter(
             models.HorarioGenerado.periodo_id == periodo_id,
-            models.HorarioGenerado.estado == 'ACTIVO'
+            models.HorarioGenerado.estado == 'ACTIVO',
+            models.HorarioGenerado.version_horario != version,
         ).update({'estado': 'HISTORICO'}, synchronize_session='fetch')
 
-        # La versión objetivo pasa a ACTIVO
+        # SOLO las filas HISTORICO de la versión objetivo pasan a ACTIVO
+        # (NUNCA revivir filas ELIMINADO ni tocar filas BORRADOR).
         db.query(models.HorarioGenerado).filter(
             models.HorarioGenerado.periodo_id == periodo_id,
-            models.HorarioGenerado.version_horario == version
+            models.HorarioGenerado.version_horario == version,
+            models.HorarioGenerado.estado == 'HISTORICO',
         ).update({'estado': 'ACTIVO'}, synchronize_session='fetch')
 
         db.commit()
@@ -990,9 +1003,23 @@ def asignar_horario_manual(db: Session, *, leccion_id: int, aula_id: int,
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                 detail={"error_code": error_code, "mensaje": mensaje})
 
-    version = filas_a_reemplazar[0].version_horario if filas_a_reemplazar else (
-        (db.query(func.max(models.HorarioGenerado.version_horario))
-           .filter(models.HorarioGenerado.periodo_id == periodo_id).scalar() or 0) + 1)
+    version_activa = (
+        db.query(func.max(models.HorarioGenerado.version_horario))
+        .filter(
+            models.HorarioGenerado.periodo_id == periodo_id,
+            models.HorarioGenerado.estado == 'ACTIVO',
+        )
+        .scalar()
+    )
+    if version_activa is not None:
+        version = version_activa
+    elif filas_a_reemplazar:
+        version = filas_a_reemplazar[0].version_horario
+    else:
+        version = (
+            (db.query(func.max(models.HorarioGenerado.version_horario))
+               .filter(models.HorarioGenerado.periodo_id == periodo_id).scalar() or 0) + 1
+        )
 
     for fila in filas_a_reemplazar:
         fila.estado = 'ELIMINADO'
@@ -1229,8 +1256,19 @@ def liberar_reservas(db: Session, *, periodo_id: int, leccion_id: int,
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                     detail={"error_code": error_code, "mensaje": mensaje})
 
+    from sqlalchemy import func
+    version_activa = (
+        db.query(func.max(models.HorarioGenerado.version_horario))
+        .filter(
+            models.HorarioGenerado.periodo_id == periodo_id,
+            models.HorarioGenerado.estado == 'ACTIVO',
+        )
+        .scalar()
+    )
     for f in filas:
         f.estado = 'ACTIVO'
+        if version_activa is not None:
+            f.version_horario = version_activa
     db.commit()
     for f in filas:
         db.refresh(f)

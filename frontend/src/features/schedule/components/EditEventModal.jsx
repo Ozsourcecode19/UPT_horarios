@@ -48,9 +48,9 @@ const EditEventModal = ({
   return (
     <ModalShell
       onSubmit={enviar}
-      space="space-y-6"
+      space="space-y-4"
       header={(
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg uppercase tracking-wider">
               {evento.materia_codigo || "Clase"}

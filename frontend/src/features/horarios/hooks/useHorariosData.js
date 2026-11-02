@@ -200,23 +200,49 @@ export default function useHorariosData() {
     retry: 0,
   });
 
+  const ultimaVersionActivaRef = useRef(null);
+
   useEffect(() => {
-    if (!selectedVersion && versiones.length > 0) {
-      const activa = versiones.find(v => v.estado === 'ACTIVO');
+    setSelectedVersion('');
+    ultimaVersionActivaRef.current = null;
+  }, [selectedPeriodoId]);
+
+  useEffect(() => {
+    if (versiones.length === 0) {
+      if (selectedVersion !== '') setSelectedVersion('');
+      ultimaVersionActivaRef.current = null;
+      return;
+    }
+    const activa = versiones.find(v => v.estado === 'ACTIVO');
+    const idActiva = activa ? Number(activa.version_horario) : null;
+    const cambioActiva = idActiva !== ultimaVersionActivaRef.current;
+    ultimaVersionActivaRef.current = idActiva;
+
+    const existeSeleccionada = Boolean(selectedVersion) && versiones.some(
+      v => Number(v.version_horario) === Number(selectedVersion)
+    );
+
+    if (!existeSeleccionada || (cambioActiva && idActiva != null)) {
       setSelectedVersion(activa ? activa.version_horario : versiones[0].version_horario);
     }
-  }, [versiones]);
+  }, [versiones, selectedVersion]);
 
   const restoreVersionMutation = useMutation({
     mutationFn: async ({ version }) => {
       return await ScheduleService.restoreScheduleVersion(selectedPeriodoId, version);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables?.version != null) {
+        setSelectedVersion(Number(variables.version));
+      }
       showToast("Versión restaurada correctamente. El calendario refleja el horario restaurado.", "success");
       queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
       queryClient.invalidateQueries({ queryKey: ['schedule-versions', selectedPeriodoId] });
+      queryClient.invalidateQueries({ queryKey: ['bandeja-reserva', selectedPeriodoId] });
+      queryClient.invalidateQueries({ queryKey: ['pre-generation-check', selectedPeriodoId] });
       refetchHorarios();
       refetchVersiones();
+      refetchPreCheck();
     },
     onError: (err) => {
       const detail = err.response?.data?.detail;
@@ -243,10 +269,15 @@ export default function useHorariosData() {
     }
   }, [filterType, aulas, docentes, grupos]);
 
-  const invalidateHorarios = () => queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+  const invalidateHorarios = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['horarios', selectedPeriodoId] });
+    queryClient.invalidateQueries({ queryKey: ['schedule-versions', selectedPeriodoId] });
+    queryClient.invalidateQueries({ queryKey: ['bandeja-reserva', selectedPeriodoId] });
+    queryClient.invalidateQueries({ queryKey: ['pre-generation-check', selectedPeriodoId] });
+  }, [queryClient, selectedPeriodoId]);
 
   const reconectarApi = useReconectarDemo({
-    refetches: [refetchHorarios],
+    refetches: [refetchHorarios, refetchVersiones, refetchPreCheck],
     showToast,
     mensaje: MSG_RECONECTANDO_API,
   });

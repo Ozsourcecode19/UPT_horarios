@@ -177,11 +177,12 @@ export const useDragDropValidation = ({
   // Filas (eventos) de la MISMA sesión (run contiguo) que el evento clickeado.
   const _filasDeSesion = (horario, fuente) => {
     const lid = horario?.extendedProps?.leccion_id ?? horario?.leccion_id;
-    if (lid == null) return [horario];
+    if (lid == null || !Array.isArray(fuente)) return [horario];
     const mismaLeccion = fuente.filter(h =>
       Number(h.extendedProps?.leccion_id ?? h.leccion_id) === Number(lid));
     if (mismaLeccion.length <= 1) return [horario];
-    const info = agruparSesiones(mismaLeccion, bloques).get(horario.id);
+    const mapa = agruparSesiones(mismaLeccion, bloques);
+    const info = mapa.get(horario.id) ?? mapa.get(Number(horario.id)) ?? mapa.get(String(horario.id));
     return info?.filas?.length ? info.filas : [horario];
   };
 
@@ -370,16 +371,25 @@ export const useDragDropValidation = ({
     // clickInfo es un objeto plano {id, start, end, extendedProps} enviado por
     // GridSemanalBloques (ya no envuelve { event: ... } como hacía FullCalendar).
     const evProps = clickInfo.extendedProps;
+    const fuente = demoMode ? demoHorarios : listadoHorarios;
+    const filasSesion = _filasDeSesion(
+      { id: String(clickInfo.id), start: clickInfo.start, end: clickInfo.end, extendedProps: evProps },
+      fuente
+    );
+    const primera = filasSesion[0] || clickInfo;
+    const ultima = filasSesion[filasSesion.length - 1] || clickInfo;
+    const startSesion = primera.start instanceof Date ? primera.start : (primera.start ? new Date(primera.start) : clickInfo.start);
+    const endSesion = ultima.end instanceof Date ? ultima.end : (ultima.end ? new Date(ultima.end) : clickInfo.end);
 
     const evId = parseInt(clickInfo.id);
     const cAulaId = evProps.aula_id || parseInt(clickInfo.resourceId?.replace("aula_", ""));
-    const cBloqueId = evProps.bloque_id;
+    const cBloqueId = primera.extendedProps?.bloque_id ?? evProps.bloque_id;
 
     setSelectedEvent({
       id: evId,
       title: clickInfo.title || evProps.materia,
-      start: clickInfo.start,
-      end: clickInfo.end,
+      start: startSesion,
+      end: endSesion,
       materia: evProps.materia,
       materia_codigo: evProps.materia_codigo,
       docente: evProps.docente,
