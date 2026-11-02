@@ -37,6 +37,7 @@ const LeccionFormModal = ({
 
   // Badges en vivo de los sliders (horas/prioridad)
   const [divisiones, setDivisiones] = useState([]);
+  const [division, setDivision] = useState('MATUTINO');
   const currentPrioridadValue = watch('prioridad', 5);
   const currentHorasValue = watch('horas_semanales', 4);
   const currentBloquesPorSesion = watch('bloques_por_sesion', 1);
@@ -64,6 +65,7 @@ const LeccionFormModal = ({
     if (g && g.periodo_id != null) setValue('periodo_id', Number(g.periodo_id), { shouldValidate: true });
     // Actualizar turnos permitidos del grupo seleccionado
     setDivisiones(g?.turnos_permitidos?.map(t => t.division) || []);
+    setDivision(g?.division || 'MATUTINO');
   };
   // Cambiar el periodo a mano limpia la Sección si no pertenece a ese periodo.
   const onChangePeriodo = (e) => {
@@ -155,6 +157,7 @@ const LeccionFormModal = ({
       });
       // Cargar los turnos permitidos del grupo seleccionado
       setDivisiones(grupoEdit?.turnos_permitidos?.map(t => t.division) || []);
+      setDivision(grupoEdit?.division || 'MATUTINO');
     } else {
       const primerGrupo = grupos[0] || null;
       reset(buildLeccionDefaults({
@@ -165,13 +168,14 @@ const LeccionFormModal = ({
         periodoId: primerGrupo?.periodo_id || periodos[0]?.id || '',
       }));
       setDivisiones([]);
+      setDivision(primerGrupo?.division || 'MATUTINO');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
   return (
     <ModalShell
-      onSubmit={handleSubmit((data) => onSubmit({ ...data, divisiones }))}
+      onSubmit={handleSubmit((data) => onSubmit({ ...data, division, divisiones }))}
       header={(
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-xl font-bold text-slate-800">
@@ -207,13 +211,6 @@ const LeccionFormModal = ({
             </select>
             {errors.docente_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.docente_id.message}</span>}
           </div>
-
-          {/* Selector de turnos multiturno */}
-          <MultiTurnoSelector
-            divisiones={divisiones}
-            onChange={setDivisiones}
-          />
-
           <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Unidad Curricular *</label>
@@ -403,6 +400,29 @@ const LeccionFormModal = ({
               {errors.sede_forzada_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.sede_forzada_id.message}</span>}
             </div>
           </div>
+
+
+          {/* División principal */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">División Principal *</label>
+            <select
+              value={division}
+              onChange={(e) => setDivision(e.target.value)}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium appearance-none"
+            >
+              <option value="MATUTINO">Mañana</option>
+              <option value="VESPERTINO">Tarde</option>
+              <option value="NOCTURNO">Noche</option>
+            </select>
+          </div>
+
+          {/* Selector de turnos multiturno */}
+          <MultiTurnoSelector
+            divisiones={divisiones}
+            onChange={setDivisiones}
+            division={division}
+          />
+
 
           <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
             <input

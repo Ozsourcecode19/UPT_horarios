@@ -70,7 +70,8 @@ export const toPayloadGrupo = (data) => ({
   sede_id: Number(data.sede_id),
   cantidad_alumnos: Number(data.cantidad_alumnos),
   periodo_id: Number(data.periodo_id),
-  divisiones: data.divisiones || [],
+  division: data.division || 'MATUTINO',
+  divisiones: Array.isArray(data.divisiones) ? data.divisiones.filter(d => d !== data.division) : [],
 });
 
 // Coercion de tipos antes de enviar al backend (antes inline en handleSaveLeccion).

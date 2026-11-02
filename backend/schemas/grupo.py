@@ -24,7 +24,7 @@ class GrupoBase(BaseModel):
     cantidad_alumnos: int = Field(ge=0) # DRY: Validación con Field
     periodo_id: Optional[int] = None
     activo: bool = True
-    division: str = Field(default='MATUTINO', pattern=r'^(MATUTINO|VESPERTINO|NOCTURNO)$')
+    division: Optional[str] = Field(default='MATUTINO', pattern=r'^(MATUTINO|VESPERTINO|NOCTURNO)$')
     divisiones: Optional[List[str]] = None  # Turnos adicionales permitidos
 
     # Validación del rango de cantidad_alumnos en el schema (SOLID)
