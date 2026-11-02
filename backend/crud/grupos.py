@@ -1,6 +1,6 @@
 # backend/crud/grupos.py
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from models.grupo import Grupo
 from models.grupo_turno import GrupoTurno
 from schemas.grupo import GrupoCreate, GrupoUpdate
@@ -10,13 +10,15 @@ def get_grupo(db: Session, grupo_id: int) -> Optional[Grupo]:
     return db.query(Grupo).options(joinedload(Grupo.turnos_permitidos)).filter(Grupo.id == grupo_id).first()
 
 
-def get_grupos(db: Session, skip: int = 0, limit: int = 100, search: Optional[str] = None, sede_id: Optional[int] = None) -> List[Grupo]:
+def get_grupos(db: Session, skip: int = 0, limit: int = 100, search: Optional[str] = None, sede_id: Optional[int] = None) -> Tuple[List[Grupo], int]:
     query = db.query(Grupo).options(joinedload(Grupo.turnos_permitidos))
     if search:
         query = query.filter(Grupo.nombre.ilike(f"%{search}%"))
     if sede_id:
         query = query.filter(Grupo.sede_id == sede_id)
-    return query.offset(skip).limit(limit).all()
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 
 def create_grupo(db: Session, grupo: GrupoCreate) -> Grupo:
