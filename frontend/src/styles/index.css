@@ -103,9 +103,15 @@ table.grilla-bloques {
   min-height: 0;
 }
 
+.grilla-bloques {
+  table-layout: fixed;
+  width: 100%;
+}
+
 .grilla-bloques td {
   border: 1px solid #e2e8f0;
   vertical-align: top;
+  overflow: hidden;
 }
 
 .grilla-bloques td.celda-hora {
@@ -130,9 +136,16 @@ table.grilla-bloques {
   background-color: #fafbfc;
 }
 
+.grilla-bloques tr.fila-banda {
+  height: var(--alto-banda);
+}
+
 .grilla-bloques tr.fila-banda > td.celda-dia,
 .grilla-bloques tr.fila-banda > td.celda-hora {
   height: var(--alto-banda);
+  max-height: var(--alto-banda);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .grilla-bloques td.celda-dia {
@@ -140,6 +153,8 @@ table.grilla-bloques {
   transition: background-color 0.15s ease;
   position: relative;
   vertical-align: top;
+  overflow: hidden;
+  max-height: var(--alto-banda);
 }
 
 .grilla-bloques td.celda-droppable {
@@ -243,16 +258,37 @@ table.grilla-bloques {
   width: 100%;
   height: 100%;
   margin: 0;
-  padding: 0.25rem 0.3rem;
+  padding: 0.2rem 0.25rem;
   border-left: 5px solid var(--ev-c, #6366f1);
   border-radius: 0.45rem;
   background-color: #fff;
   box-shadow: 0 1px 4px rgb(15 23 42 / 0.10);
   cursor: grab;
-  line-height: 1.1;
+  line-height: 1.05;
   user-select: none;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   position: relative;
+  overflow: hidden;
+  max-height: 100%;
+}
+
+.evento-card .ev-materia {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  max-height: 2.4em;
+}
+
+.evento-card .ev-docente,
+.evento-card .ev-grupo,
+.evento-card .ev-aula {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .evento-card:hover {
@@ -292,6 +328,26 @@ table.grilla-bloques {
   right: 0;
   height: calc(var(--alto-banda, 64px) * var(--sesion-total, 1) - 2px);
   z-index: 2;
+  overflow: hidden;
+}
+
+.evento-sesion-unificada .ev-materia {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  max-height: 2.4em;
+}
+
+.evento-sesion-unificada .ev-docente,
+.evento-sesion-unificada .ev-grupo,
+.evento-sesion-unificada .ev-aula {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .evento-sesion-unificada:hover {
