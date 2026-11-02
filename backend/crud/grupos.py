@@ -1,93 +1,69 @@
 # backend/crud/grupos.py
 from sqlalchemy.orm import Session
-import models, schemas
 from typing import List, Optional
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
 from models.grupo import Grupo
-from models.trayecto_academico import TrayectoAcademico # Importar el modelo TrayectoAcademico
-from schemas.grupo import GrupoCreate # Asumiendo que usas este schema
+from models.grupo_turno import GrupoTurno
+from schemas.grupo import GrupoCreate, GrupoUpdate
 
-def get_grupo(db: Session, grupo_id: int) -> Optional[models.Grupo]:
-    """
-    Obtiene un grupo por su ID.
-    """
-    return db.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
 
-def get_grupos(db: Session, skip: int = 0, limit: int = 20, search: Optional[str] = None, sede_id: Optional[int] = None):
-    """
-    Obtiene una lista de grupos con paginación, búsqueda y filtro por sede.
-    """
-    q = db.query(models.Grupo)
-    if search:
-        q = q.filter(models.Grupo.nombre.ilike(f"%{search}%"))
-    if sede_id is not None:
-        q = q.filter(models.Grupo.sede_id == sede_id)
-    total = q.count()
-    items = q.offset(skip).limit(limit).all()
-    return items, total
+def get_grupo(db: Session, grupo_id: int) -> Optional[Grupo]:
+    return db.query(Grupo).filter(Grupo.id == grupo_id).first()
 
-def create_grupo(db: Session, grupo: GrupoCreate):
-    """
-    Crea un nuevo grupo. Verifica que la trayecto_id y otras FKs existan.
-    """
-    # Opción 2: Dejar que la BD intente la inserción y manejar la violación de FK (recomendada)
-    db_grupo = Grupo(**grupo.model_dump())
-    try:
-        db.add(db_grupo)
+
+def get_grupos(db: Session, skip: int = 0, limit: int = 100) -> List[Grupo]:
+    return db.query(Grupo).offset(skip).limit(limit).all()
+
+
+def create_grupo(db: Session, grupo: GrupoCreate) -> Grupo:
+    db_grupo = Grupo(
+        nombre=grupo.nombre,
+        trayecto_id=grupo.trayecto_id,
+        sede_id=grupo.sede_id,
+        cantidad_alumnos=grupo.cantidad_alumnos,
+        periodo_id=grupo.periodo_id,
+        activo=grupo.activo,
+        division=grupo.division,
+    )
+    db.add(db_grupo)
+    db.commit()
+    db.refresh(db_grupo)
+
+    # Añadir turnos adicionales permitidos
+    if grupo.divisiones:
+        for div in grupo.divisiones:
+            db.add(GrupoTurno(grupo_id=db_grupo.id, division=div))
         db.commit()
         db.refresh(db_grupo)
-        return db_grupo
-    except IntegrityError as e:
-        db.rollback()
-        # Verificar si el error es específicamente por clave foránea de trayecto
-        # El mensaje puede variar ligeramente entre drivers, pero 'grupos_trayecto_id_fkey' es el patrón clave.
-        if 'grupos_trayecto_id_fkey' in str(e.orig): # Acceder al mensaje original del driver psycopg2
-            raise HTTPException(status_code=422, detail=f"El trayecto académico con ID {grupo.trayecto_id} no existe. No se puede crear la sección.")
-        # Opcional: También puedes manejar otras FK si fallan
-        elif 'grupos_sede_id_fkey' in str(e.orig):
-            raise HTTPException(status_code=422, detail=f"La sede con ID {grupo.sede_id} no existe. No se puede crear la sección.")
-        elif 'grupos_periodo_id_fkey' in str(e.orig):
-            raise HTTPException(status_code=422, detail=f"El periodo académico con ID {grupo.periodo_id} no existe. No se puede crear la sección.")
-        else:
-            # Si es otro tipo de error de integridad (por ejemplo, violación de unicidad), relanzarlo
-            raise HTTPException(status_code=500, detail="Error de integridad de base de datos al crear la sección.")
 
-def update_grupo(db: Session, grupo_id: int, grupo_update: schemas.GrupoUpdate) -> Optional[models.Grupo]:
-    """
-    Actualiza un grupo existente.
-    """
-    db_grupo = db.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
+    return db_grupo
+
+
+def update_grupo(db: Session, grupo_id: int, grupo: GrupoUpdate) -> Optional[Grupo]:
+    db_grupo = get_grupo(db, grupo_id)
     if not db_grupo:
         return None
 
-    try:
-        update_data = grupo_update.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_grupo, field, value)
+    update_data = grupo.model_dump(exclude_unset=True)
+    divisiones = update_data.pop("divisiones", None)
 
-        db.commit()
-        db.refresh(db_grupo)
-        return db_grupo
-    except SQLAlchemyError as e:
-        db.rollback()
-        print(f"Error al actualizar grupo {grupo_id}: {e}")
-        raise
-    except Exception as e:
-        db.rollback()
-        print(f"Error inesperado al actualizar grupo {grupo_id}: {e}")
-        raise
+    for key, value in update_data.items():
+        setattr(db_grupo, key, value)
+
+    if divisiones is not None:
+        # Limpiar turnos existentes y reemplazar
+        db.query(GrupoTurno).filter(GrupoTurno.grupo_id == grupo_id).delete()
+        for div in divisiones:
+            db.add(GrupoTurno(grupo_id=grupo_id, division=div))
+
+    db.commit()
+    db.refresh(db_grupo)
+    return db_grupo
+
 
 def delete_grupo(db: Session, grupo_id: int) -> bool:
-    """
-    Elimina un grupo de la base de datos.
-    Retorna True si se eliminó, False si no existía.
-    """
-    db_grupo = db.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
+    db_grupo = get_grupo(db, grupo_id)
     if not db_grupo:
         return False
-
     db.delete(db_grupo)
     db.commit()
     return True

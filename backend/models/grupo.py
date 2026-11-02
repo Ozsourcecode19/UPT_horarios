@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, CheckConstr
 from sqlalchemy.orm import relationship
 from config.database import Base
 from datetime import datetime, timezone
+from models.grupo_turno import GrupoTurno
 
 class Grupo(Base):
     __tablename__ = "grupos"
@@ -27,6 +28,12 @@ class Grupo(Base):
     sede = relationship("Sede", back_populates="grupos")
     periodo = relationship("PeriodoAcademico", back_populates="grupos")
     lecciones = relationship("Leccion", back_populates="grupo")
+    turnos_permitidos = relationship(
+        "GrupoTurno",
+        back_populates="grupo",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     # Check Constraints
     __table_args__ = (

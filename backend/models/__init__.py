@@ -6,6 +6,7 @@ from .carrera import Carrera
 from .periodo_academico import PeriodoAcademico
 from .trayecto_academico import TrayectoAcademico
 from .grupo import Grupo
+from .grupo_turno import GrupoTurno
 from .docente import Docente
 from .materia import Materia
 from .aula import Aula
@@ -20,7 +21,7 @@ from .tablas_intermedias import carrera_periodo
 # Lista útil para Alembic u otras herramientas que necesiten conocer todos los modelos
 __all__ = [
     "Usuario", "Sede", "Carrera", "PeriodoAcademico", "TrayectoAcademico",
-    "Grupo", "Docente", "Materia", "Aula", "DisponibilidadDocente",
+    "Grupo", "GrupoTurno", "Docente", "Materia", "Aula", "DisponibilidadDocente",
     "HabilitacionDocente", "Configuracion", "BloqueHorario", "Leccion",
     "HorarioGenerado", "carrera_periodo"
 ]

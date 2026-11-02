@@ -225,8 +225,14 @@ class ScheduleGenerator:
         # COALESCE(leccion.sede_forzada_id, grupo.sede_id)).
         grupo_sede = {g.id: g.sede_id for g in grupos}
 
-        # Mapa grupo_id -> división
+        # Mapa grupo_id -> división principal
         grupo_division = {g.id: g.division for g in grupos}
+
+        # Mapa grupo_id -> turnos adicionales permitidos (multiturno)
+        grupo_turnos_permitidos = {
+            g.id: [t.division for t in g.turnos_permitidos]
+            for g in grupos
+        }
 
         # Mapa división -> ventana horaria (tomado de configuracion)
         # La columna `valor` es JSONB: SQLAlchemy ya entrega un dict; se acepta
@@ -296,27 +302,35 @@ class ScheduleGenerator:
                 self.omitidas.append({"leccion_id": leccion.id, "motivo": "docente no habilitado"})
                 continue
 
-            # Ventana horaria de la división del grupo
+            # Ventana horaria de la división del grupo (y de sus turnos permitidos adicionales)
             grupo_div = grupo_division.get(leccion.grupo_id)
-            ventana_turno = ventana_por_turno.get(f'ventana_{str(grupo_div).lower()}')
-            if ventana_turno is None:
-                self.logger.warning(f"Lección {leccion.id}: ventana de turno {grupo_div} no configurada; usando jornada global.")
-            ven_inicio = ven_fin = None
-            if ventana_turno:
-                ven_inicio = datetime.strptime(ventana_turno['hora_inicio'], '%H:%M:%S').time()
-                ven_fin = datetime.strptime(ventana_turno['hora_fin'], '%H:%M:%S').time()
+            turnos_del_grupo = [grupo_div] + grupo_turnos_permitidos.get(leccion.grupo_id, [])
 
             # Bloques aptos de la lección: día laborable, sede coherente,
-            # dentro de la ventana del turno y con docente disponible.
+            # dentro de la ventana de algún turno permitido y con docente disponible.
             por_dia: Dict[int, list] = {}
             for bloque in bloques:
                 if bloque.dia_semana not in dias_disponibles:
                     continue
                 if bloque.sede_id != leccion_sede:
                     continue
-                if ven_inicio is not None:
-                    if bloque.hora_inicio < ven_inicio or self._fin_bloque(bloque) > ven_fin:
-                        continue
+
+                # El bloque debe caber en la ventana de ALGÚN turno permitido para este grupo
+                bloque_valido = False
+                for turno in turnos_del_grupo:
+                    ventana_turno = ventana_por_turno.get(f'ventana_{str(turno).lower()}')
+                    if ventana_turno is None:
+                        bloque_valido = True
+                        break
+                    ven_inicio = datetime.strptime(ventana_turno['hora_inicio'], '%H:%M:%S').time()
+                    ven_fin = datetime.strptime(ventana_turno['hora_fin'], '%H:%M:%S').time()
+                    if bloque.hora_inicio >= ven_inicio and self._fin_bloque(bloque) <= ven_fin:
+                        bloque_valido = True
+                        break
+
+                if not bloque_valido:
+                    continue
+
                 if not self._docente_disponible_en_bloque(disp_por_docente, leccion.docente_id, bloque):
                     continue
                 por_dia.setdefault(bloque.dia_semana, []).append(bloque)

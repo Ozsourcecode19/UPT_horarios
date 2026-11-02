@@ -74,37 +74,49 @@ def validar_asignacion(db_session, *, leccion, bloque_objetivo, aula_objetivo,
     # sin restricción adicional.
     grupo_mov = db_session.query(models.Grupo).filter(models.Grupo.id == grupo_id).first()
     if grupo_mov and grupo_mov.division:
-        clave_ventana = f'ventana_{str(grupo_mov.division).lower()}'
-        cfg_ventana = db_session.query(models.Configuracion).filter(
-            models.Configuracion.clave == clave_ventana
-        ).first()
-        ventana = None
-        if cfg_ventana is not None:
-            v = cfg_ventana.valor
-            if isinstance(v, str):
-                try:
-                    import json as _json
-                    v = _json.loads(v)
-                except (ValueError, TypeError):
-                    v = None
-            if isinstance(v, dict) and v.get('hora_inicio') and v.get('hora_fin'):
-                ventana = (str(v['hora_inicio']), str(v['hora_fin']))
-        if ventana:
-            def _a_minutos(hms):
-                partes = [int(x) for x in str(hms).split(':')]
-                return partes[0] * 60 + (partes[1] if len(partes) > 1 else 0)
+        turnos_permitidos = [grupo_mov.division] + [t.division for t in grupo_mov.turnos_permitidos]
+        
+        # El bloque es válido si cabe en ALGÚN turno permitido
+        bloque_valido = False
+        for turno in turnos_permitidos:
+            clave_ventana = f'ventana_{str(turno).lower()}'
+            cfg_ventana = db_session.query(models.Configuracion).filter(
+                models.Configuracion.clave == clave_ventana
+            ).first()
+            ventana = None
+            if cfg_ventana is not None:
+                v = cfg_ventana.valor
+                if isinstance(v, str):
+                    try:
+                        import json as _json
+                        v = _json.loads(v)
+                    except (ValueError, TypeError):
+                        v = None
+                if isinstance(v, dict) and v.get('hora_inicio') and v.get('hora_fin'):
+                    ventana = (str(v['hora_inicio']), str(v['hora_fin']))
 
-            ven_ini = _a_minutos(ventana[0])
-            ven_fin = _a_minutos(ventana[1])
-            bloque_ini = _a_minutos(bloque_objetivo.hora_inicio)
-            bloque_fin = bloque_ini + (bloque_objetivo.duracion_minutos or 0)
-            if bloque_ini < ven_ini or bloque_fin > ven_fin:
-                mensaje = (
-                    f"El turno {TURNOS_LABELS.get(str(grupo_mov.division).upper(), grupo_mov.division)} "
-                    f"solo admite bloques entre {ventana[0][:5]} y {ventana[1][:5]}."
-                )
-                if _fallo("FUERA_VENTANA_DIVISION", mensaje):
-                    return ValidationResult(False, mensaje, "FUERA_VENTANA_DIVISION")
+            if ventana:
+                def _a_minutos(hms):
+                    partes = [int(x) for x in str(hms).split(':')]
+                    return partes[0] * 60 + (partes[1] if len(partes) > 1 else 0)
+
+                ven_ini = _a_minutos(ventana[0])
+                ven_fin = _a_minutos(ventana[1])
+                bloque_ini = _a_minutos(bloque_objetivo.hora_inicio)
+                bloque_fin = bloque_ini + (bloque_objetivo.duracion_minutos or 0)
+                if bloque_ini >= ven_ini and bloque_fin <= ven_fin:
+                    bloque_valido = True
+                    break
+            else:
+                bloque_valido = True
+                break
+
+        if not bloque_valido:
+            mensaje = (
+                f"El bloque no pertenece a ninguno de los turnos permitidos para la sección ({', '.join(turnos_permitidos)})."
+            )
+            if _fallo("FUERA_VENTANA_DIVISION", mensaje):
+                return ValidationResult(False, mensaje, "FUERA_VENTANA_DIVISION")
 
     # 2. Disponibilidad del docente en el bloque objetivo.
     # Consistente con el solver: sin franjas DISPONIBLE explícitas el docente se
