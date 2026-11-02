@@ -883,7 +883,9 @@ table.grilla-bloques {
 
   /* Eventos sobrios en papel: fondo blanco, borde fino y acento de materia */
   .print-area .evento-card,
-  .print-section .evento-card {
+  .print-section .evento-card,
+  .print-area .evento-sesion-unificada,
+  .print-section .evento-sesion-unificada {
     background: #fff !important;
     color: #1e293b !important;
     border: 1px solid #94a3b8 !important;
@@ -891,6 +893,15 @@ table.grilla-bloques {
     box-shadow: none !important;
     padding: 0.15rem 0.3rem;
     margin-bottom: 0.08rem;
+    /* Resetear el posicionamiento absoluto de las clases multibloque:
+       en pantalla la tarjeta cubre N filas con position:absolute; en impresión
+       cada celda es independiente y la tarjeta debe ocupar solo su propia celda. */
+    position: static !important;
+    height: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
   }
 
   .print-area .evento-card *,
