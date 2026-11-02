@@ -3,7 +3,7 @@
 // El modal es dueño de su formulario (react-hook-form + zod); emite onSubmit(data)
 // ya validado y la página decide cerrar según el resultado del CRUD.
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,7 @@ import BloquesService from '../../../api/bloques';
 import ConfiguracionesService from '../../../api/configuraciones';
 import { grupoSchema, buildGrupoDefaults } from '../schemas';
 import { coberturaDivision } from '../utils/planning';
+import MultiTurnoSelector from './MultiTurnoSelector';
 
 const GrupoFormModal = ({
   editing = null,          // grupo en edición o null para nuevo
@@ -41,6 +42,7 @@ const GrupoFormModal = ({
   // horario (el solver no tendrá candidatos) y no aparecerá en vista Horarios.
   const sedeElegida = watch('sede_id');
   const divisionElegida = watch('division');
+  const [divisiones, setDivisiones] = useState([]);
   const { data: bloquesCatalogo = [] } = useQuery({
     queryKey: ['bloques'],
     queryFn: async () => {
@@ -86,7 +88,9 @@ const GrupoFormModal = ({
         division: editing.division || 'MATUTINO',
         activo: editing.activo,
       });
+      setDivisiones(editing.turnos_permitidos?.map(t => t.division) || []);
     } else {
+      setDivisiones([]);
       reset(buildGrupoDefaults({
         trayectoId: trayectos[0]?.id || '',
         sedeId: sedes[0]?.id || '',
@@ -98,7 +102,7 @@ const GrupoFormModal = ({
 
   return (
     <ModalShell
-      onSubmit={handleSubmit((data) => onSubmit(data))}
+      onSubmit={handleSubmit((data) => onSubmit({ ...data, divisiones }))}
       header={(
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-xl font-bold text-slate-800">
@@ -188,6 +192,13 @@ const GrupoFormModal = ({
               {errors.periodo_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.periodo_id.message}</span>}
             </div>
           </div>
+
+          {/* Selector de turnos multiturno */}
+          <MultiTurnoSelector
+            divisiones={divisiones}
+            onChange={setDivisiones}
+            division={divisionElegida}
+          />
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Turno *</label>
