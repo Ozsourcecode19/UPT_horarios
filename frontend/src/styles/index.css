@@ -276,7 +276,6 @@ table.grilla-bloques {
   justify-content: center;
   text-align: center;
   width: 100%;
-  height: 100%;
   margin: 0;
   padding: 0.3rem 0.4rem;
   border-left: 5px solid var(--ev-c, #6366f1);
@@ -291,6 +290,7 @@ table.grilla-bloques {
   top: 0;
   left: 0;
   right: 0;
+  height: calc(var(--alto-banda, 64px) * var(--sesion-total, 1) - 2px);
   z-index: 2;
 }
 
@@ -860,7 +860,9 @@ table.grilla-bloques {
   .print-section .grilla-bloques th,
   .print-section .grilla-bloques td {
     border: 1px solid #64748b !important;
-    position: static !important;
+    /* Mantener position:relative para que la tarjeta multibloque (absolute)
+       se ancle dentro de la celda (que abarca N filas con rowSpan). */
+    position: relative !important;
     background: transparent !important;
   }
 
@@ -883,7 +885,18 @@ table.grilla-bloques {
 
   /* Eventos sobrios en papel: fondo blanco, borde fino y acento de materia */
   .print-area .evento-card,
-  .print-section .evento-card,
+  .print-section .evento-card {
+    background: #fff !important;
+    color: #1e293b !important;
+    border: 1px solid #94a3b8 !important;
+    border-left: 4px solid var(--ev-c, #6366f1) !important;
+    box-shadow: none !important;
+    padding: 0.15rem 0.3rem;
+    margin-bottom: 0.08rem;
+  }
+
+  /* La tarjeta multibloque en impresión: altura explícita basada en bandas,
+     NO 100% (que en print puede resolver contra el viewport y cubrir la hoja). */
   .print-area .evento-sesion-unificada,
   .print-section .evento-sesion-unificada {
     background: #fff !important;
@@ -893,13 +906,11 @@ table.grilla-bloques {
     box-shadow: none !important;
     padding: 0.15rem 0.3rem;
     margin-bottom: 0.08rem;
-    /* La clase multibloque usa position:absolute con rowSpan en el <td>:
-       la celda abarca N filas, así que la tarjeta no desborda. */
     position: absolute !important;
-    height: 100% !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
+    height: calc(var(--alto-banda) * var(--sesion-total, 1) - 2px) !important;
     z-index: 2 !important;
   }
 
