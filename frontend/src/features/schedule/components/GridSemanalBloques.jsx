@@ -301,16 +301,25 @@ const GridSemanalBloques = ({
                       {evs.map(ev => {
                         const info = infoSpanPorId.get(ev.id);
                         const esContinuacion = !!info?.esContinuacion;
+                        // Las clases multibloque se renderizan UNA sola vez, en su
+                        // bloque principal. Las celdas de continuación se omiten
+                        // (el card del principal cubre toda la sesión con rowSpan).
+                        if (esContinuacion) return null;
                         const objetivo = info?.principal || ev;   // click/drag delegan al principal
                         const mostrarGrupo = contextoVista !== 'grupo';
                         const mostrarAula = contextoVista !== 'aula';
+                        const sessionTotal = info?.total || 1;
                         return (
                           <div
                             key={ev.id}
-                            className={`evento-card ${esContinuacion ? 'evento-continuacion' : ''} ${
+                            className={`evento-card ${sessionTotal > 1 ? 'evento-sesion-unificada' : ''} ${
                               seleccion?.horarioId === String(objetivo.id) ? 'seleccionada' : ''
                             }`}
-                            style={{ '--ev-c': ev.extendedProps?.backgroundColor || COLOR_FALLBACK }}
+                            style={{
+                              '--ev-c': ev.extendedProps?.backgroundColor || COLOR_FALLBACK,
+                              '--sesion-total': sessionTotal,
+                              height: sessionTotal > 1 ? `calc(var(--alto-banda, 64px) * ${sessionTotal} - 2px)` : undefined,
+                            }}
                             draggable
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));
@@ -367,8 +376,7 @@ const GridSemanalBloques = ({
                             )}
                             <span className="ev-materia">
                               {ev.extendedProps?.materia || ev.title}
-                              {info?.esSesion && !esContinuacion ? <em className="ev-x2"> · ×{info?.total || 1}</em> : null}
-                              {esContinuacion ? <em className="ev-x2"> · cont.</em> : null}
+                              {sessionTotal > 1 ? <em className="ev-x2"> · ×{sessionTotal}</em> : null}
                             </span>
                             {!esContinuacion && (
                               <span className="ev-docente">{ev.extendedProps?.docente}</span>
