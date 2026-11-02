@@ -26,6 +26,7 @@ import {
 
 const Horarios = () => {
   const [turnoActivo, setTurnoActivo] = useState('TODOS');
+  const [turnoFiltro, setTurnoFiltro] = useState('TODOS');
   const {
     canRestore,
     selectedPeriodoId, setSelectedPeriodoId,
@@ -189,9 +190,18 @@ const Horarios = () => {
     return [];
   }, [filterType, filterValue, itemSeleccionado, aulas]);
 
+  // Filtro de turno en vistas densas (docente/aula): reduce la grilla a un solo turno.
+  const bloquesFiltradosPorTurno = useMemo(() => {
+    if (filterType === 'grupo' || turnoFiltro === 'TODOS') return bloques;
+    return bloques.filter(b => {
+      const div = (b.division || '').toUpperCase();
+      return div === turnoFiltro;
+    });
+  }, [bloques, filterType, turnoFiltro]);
+
   const bandas = useMemo(
-    () => construirBandasEje(bloques, sedesEje, ventanaGrilla),
-    [bloques, sedesEje, ventanaGrilla]
+    () => construirBandasEje(bloquesFiltradosPorTurno, sedesEje, ventanaGrilla),
+    [bloquesFiltradosPorTurno, sedesEje, ventanaGrilla]
   );
 
   const altoBandaPrint = useMemo(() => {
@@ -521,8 +531,16 @@ const Horarios = () => {
 
   const initialDateString = selectedPeriodo?.fecha_inicio || "2026-06-29";
 
+  // Altura de banda adaptativa: compacta en vistas densas (docente/aula).
+  const altoBanda = useMemo(() => {
+    if (filterType === 'grupo') return 64;
+    if (bandas.length > 12) return 40;
+    if (bandas.length > 8) return 48;
+    return 56;
+  }, [filterType, bandas.length]);
+
   return (
-    <div className="horarios-page max-w-7xl 2xl:max-w-[1700px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+    <div className={`horarios-page max-w-7xl 2xl:max-w-[1700px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${altoBanda < 56 ? 'grilla-compacta' : ''}`} style={{ '--alto-banda': `${altoBanda}px` }}>
       {demoMode && <DemoBanner onReconnect={reconectarApi} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
       <Toast toast={toast} />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
@@ -541,6 +559,8 @@ const Horarios = () => {
         tiposVista={TIPOS_VISTA}
         tipoVista={filterType}
         onTipoVistaChange={setFilterType}
+        turnoFiltro={turnoFiltro}
+        onTurnoFiltroChange={filterType !== 'grupo' ? setTurnoFiltro : undefined}
         entidades={entidadesParaToolbar}
         entidadValor={filterValue}
         onEntidadChange={setFilterValue}

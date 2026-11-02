@@ -21,6 +21,8 @@ const ToolbarHorarios = ({
   tiposVista = [],
   tipoVista,
   onTipoVistaChange,
+  turnoFiltro = 'TODOS',
+  onTurnoFiltroChange,
   entidades = [],
   entidadValor,
   onEntidadChange,
@@ -102,6 +104,24 @@ const ToolbarHorarios = ({
             ))}
           </div>
         </div>
+        {tipoVista !== 'grupo' && onTurnoFiltroChange && (
+          <div className="min-w-0 flex-1 lg:max-w-[9rem]">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Turno
+            </label>
+            <select
+              value={turnoFiltro}
+              onChange={(e) => onTurnoFiltroChange(e.target.value)}
+              aria-label="Filtrar por turno"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-semibold text-slate-700"
+            >
+              <option value="TODOS">Todos</option>
+              <option value="MATUTINO">Mañana</option>
+              <option value="VESPERTINO">Tarde</option>
+              <option value="NOCTURNO">Noche</option>
+            </select>
+          </div>
+        )}
         <div className="min-w-0 flex-1 lg:hidden">
           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
             {entidadPlaceholder}

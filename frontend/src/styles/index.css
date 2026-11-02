@@ -103,6 +103,33 @@ table.grilla-bloques {
   min-height: 0;
 }
 
+/* Modo compacto: reduce fuente y padding cuando la grilla es densa */
+.grilla-compacta .evento-card,
+.grilla-compacta .evento-sesion-unificada {
+  padding: 0.15rem 0.2rem;
+  line-height: 1.0;
+}
+
+.grilla-compacta .evento-card .ev-materia,
+.grilla-compacta .evento-sesion-unificada .ev-materia {
+  font-size: 0.6rem;
+  -webkit-line-clamp: 1;
+  max-height: 1.2em;
+}
+
+.grilla-compacta .evento-card .ev-docente,
+.grilla-compacta .evento-card .ev-grupo,
+.grilla-compacta .evento-card .ev-aula,
+.grilla-compacta .evento-sesion-unificada .ev-docente,
+.grilla-compacta .evento-sesion-unificada .ev-grupo,
+.grilla-compacta .evento-sesion-unificada .ev-aula {
+  font-size: 0.5rem;
+}
+
+.grilla-compacta .grilla-bloques td.celda-hora .rango-hora {
+  font-size: 0.65rem;
+}
+
 .grilla-bloques {
   table-layout: fixed;
   width: 100%;
