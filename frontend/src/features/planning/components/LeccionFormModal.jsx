@@ -2,7 +2,7 @@
 // Modal de registro/edición de Lecciones Académicas, extraido de pages/Lecciones.jsx (E16).
 // Dueño de su formulario (react-hook-form + zod); emite onSubmit(data) ya validado.
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,7 @@ import ModalShell from '../../../components/ui/ModalShell';
 
 import HabilitacionesService from '../../../api/habilitaciones';
 import { leccionSchema, buildLeccionDefaults } from '../schemas';
+import MultiTurnoSelector from './MultiTurnoSelector';
 
 const LeccionFormModal = ({
   editing = null,          // lección en edición o null para nueva
@@ -35,6 +36,7 @@ const LeccionFormModal = ({
   });
 
   // Badges en vivo de los sliders (horas/prioridad)
+  const [divisiones, setDivisiones] = useState([]);
   const currentPrioridadValue = watch('prioridad', 5);
   const currentHorasValue = watch('horas_semanales', 4);
   const currentBloquesPorSesion = watch('bloques_por_sesion', 1);
@@ -60,6 +62,8 @@ const LeccionFormModal = ({
     setValue('grupo_id', id, { shouldValidate: true });
     const g = grupos.find(x => Number(x.id) === id);
     if (g && g.periodo_id != null) setValue('periodo_id', Number(g.periodo_id), { shouldValidate: true });
+    // Actualizar turnos permitidos del grupo seleccionado
+    setDivisiones(g?.turnos_permitidos?.map(t => t.division) || []);
   };
   // Cambiar el periodo a mano limpia la Sección si no pertenece a ese periodo.
   const onChangePeriodo = (e) => {
@@ -149,6 +153,8 @@ const LeccionFormModal = ({
         periodo_id: grupoEdit?.periodo_id ?? editing.periodo_id,
         activo: editing.activo,
       });
+      // Cargar los turnos permitidos del grupo seleccionado
+      setDivisiones(grupoEdit?.turnos_permitidos?.map(t => t.division) || []);
     } else {
       const primerGrupo = grupos[0] || null;
       reset(buildLeccionDefaults({
@@ -158,13 +164,14 @@ const LeccionFormModal = ({
         // R0: el periodo nace de la Sección elegida (coherente por construcción).
         periodoId: primerGrupo?.periodo_id || periodos[0]?.id || '',
       }));
+      setDivisiones([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
   return (
     <ModalShell
-      onSubmit={handleSubmit((data) => onSubmit(data))}
+      onSubmit={handleSubmit((data) => onSubmit({ ...data, divisiones }))}
       header={(
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-xl font-bold text-slate-800">
@@ -200,6 +207,12 @@ const LeccionFormModal = ({
             </select>
             {errors.docente_id && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.docente_id.message}</span>}
           </div>
+
+          {/* Selector de turnos multiturno */}
+          <MultiTurnoSelector
+            divisiones={divisiones}
+            onChange={setDivisiones}
+          />
 
           <div className="grid grid-cols-2 gap-4">
               <div>

@@ -155,6 +155,12 @@ export interface PeriodoAcademicoUpdate {
 
 // ─── Grupo ──────────────────────────────────────────────────
 
+export interface GrupoTurno {
+  id: number
+  grupo_id: number
+  division: Division
+}
+
 export interface Grupo {
   id: number
   nombre: string
@@ -163,6 +169,7 @@ export interface Grupo {
   cantidad_alumnos: number
   periodo_id?: number | null
   division: Division
+  turnos_permitidos?: GrupoTurno[]
   activo: boolean
   created_at: string
   updated_at: string
@@ -175,6 +182,7 @@ export interface GrupoCreate {
   cantidad_alumnos?: number
   periodo_id?: number | null
   division?: Division
+  divisiones?: Division[]
   activo?: boolean
 }
 
@@ -185,6 +193,7 @@ export interface GrupoUpdate {
   cantidad_alumnos?: number
   periodo_id?: number | null
   division?: Division
+  divisiones?: Division[]
   activo?: boolean
 }
 

@@ -208,6 +208,22 @@ describe('resolveVentanaGrilla', () => {
     })).toEqual({ inicio: '18:00:00', fin: '22:00:00' });
   });
 
+  it('grupo multiturno (turnos_permitidos) cubre todos los turnos', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 1, division: 'MATUTINO', turnos_permitidos: [{ division: 'VESPERTINO' }] },
+      configs: configsCompletas,
+    })).toEqual({ inicio: '07:00:00', fin: '18:00:00' });
+  });
+
+  it('grupo multiturno con turnos en minusculas', () => {
+    expect(resolveVentanaGrilla({
+      filterType: 'grupo',
+      item: { id: 1, division: 'MATUTINO', divisiones: ['vespertino', 'nocturno'] },
+      configs: configsCompletas,
+    })).toEqual({ inicio: '07:00:00', fin: '22:00:00' });
+  });
+
   it('grupo sin division muestra la jornada completa general', () => {
     expect(resolveVentanaGrilla({
       filterType: 'grupo',

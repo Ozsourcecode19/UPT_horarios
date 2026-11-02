@@ -170,6 +170,33 @@ export const resolveVentanaTurno = (division: string, configs: Configuracion[] =
  */
 export const resolveVentanaGrilla = ({ filterType, item, configs = [] }: ResolveVentanaGrillaParams = {}): VentanaTurno => {
   if (filterType === 'grupo') {
+    // Multiturno: si el grupo tiene turnos permitidos, la ventana cubre todos
+    // los turnos permitidos (desde el mas temprano hasta el mas tardio).
+    const turnosRaw = (item?.turnos_permitidos ?? item?.divisiones ?? []);
+    const turnos = turnosRaw
+      .map(d => {
+        // Soportar tanto objetos {division} como strings
+        const div = typeof d === 'object' && d !== null ? (d.division ?? d) : d;
+        return String(div).toUpperCase();
+      })
+      .filter(Boolean);
+    // Incluir la division principal del grupo si existe
+    if (item?.division) {
+      const divPrincipal = String(item.division).toUpperCase();
+      if (!turnos.includes(divPrincipal)) {
+        turnos.push(divPrincipal);
+      }
+    }
+    if (turnos.length > 0) {
+      const ventanas = turnos
+        .map(t => resolveVentanaTurno(t, configs))
+        .filter((v): v is VentanaTurno => v !== null);
+      if (ventanas.length > 0) {
+        // Ordenar por hora de inicio para encontrar el rango completo
+        ventanas.sort((a, b) => a.inicio.localeCompare(b.inicio));
+        return { inicio: ventanas[0].inicio, fin: ventanas[ventanas.length - 1].fin };
+      }
+    }
     const ventana = resolveVentanaTurno(item?.division || '', configs);
     if (ventana) return ventana;
   }

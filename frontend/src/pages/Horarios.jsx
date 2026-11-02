@@ -173,7 +173,11 @@ const Horarios = () => {
     if (filterType === 'docente') {
       return ventanaDinamicaDeEventos(listadoHorarios, bloques, configuraciones);
     }
-    return resolveVentanaGrilla({ filterType, item: itemSeleccionado, configs: configuraciones });
+    const item = itemSeleccionado;
+    // Multiturno: si el grupo tiene turnos permitidos, se pasan para que la
+    // ventana cubra todos los turnos.
+    const turnosPermitidos = item?.turnos_permitidos ?? item?.divisiones ?? [];
+    return resolveVentanaGrilla({ filterType, item: { ...item, turnos_permitidos: turnosPermitidos }, configs: configuraciones });
   }, [filterType, itemSeleccionado, configuraciones, listadoHorarios, bloques]);
 
   const sedesEje = useMemo(() => {
