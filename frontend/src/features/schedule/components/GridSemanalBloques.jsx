@@ -150,6 +150,27 @@ const GridSemanalBloques = ({
     }
   });
 
+  // Celdas cubiertas por el rowSpan de una sesión multibloque: las bandas
+  // siguientes al principal en la misma columna (día) no renderizan <td>.
+  const celdasCubiertas = new Set();
+  eventos.forEach(ev => {
+    const info = infoSpanPorId.get(ev.id);
+    if (!info || info.esContinuacion || (info.total || 1) <= 1) return;
+    const bid = ev.extendedProps?.bloque_id;
+    const b = bid != null ? bloques.find(x => Number(x.id) === Number(bid)) : null;
+    if (!b) return;
+    const dia = b.dia_semana;
+    const iniMin = horaAMinutos(b.hora_inicio);
+    const bandIndex = filas.findIndex(f => f.tipo === 'banda' && f.banda.iniMin === iniMin);
+    if (bandIndex < 0) return;
+    for (let k = 1; k < (info.total || 1); k++) {
+      const nextBand = filas[bandIndex + k];
+      if (nextBand && nextBand.tipo === 'banda') {
+        celdasCubiertas.add(`${dia}|${nextBand.banda.iniMin}`);
+      }
+    }
+  });
+
   const handleDropEnDia = (e, dia, banda) => {
     e.preventDefault();
     setCeldaHover(null);
@@ -241,6 +262,10 @@ const GridSemanalBloques = ({
                 </td>
                 {DIAS.map(({ dia }) => {
                   const key = `${dia}|${fila.banda.iniMin}`;
+                  // Si esta celda está cubierta por un rowSpan de una sesión
+                  // multibloque del bloque anterior, omitir el <td> completo.
+                  if (celdasCubiertas.has(key)) return null;
+
                   const evs = celdas.get(key) || [];
                   const esHover = celdaHover === key;
                   const conflicto = esHover && conflictoHover;
@@ -267,9 +292,21 @@ const GridSemanalBloques = ({
                   const claseConflicto = conflicto
                     ? `celda-conflicto-${conflicto.tipo} ${modoLibre ? 'celda-conflicto-libre' : ''}`
                     : '';
+
+                  // rowSpan para sesiones multibloque: la celda principal cubre
+                  // N filas (bloques) consecutivas.
+                  const principalMulti = evs.find(ev => {
+                    const info = infoSpanPorId.get(ev.id);
+                    return info && !info.esContinuacion && (info.total || 1) > 1;
+                  });
+                  const rowSpan = principalMulti
+                    ? (infoSpanPorId.get(principalMulti.id)?.total || 1)
+                    : undefined;
+
                   return (
                     <td
                       key={dia}
+                      rowSpan={rowSpan}
                       className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto} ${
                         enModoMover ? (seleccion.celdaKey === key ? 'celda-origen' : 'celda-destino') : ''
                       }`}
@@ -302,8 +339,7 @@ const GridSemanalBloques = ({
                         const info = infoSpanPorId.get(ev.id);
                         const esContinuacion = !!info?.esContinuacion;
                         // Las clases multibloque se renderizan UNA sola vez, en su
-                        // bloque principal. Las celdas de continuación se omiten
-                        // (el card del principal cubre toda la sesión con rowSpan).
+                        // bloque principal. Las celdas de continuación se omiten.
                         if (esContinuacion) return null;
                         const objetivo = info?.principal || ev;   // click/drag delegan al principal
                         const mostrarGrupo = contextoVista !== 'grupo';
@@ -318,7 +354,6 @@ const GridSemanalBloques = ({
                             style={{
                               '--ev-c': ev.extendedProps?.backgroundColor || COLOR_FALLBACK,
                               '--sesion-total': sessionTotal,
-                              height: sessionTotal > 1 ? `calc(var(--alto-banda, 64px) * ${sessionTotal} - 2px)` : undefined,
                             }}
                             draggable
                             onDragStart={(e) => {
