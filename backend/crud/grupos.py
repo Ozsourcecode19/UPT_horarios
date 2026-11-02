@@ -10,8 +10,13 @@ def get_grupo(db: Session, grupo_id: int) -> Optional[Grupo]:
     return db.query(Grupo).options(joinedload(Grupo.turnos_permitidos)).filter(Grupo.id == grupo_id).first()
 
 
-def get_grupos(db: Session, skip: int = 0, limit: int = 100) -> List[Grupo]:
-    return db.query(Grupo).options(joinedload(Grupo.turnos_permitidos)).offset(skip).limit(limit).all()
+def get_grupos(db: Session, skip: int = 0, limit: int = 100, search: Optional[str] = None, sede_id: Optional[int] = None) -> List[Grupo]:
+    query = db.query(Grupo).options(joinedload(Grupo.turnos_permitidos))
+    if search:
+        query = query.filter(Grupo.nombre.ilike(f"%{search}%"))
+    if sede_id:
+        query = query.filter(Grupo.sede_id == sede_id)
+    return query.offset(skip).limit(limit).all()
 
 
 def create_grupo(db: Session, grupo: GrupoCreate) -> Grupo:
@@ -22,15 +27,16 @@ def create_grupo(db: Session, grupo: GrupoCreate) -> Grupo:
         cantidad_alumnos=grupo.cantidad_alumnos,
         periodo_id=grupo.periodo_id,
         activo=grupo.activo,
-        division=grupo.division,
+        division=grupo.division or 'MATUTINO',
     )
     db.add(db_grupo)
     db.commit()
     db.refresh(db_grupo)
 
-    # Añadir turnos adicionales permitidos
-    if grupo.divisiones:
-        for div in grupo.divisiones:
+    # Añadir turnos adicionales permitidos (excluyendo la división principal)
+    divisiones = [d for d in (grupo.divisiones or []) if d != db_grupo.division]
+    if divisiones:
+        for div in divisiones:
             db.add(GrupoTurno(grupo_id=db_grupo.id, division=div))
         db.commit()
         db.refresh(db_grupo)
@@ -50,8 +56,9 @@ def update_grupo(db: Session, grupo_id: int, grupo: GrupoUpdate) -> Optional[Gru
         setattr(db_grupo, key, value)
 
     if divisiones is not None:
-        # Limpiar turnos existentes y reemplazar
+        # Limpiar turnos existentes y reemplazar (excluyendo la división principal)
         db.query(GrupoTurno).filter(GrupoTurno.grupo_id == grupo_id).delete()
+        divisiones = [d for d in divisiones if d != db_grupo.division]
         for div in divisiones:
             db.add(GrupoTurno(grupo_id=grupo_id, division=div))
 
