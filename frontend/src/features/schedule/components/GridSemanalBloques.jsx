@@ -163,10 +163,11 @@ const GridSemanalBloques = ({
     const iniMin = horaAMinutos(b.hora_inicio);
     const bandIndex = filas.findIndex(f => f.tipo === 'banda' && f.banda.iniMin === iniMin);
     if (bandIndex < 0) return;
-    for (let k = 1; k < (info.total || 1); k++) {
-      const nextBand = filas[bandIndex + k];
-      if (nextBand && nextBand.tipo === 'banda') {
-        celdasCubiertas.add(`${dia}|${nextBand.banda.iniMin}`);
+    let avanzados = 0;
+    for (let j = bandIndex + 1; j < filas.length && avanzados < (info.total || 1) - 1; j++) {
+      if (filas[j].tipo === 'banda') {
+        celdasCubiertas.add(`${dia}|${filas[j].banda.iniMin}`);
+        avanzados++;
       }
     }
   });
