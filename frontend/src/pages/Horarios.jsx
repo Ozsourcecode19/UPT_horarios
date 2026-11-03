@@ -583,7 +583,7 @@ const Horarios = () => {
           blobUrl={pdfBlobUrl}
           generando={generandoPdf}
           error={null}
-          onDescargar={() => descargarPdf({
+          onDescargar={() => descargarPdf(pdfParams || {
             selectedPeriodo,
             descripcion: itemSeleccionado?.nombre || 'Horario',
             ventanaGrilla,
@@ -637,8 +637,7 @@ const Horarios = () => {
         onImprimir={() => window.print()}
         imprimirDeshabilitado={listadoHorarios.length === 0}
         onDescargarPdf={() => {
-          setMostrarPreviewPdf(true);
-          generarPdfPreview({
+          const params = {
             selectedPeriodo,
             descripcion: itemSeleccionado?.nombre || 'Horario',
             ventanaGrilla,
@@ -647,7 +646,10 @@ const Horarios = () => {
             bloques,
             contextoVista: filterType,
             itemSeleccionado,
-          });
+          };
+          setPdfParams(params);
+          setMostrarPreviewPdf(true);
+          generarPdfPreview(params);
         }}
         onDescargarPdfTodos={() => setPdfTodosTipo(filterType)}
         descargarPdfDeshabilitado={listadoHorarios.length === 0 || generandoPdf}
