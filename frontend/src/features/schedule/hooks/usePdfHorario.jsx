@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { saveAs } from 'file-saver';
+import { agruparSesiones } from '../utils/sesiones';
 
 export default function usePdfHorario() {
   const [generando, setGenerando] = useState(false);
@@ -21,7 +21,6 @@ export default function usePdfHorario() {
     const descripcion = params.descripcion || 'Horario';
     const fecha = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    // Encabezado
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text(descripcion, 14, 15);
@@ -31,20 +30,39 @@ export default function usePdfHorario() {
     doc.setFontSize(8);
     doc.text(fecha, pageWidth - 14, 15, { align: 'right' });
 
-    // Mapa de celdas: "dia|iniMin" -> eventos[]
+    const infoSpanPorId = agruparSesiones(eventos, bloques);
+
     const celdas = new Map();
     eventos.forEach(ev => {
       const bid = ev.extendedProps?.bloque_id;
       const b = bid != null ? bloques.find(x => Number(x.id) === Number(bid)) : null;
       if (b && b.activo !== false) {
-        const clave = `${b.dia_semana}|${b.hora_inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 60 : i === 1 ? 1 : 0) * Number(v), 0)}`;
+        const iniMin = b.hora_inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 60 : i === 1 ? 1 : 0) * Number(v), 0);
+        const clave = `${b.dia_semana}|${iniMin}`;
         if (!celdas.has(clave)) celdas.set(clave, []);
         celdas.get(clave).push(ev);
       }
     });
 
-    // Construir filas de la tabla
-    const head = [['Hora', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']];
+    const celdasCubiertas = new Set();
+    eventos.forEach(ev => {
+      const info = infoSpanPorId.get(ev.id);
+      if (!info || info.esContinuacion || (info.total || 1) <= 1) return;
+      const bid = ev.extendedProps?.bloque_id;
+      const b = bid != null ? bloques.find(x => Number(x.id) === Number(bid)) : null;
+      if (!b) return;
+      const dia = b.dia_semana;
+      const iniMin = b.hora_inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 60 : i === 1 ? 1 : 0) * Number(v), 0);
+      const bandIndex = bandas.findIndex(f => f.iniMin === iniMin);
+      if (bandIndex < 0) return;
+      let avanzados = 0;
+      for (let j = bandIndex + 1; j < bandas.length && avanzados < (info.total || 1) - 1; j++) {
+        celdasCubiertas.add(`${dia}|${bandas[j].iniMin}`);
+        avanzados++;
+      }
+    });
+
+    const head = [['Hora', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes']];
     const body = [];
 
     bandas.forEach((banda, i) => {
@@ -52,7 +70,7 @@ export default function usePdfHorario() {
       const hueco = siguiente ? siguiente.iniMin - banda.finMin : 0;
       if (siguiente && hueco > 0 && hueco >= 30) {
         body.push([{
-          content: `Descanso · ${Math.floor(banda.finMin / 60)}:${String(banda.finMin % 60).padStart(2, '0')} – ${Math.floor(siguiente.iniMin / 60)}:${String(siguiente.iniMin % 60).padStart(2, '0')}`,
+          content: `Descanso - ${Math.floor(banda.finMin / 60)}:${String(banda.finMin % 60).padStart(2, '0')} a ${Math.floor(siguiente.iniMin / 60)}:${String(siguiente.iniMin % 60).padStart(2, '0')}`,
           colSpan: 6,
           styles: { halign: 'center', fillColor: [248, 250, 252], textColor: [148, 163, 184], fontSize: 7 },
         }]);
@@ -62,6 +80,11 @@ export default function usePdfHorario() {
       const row = [banda.etiqueta];
       for (let d = 1; d <= 5; d++) {
         const key = `${d}|${banda.iniMin}`;
+        if (celdasCubiertas.has(key)) {
+          row.push('');
+          continue;
+        }
+
         const evs = celdas.get(key) || [];
         if (evs.length === 0) {
           row.push('');
@@ -69,21 +92,49 @@ export default function usePdfHorario() {
         }
 
         const textos = evs.map(ev => {
+          const info = infoSpanPorId.get(ev.id);
+          const esContinuacion = !!info?.esContinuacion;
+          if (esContinuacion) {
+            const materia = ev.extendedProps?.materia || ev.title || '';
+            return `cont. ${materia}`;
+          }
           const materia = ev.extendedProps?.materia || ev.title || '';
           const docente = ev.extendedProps?.docente || '';
           const aula = ev.extendedProps?.aula || '';
-          return `${materia}\n${docente}\n${aula}`;
+          const sessionTotal = info?.total || 1;
+          const x2 = sessionTotal > 1 ? ` (x${sessionTotal})` : '';
+          return `${materia}${x2}\n${docente}\n${aula}`;
         }).join('\n---\n');
 
-        row.push({
+        const principalMulti = evs.find(ev => {
+          const info = infoSpanPorId.get(ev.id);
+          return info && !info.esContinuacion && (info.total || 1) > 1;
+        });
+        const rowSpan = principalMulti ? (infoSpanPorId.get(principalMulti.id)?.total || 1) : 1;
+
+        const color = evs[0]?.extendedProps?.backgroundColor || '#6366f1';
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16) || 99;
+        const g = parseInt(hex.substring(2, 4), 16) || 102;
+        const b = parseInt(hex.substring(4, 6), 16) || 241;
+
+        const cellObj = {
           content: textos,
           styles: {
             fillColor: [255, 255, 255],
             textColor: [30, 41, 59],
             fontSize: 6.5,
             halign: 'center',
+            cellPadding: 1,
           },
-        });
+        };
+        if (rowSpan > 1) {
+          cellObj.rowSpan = rowSpan;
+        }
+        cellObj.styles.lineWidth = { left: 1.5 };
+        cellObj.styles.lineColor = { left: [r, g, b] };
+
+        row.push(cellObj);
       }
 
       body.push(row);
@@ -97,7 +148,6 @@ export default function usePdfHorario() {
       }]);
     }
 
-    // Generar la tabla con autotable
     autoTable(doc, {
       startY: 28,
       head: head,
