@@ -37,7 +37,7 @@ export default function usePdfHorario() {
       const bid = ev.extendedProps?.bloque_id;
       const b = bid != null ? bloques.find(x => Number(x.id) === Number(bid)) : null;
       if (b && b.activo !== false) {
-        const clave = `${b.dia_semana}|${b.hora_inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0)}`;
+        const clave = `${b.dia_semana}|${b.hora_inicio?.split(':').reduce((acc, v, i) => acc + (i === 0 ? 60 : i === 1 ? 1 : 0) * Number(v), 0)}`;
         if (!celdas.has(clave)) celdas.set(clave, []);
         celdas.get(clave).push(ev);
       }

@@ -273,9 +273,9 @@ const Horarios = () => {
       const eventosTurno = eventosFiltrados.filter(ev => {
         const bloque = bloques.find(b => Number(b.id) === Number(ev.extendedProps?.bloque_id));
         if (!bloque) return false;
-        const ini = (bloque.hora_inicio || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
-        const vIni = (turno.ventana.inicio || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
-        const vFin = (turno.ventana.fin || '').split(':').reduce((acc, v, i) => acc + (i === 0 ? 3600 : i === 1 ? 60 : 0) * Number(v), 0);
+        const ini = horaAMinutos(bloque.hora_inicio || '');
+        const vIni = horaAMinutos(turno.ventana.inicio || '');
+        const vFin = horaAMinutos(turno.ventana.fin || '');
         return ini >= vIni && ini < vFin;
       });
       const turnoLabel = turno.nombre.charAt(0) + turno.nombre.slice(1).toLowerCase();
