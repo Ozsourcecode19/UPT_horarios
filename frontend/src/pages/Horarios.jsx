@@ -24,6 +24,7 @@ import {
   usePrintMultiEntity, PrintMultiSection,
 } from '../features/horarios';
 import usePdfHorario from '../features/schedule/hooks/usePdfHorario.jsx';
+import PdfPreviewModal from '../features/schedule/components/pdf/PdfPreviewModal.jsx';
 
 const Horarios = () => {
   const [turnoActivo, setTurnoActivo] = useState('TODOS');
@@ -389,7 +390,8 @@ const Horarios = () => {
     showToast,
   });
 
-  const { generando: generandoPdf, generarYDescargar: descargarPdf } = usePdfHorario();
+  const { generando: generandoPdf, blobUrl: pdfBlobUrl, generarBlob: generarPdfPreview, descargarPdf, limpiarPreview: limpiarPdfPreview } = usePdfHorario();
+  const [mostrarPreviewPdf, setMostrarPreviewPdf] = useState(false);
 
   // E23 — Colocar una clase de la bandeja: resuelve el bloque destino y la
   // asigna; si la clase nunca tuvo aula, se abre el editor para elegirla.
@@ -546,6 +548,27 @@ const Horarios = () => {
     <div className={`horarios-page max-w-7xl 2xl:max-w-[1700px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${altoBanda < 56 ? 'grilla-compacta' : ''}`} style={{ '--alto-banda': `${altoBanda}px` }}>
       {demoMode && <DemoBanner onReconnect={reconectarApi} noPrint description="El backend de FastAPI está inactivo o desconectado. Visualizando y simulando operaciones de horarios localmente en memoria." />}
       <Toast toast={toast} />
+
+      {mostrarPreviewPdf && (
+        <PdfPreviewModal
+          blobUrl={pdfBlobUrl}
+          generando={generandoPdf}
+          error={null}
+          onDescargar={() => descargarPdf({
+            selectedPeriodo,
+            descripcion: itemSeleccionado?.nombre || 'Horario',
+            ventanaGrilla,
+            bandas,
+            eventos: listadoHorarios,
+            bloques,
+            contextoVista: filterType,
+          })}
+          onCerrar={() => {
+            setMostrarPreviewPdf(false);
+            limpiarPdfPreview();
+          }}
+        />
+      )}
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
 
       {/* E24: la toolbar del área de trabajo. Reemplaza al bloque grande de
@@ -583,15 +606,18 @@ const Horarios = () => {
         exportarDeshabilitado={listadoHorarios.length === 0}
         onImprimir={() => window.print()}
         imprimirDeshabilitado={listadoHorarios.length === 0}
-        onDescargarPdf={() => descargarPdf({
-          selectedPeriodo,
-          descripcion: itemSeleccionado?.nombre || 'Horario',
-          ventanaGrilla,
-          bandas,
-          eventos: listadoHorarios,
-          bloques,
-          contextoVista: filterType,
-        })}
+        onDescargarPdf={() => {
+          setMostrarPreviewPdf(true);
+          generarPdfPreview({
+            selectedPeriodo,
+            descripcion: itemSeleccionado?.nombre || 'Horario',
+            ventanaGrilla,
+            bandas,
+            eventos: listadoHorarios,
+            bloques,
+            contextoVista: filterType,
+          });
+        }}
         descargarPdfDeshabilitado={listadoHorarios.length === 0 || generandoPdf}
         generandoPdf={generandoPdf}
         onImprimirTodos={(tipo) => {
