@@ -52,6 +52,7 @@ export default function usePdfHorario() {
   // Dibuja una página completa (logo + encabezado + tabla) en el doc.
   const dibujarPagina = (doc, params) => {
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const bandas = Array.isArray(params.bandas) ? params.bandas : [];
     const eventos = Array.isArray(params.eventos) ? params.eventos : [];
     const bloques = Array.isArray(params.bloques) ? params.bloques : [];
@@ -215,6 +216,18 @@ export default function usePdfHorario() {
       }]);
     }
 
+    // Calcular alto por fila para que la tabla ocupe toda la altura disponible
+    const startY = 32;
+    const marginBottom = 10;
+    const alturaDisponible = pageHeight - startY - marginBottom;
+    let numDescansos = 0;
+    for (let i = 0; i < bandas.length - 1; i++) {
+      const hueco = bandas[i + 1].iniMin - bandas[i].finMin;
+      if (hueco > 0 && hueco >= 30) numDescansos++;
+    }
+    const numFilas = (body.length > 0 ? body.length : 1);
+    const altoPorFila = Math.max(8, alturaDisponible / numFilas);
+
     autoTable(doc, {
       startY: 32,
       head: head,
@@ -227,14 +240,14 @@ export default function usePdfHorario() {
         lineWidth: 0.3,
         valign: 'middle',
         halign: 'center',
-        minCellHeight: 8,
+        minCellHeight: altoPorFila,
       },
       headStyles: {
         fillColor: [241, 245, 249],
         textColor: [71, 85, 105],
         fontStyle: 'bold',
         fontSize: 7.5,
-        minCellHeight: 8,
+        minCellHeight: altoPorFila,
       },
       columnStyles: {
         0: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
