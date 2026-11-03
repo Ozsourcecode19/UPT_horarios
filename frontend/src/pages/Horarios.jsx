@@ -406,6 +406,7 @@ const Horarios = () => {
 
   const { generando: generandoPdf, blobUrl: pdfBlobUrl, generarBlob: generarPdfPreview, descargarPdf, limpiarPreview: limpiarPdfPreview } = usePdfHorario();
   const [mostrarPreviewPdf, setMostrarPreviewPdf] = useState(false);
+  const [pdfParams, setPdfParams] = useState(null);
 
   // Cuando se calculan las secciones del PDF Todos, generar el preview
   useEffect(() => {
@@ -583,16 +584,16 @@ const Horarios = () => {
           blobUrl={pdfBlobUrl}
           generando={generandoPdf}
           error={null}
-          onDescargar={() => descargarPdf(pdfParams || {
-            selectedPeriodo,
-            descripcion: itemSeleccionado?.nombre || 'Horario',
-            ventanaGrilla,
-            bandas,
-            eventos: listadoHorarios,
-            bloques,
-            contextoVista: filterType,
-            itemSeleccionado,
-          })}
+          onDescargar={() => {
+            if (pdfBlobUrl) {
+              const a = document.createElement('a');
+              a.href = pdfBlobUrl;
+              a.download = `horario_${(pdfParams?.descripcion || itemSeleccionado?.nombre || 'horario').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }
+          }}
           onCerrar={() => {
             setMostrarPreviewPdf(false);
             limpiarPdfPreview();
