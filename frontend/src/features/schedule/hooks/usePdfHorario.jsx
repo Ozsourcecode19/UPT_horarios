@@ -133,7 +133,8 @@ export default function usePdfHorario() {
     // Calcular alto por fila para que la tabla ocupe toda la altura disponible
     const startY = 32;
     const marginBottom = 10;
-    const alturaDisponible = pageHeight - startY - marginBottom;
+    const headerHeight = 10; // altura estimada del header de la tabla
+    const alturaDisponible = pageHeight - startY - headerHeight - marginBottom;
     let numDescansos = 0;
     for (let i = 0; i < bandas.length - 1; i++) {
       const hueco = bandas[i + 1].iniMin - bandas[i].finMin;
