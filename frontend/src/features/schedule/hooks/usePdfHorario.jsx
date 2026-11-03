@@ -130,6 +130,19 @@ export default function usePdfHorario() {
     });
 
     // Construir filas de la tabla
+    // Calcular alto por fila para que la tabla ocupe toda la altura disponible
+    const startY = 32;
+    const marginBottom = 10;
+    const alturaDisponible = pageHeight - startY - marginBottom;
+    let numDescansos = 0;
+    for (let i = 0; i < bandas.length - 1; i++) {
+      const hueco = bandas[i + 1].iniMin - bandas[i].finMin;
+      if (hueco > 0 && hueco >= 30) numDescansos++;
+    }
+    const alturaDescansos = numDescansos * 6;
+    const alturaBandas = alturaDisponible - alturaDescansos;
+    const altoPorFila = Math.max(8, alturaBandas / Math.max(bandas.length, 1));
+
     const head = [['Hora', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes']];
     const body = [];
 
@@ -140,7 +153,7 @@ export default function usePdfHorario() {
         body.push([{
           content: `Descanso - ${Math.floor(banda.finMin / 60)}:${String(banda.finMin % 60).padStart(2, '0')} a ${Math.floor(siguiente.iniMin / 60)}:${String(siguiente.iniMin % 60).padStart(2, '0')}`,
           colSpan: 6,
-          styles: { halign: 'center', fillColor: [248, 250, 252], textColor: [148, 163, 184], fontSize: 7 },
+          styles: { halign: 'center', fillColor: [248, 250, 252], textColor: [148, 163, 184], fontSize: 7, minCellHeight: 6 },
         }]);
         return;
       }
@@ -149,13 +162,13 @@ export default function usePdfHorario() {
       for (let d = 1; d <= 5; d++) {
         const key = `${d}|${banda.iniMin}`;
         if (celdasCubiertas.has(key)) {
-          row.push('');
+          row.push({ content: '', styles: { minCellHeight: altoPorFila } });
           continue;
         }
 
         const evs = celdas.get(key) || [];
         if (evs.length === 0) {
-          row.push('');
+          row.push({ content: '', styles: { minCellHeight: altoPorFila } });
           continue;
         }
 
@@ -194,6 +207,7 @@ export default function usePdfHorario() {
             fontSize: 6.5,
             halign: 'center',
             cellPadding: 1,
+            minCellHeight: altoPorFila,
           },
         };
         if (rowSpan > 1) {
@@ -212,21 +226,9 @@ export default function usePdfHorario() {
       body.push([{
         content: 'Sin clases asignadas para esta entidad.',
         colSpan: 6,
-        styles: { halign: 'center', textColor: [148, 163, 184], fontSize: 9 },
+        styles: { halign: 'center', textColor: [148, 163, 184], fontSize: 9, minCellHeight: altoPorFila },
       }]);
     }
-
-    // Calcular alto por fila para que la tabla ocupe toda la altura disponible
-    const startY = 32;
-    const marginBottom = 10;
-    const alturaDisponible = pageHeight - startY - marginBottom;
-    let numDescansos = 0;
-    for (let i = 0; i < bandas.length - 1; i++) {
-      const hueco = bandas[i + 1].iniMin - bandas[i].finMin;
-      if (hueco > 0 && hueco >= 30) numDescansos++;
-    }
-    const numFilas = (body.length > 0 ? body.length : 1);
-    const altoPorFila = Math.max(8, alturaDisponible / numFilas);
 
     autoTable(doc, {
       startY: 32,
@@ -240,14 +242,12 @@ export default function usePdfHorario() {
         lineWidth: 0.3,
         valign: 'middle',
         halign: 'center',
-        minCellHeight: altoPorFila,
       },
       headStyles: {
         fillColor: [241, 245, 249],
         textColor: [71, 85, 105],
         fontStyle: 'bold',
         fontSize: 7.5,
-        minCellHeight: altoPorFila,
       },
       columnStyles: {
         0: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
