@@ -12,17 +12,18 @@ const DIAS = [
   { dia: 5, nombre: 'Vie' },
 ];
 
+const BAND_HEIGHT = 14;
+
 const styles = StyleSheet.create({
   table: {
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#64748b',
   },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
     borderBottomWidth: 1,
     borderBottomColor: '#64748b',
+    width: '100%',
   },
   headerCell: {
     fontSize: 7,
@@ -48,7 +49,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    minHeight: 14,
+    width: '100%',
+    minHeight: BAND_HEIGHT,
   },
   cellHora: {
     width: '11%',
@@ -64,14 +66,17 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: '#cbd5e1',
     backgroundColor: '#f8fafc',
-    minHeight: 14,
+    minHeight: BAND_HEIGHT,
   },
   cellDia: {
     width: '17.8%',
-    padding: 1,
+    paddingTop: 1,
+    paddingRight: 1,
+    paddingBottom: 1,
+    paddingLeft: 1,
     borderRightWidth: 1,
     borderRightColor: '#cbd5e1',
-    minHeight: 14,
+    minHeight: BAND_HEIGHT,
   },
   descanso: {
     flexDirection: 'row',
@@ -80,6 +85,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e2e8f0',
     minHeight: 6,
     alignItems: 'center',
+    width: '100%',
   },
   descansoText: {
     fontSize: 6,
@@ -105,6 +111,12 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginTop: 20,
+  },
+  debugText: {
+    fontSize: 8,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 
