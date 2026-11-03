@@ -383,6 +383,20 @@ const Horarios = () => {
     selectedPeriodo,
   });
 
+  // PDF Todos: calcula secciones para el PDF multi-entidad
+  const [pdfTodosTipo, setPdfTodosTipo] = useState(null);
+  const { secciones: seccionesPdfTodos } = usePrintMultiEntity({
+    tipoEntidad: pdfTodosTipo,
+    todosLosHorarios: listadoHorariosRaw,
+    grupos,
+    docentes,
+    aulas,
+    bloques,
+    configuraciones,
+    sedes,
+    selectedPeriodo,
+  });
+
   const { isGenerating, genStatusText, triggerAutoGeneration } = useScheduleGeneration({
     demoMode, selectedPeriodoId, selectedPeriodo,
     setDemoHorarios, onRefetch: refetchHorarios,
@@ -392,6 +406,21 @@ const Horarios = () => {
 
   const { generando: generandoPdf, blobUrl: pdfBlobUrl, generarBlob: generarPdfPreview, descargarPdf, limpiarPreview: limpiarPdfPreview } = usePdfHorario();
   const [mostrarPreviewPdf, setMostrarPreviewPdf] = useState(false);
+
+  // Cuando se calculan las secciones del PDF Todos, generar el preview
+  useEffect(() => {
+    if (pdfTodosTipo && seccionesPdfTodos && seccionesPdfTodos.length > 0) {
+      setMostrarPreviewPdf(true);
+      generarPdfPreview({
+        selectedPeriodo,
+        descripcion: pdfTodosTipo === 'grupo' ? 'Todas las Secciones' : pdfTodosTipo === 'docente' ? 'Todos los Docentes' : 'Todas las Aulas',
+        secciones: seccionesPdfTodos,
+        bloques,
+        contextoVista: pdfTodosTipo,
+      });
+      setPdfTodosTipo(null);
+    }
+  }, [pdfTodosTipo, seccionesPdfTodos]);
 
   // E23 — Colocar una clase de la bandeja: resuelve el bloque destino y la
   // asigna; si la clase nunca tuvo aula, se abre el editor para elegirla.
@@ -562,6 +591,7 @@ const Horarios = () => {
             eventos: listadoHorarios,
             bloques,
             contextoVista: filterType,
+            itemSeleccionado,
           })}
           onCerrar={() => {
             setMostrarPreviewPdf(false);
@@ -616,8 +646,10 @@ const Horarios = () => {
             eventos: listadoHorarios,
             bloques,
             contextoVista: filterType,
+            itemSeleccionado,
           });
         }}
+        onDescargarPdfTodos={() => setPdfTodosTipo(filterType)}
         descargarPdfDeshabilitado={listadoHorarios.length === 0 || generandoPdf}
         generandoPdf={generandoPdf}
         onImprimirTodos={(tipo) => {

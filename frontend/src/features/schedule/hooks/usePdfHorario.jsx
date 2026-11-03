@@ -1,37 +1,102 @@
 // src/features/schedule/hooks/usePdfHorario.jsx
 // Hook para generar y descargar un PDF de horarios con jspdf + jspdf-autotable.
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { agruparSesiones } from '../utils/sesiones';
+import { TURNOS_LABELS } from '../../../constants';
+import { formatHora12 } from '../../../utils/timeFormat';
+
+const DIAS = [1, 2, 3, 4, 5];
+
+// Construye el subtítulo adaptativo según el tipo de vista (igual que PrintHeader).
+function construirSubtitulo(contextoVista, itemSeleccionado, ventanaGrilla) {
+  const fecha = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
+  let turnoLabel = 'Jornada general';
+  if (contextoVista === 'grupo' && itemSeleccionado?.division) {
+    turnoLabel = `Turno ${TURNOS_LABELS[itemSeleccionado.division] ?? itemSeleccionado.division}`;
+  }
+  let ventanaTexto = '';
+  if (ventanaGrilla?.inicio && ventanaGrilla?.fin) {
+    ventanaTexto = `${formatHora12(ventanaGrilla.inicio.slice(0, 5))}–${formatHora12(ventanaGrilla.fin.slice(0, 5))}`;
+  }
+  return `${turnoLabel}${ventanaTexto ? ' · ' + ventanaTexto : ''} · Generado: ${fecha}`;
+}
+
+// Carga una imagen como base64 para usar en doc.addImage().
+function cargarImagenBase64(url) {
+  return fetch(url)
+    .then(r => r.blob())
+    .then(blob => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    }))
+    .catch(() => null);
+}
 
 export default function usePdfHorario() {
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
+  const [logoBase64, setLogoBase64] = useState(null);
+  const logoRef = useRef(null);
 
-  const generarPdf = useCallback((params) => {
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  useEffect(() => {
+    cargarImagenBase64('/img/Logo-circular-uptbolivar.png').then(b64 => {
+      logoRef.current = b64;
+      setLogoBase64(b64);
+    });
+  }, []);
+
+  // Dibuja una página completa (logo + encabezado + tabla) en el doc.
+  const dibujarPagina = (doc, params) => {
     const pageWidth = doc.internal.pageSize.getWidth();
-
     const bandas = Array.isArray(params.bandas) ? params.bandas : [];
     const eventos = Array.isArray(params.eventos) ? params.eventos : [];
     const bloques = Array.isArray(params.bloques) ? params.bloques : [];
     const periodo = params.selectedPeriodo?.nombre || 'Sin periodo';
     const descripcion = params.descripcion || 'Horario';
-    const fecha = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const contextoVista = params.contextoVista || 'grupo';
+    const itemSeleccionado = params.itemSeleccionado || params.entidad || null;
+    const ventanaGrilla = params.ventanaGrilla || null;
+    const logo = params.logoBase64 || logoRef.current;
 
+    // Logo (todas las páginas)
+    if (logo) {
+      try {
+        doc.addImage(logo, 'PNG', 10, 8, 12, 12);
+      } catch (e) {
+        // Si falla, continuar sin logo
+      }
+    }
+
+    // Título
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(descripcion, 14, 15);
+    doc.text(descripcion, 26, 15);
+
+    // Periodo
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(periodo, 14, 22);
+    doc.text(periodo, 26, 22);
+
+    // Fecha (esquina derecha)
+    const fecha = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
     doc.setFontSize(8);
     doc.text(fecha, pageWidth - 14, 15, { align: 'right' });
 
+    // Subtítulo adaptativo
+    const subtitulo = construirSubtitulo(contextoVista, itemSeleccionado, ventanaGrilla);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text(subtitulo, 26, 28);
+    doc.setFont('helvetica', 'normal');
+
+    // Agrupar sesiones multibloque
     const infoSpanPorId = agruparSesiones(eventos, bloques);
 
+    // Mapa de celdas: "dia|iniMin" -> eventos[]
     const celdas = new Map();
     eventos.forEach(ev => {
       const bid = ev.extendedProps?.bloque_id;
@@ -44,6 +109,7 @@ export default function usePdfHorario() {
       }
     });
 
+    // Celdas cubiertas por rowSpan (multibloque)
     const celdasCubiertas = new Set();
     eventos.forEach(ev => {
       const info = infoSpanPorId.get(ev.id);
@@ -62,6 +128,7 @@ export default function usePdfHorario() {
       }
     });
 
+    // Construir filas de la tabla
     const head = [['Hora', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes']];
     const body = [];
 
@@ -149,7 +216,7 @@ export default function usePdfHorario() {
     }
 
     autoTable(doc, {
-      startY: 28,
+      startY: 32,
       head: head,
       body: body,
       styles: {
@@ -172,9 +239,34 @@ export default function usePdfHorario() {
       margin: { left: 10, right: 10 },
       theme: 'grid',
     });
+  };
+
+  const generarPdf = useCallback((params) => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    const secciones = Array.isArray(params.secciones) ? params.secciones : null;
+    const logo = logoRef.current;
+
+    if (secciones && secciones.length > 0) {
+      secciones.forEach((sec, i) => {
+        if (i > 0) doc.addPage();
+        dibujarPagina(doc, {
+          ...params,
+          descripcion: sec.descripcion || params.descripcion,
+          eventos: sec.eventos || [],
+          bandas: sec.bandas || [],
+          ventanaGrilla: sec.ventanaGrilla || params.ventanaGrilla,
+          contextoVista: sec.contextoVista || params.contextoVista,
+          itemSeleccionado: sec.entidad || params.itemSeleccionado,
+          logoBase64: logo,
+        });
+      });
+    } else {
+      dibujarPagina(doc, { ...params, logoBase64: logo });
+    }
 
     return doc;
-  }, []);
+  }, [logoBase64]);
 
   const generarBlob = useCallback(async (params) => {
     setGenerando(true);

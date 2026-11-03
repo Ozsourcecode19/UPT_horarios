@@ -37,6 +37,7 @@ const ToolbarHorarios = ({
   onImprimir,
   imprimirDeshabilitado = false,
   onDescargarPdf,
+  onDescargarPdfTodos,
   descargarPdfDeshabilitado = false,
   generandoPdf = false,
   onImprimirTodos,
@@ -172,18 +173,21 @@ const ToolbarHorarios = ({
           <span className="hidden xl:inline">iCal</span>
         </button>
 
-        <div className="relative" onMouseEnter={onPrintMenuEnter} onMouseLeave={onPrintMenuLeave}>
-          <button
-            type="button"
-            onClick={onImprimir}
-            disabled={imprimirDeshabilitado}
-            title="Imprimir o guardar como PDF"
-            aria-label="Imprimir o guardar como PDF"
-            className="flex items-center justify-center gap-2 h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <Printer className="w-4 h-4" />
-            <span className="hidden xl:inline">Imprimir</span>
-          </button>
+        {/* Botones de impresión ocultos (lógica mantenida) */}
+        <div className="hidden">
+          <div className="relative" onMouseEnter={onPrintMenuEnter} onMouseLeave={onPrintMenuLeave}>
+            <button
+              type="button"
+              onClick={onImprimir}
+              disabled={imprimirDeshabilitado}
+              title="Imprimir o guardar como PDF"
+              aria-label="Imprimir o guardar como PDF"
+              className="flex items-center justify-center gap-2 h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Printer className="w-4 h-4" />
+              <span className="hidden xl:inline">Imprimir</span>
+            </button>
+          </div>
         </div>
 
         <button
@@ -202,34 +206,49 @@ const ToolbarHorarios = ({
           <span className="hidden xl:inline">{generandoPdf ? 'Generando...' : 'PDF'}</span>
         </button>
 
-        <div className="relative" onMouseEnter={onPrintMenuEnter} onMouseLeave={onPrintMenuLeave}>
-          <button
-            type="button"
-            onClick={() => onImprimirTodos?.()}
-            disabled={imprimirDeshabilitado}
-            title="Imprimir todas las entidades del tipo seleccionado"
-            aria-label="Imprimir todas las entidades del tipo seleccionado"
-            className="flex items-center justify-center gap-2 h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <FileText className="w-4 h-4" />
-            <span className="hidden xl:inline">Imprimir Todos</span>
-          </button>
-          {printMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 min-w-[180px]">
-              <button onClick={() => onImprimirTodos?.('grupo')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-500" />
-                <span>Todas las Secciones</span>
-              </button>
-              <button onClick={() => onImprimirTodos?.('docente')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                <CalendarRange className="w-4 h-4 text-green-500" />
-                <span>Todos los Docentes</span>
-              </button>
-              <button onClick={() => onImprimirTodos?.('aula')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-500" />
-                <span>Todas las Aulas</span>
-              </button>
-            </div>
-          )}
+        <button
+          type="button"
+          onClick={() => onDescargarPdfTodos?.()}
+          disabled={descargarPdfDeshabilitado}
+          title="Descargar todas las entidades como un solo PDF"
+          aria-label="Descargar todas las entidades como PDF"
+          className="flex items-center justify-center gap-2 h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <FileText className="w-4 h-4" />
+          <span className="hidden xl:inline">PDF Todos</span>
+        </button>
+
+        {/* Botón Imprimir Todos oculto (lógica mantenida) */}
+        <div className="hidden">
+          <div className="relative" onMouseEnter={onPrintMenuEnter} onMouseLeave={onPrintMenuLeave}>
+            <button
+              type="button"
+              onClick={() => onImprimirTodos?.()}
+              disabled={imprimirDeshabilitado}
+              title="Imprimir todas las entidades del tipo seleccionado"
+              aria-label="Imprimir todas las entidades del tipo seleccionado"
+              className="flex items-center justify-center gap-2 h-10 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <FileText className="w-4 h-4" />
+              <span className="hidden xl:inline">Imprimir Todos</span>
+            </button>
+            {printMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 min-w-[180px]">
+                <button onClick={() => onImprimirTodos?.('grupo')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-500" />
+                  <span>Todas las Secciones</span>
+                </button>
+                <button onClick={() => onImprimirTodos?.('docente')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                  <CalendarRange className="w-4 h-4 text-green-500" />
+                  <span>Todos los Docentes</span>
+                </button>
+                <button onClick={() => onImprimirTodos?.('aula')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                  <span>Todas las Aulas</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <button
