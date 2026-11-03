@@ -29,6 +29,7 @@ export default function usePdfHorario() {
     setError(null);
     try {
       const doc = crearDoc(params);
+      console.log('PDF params:', params, 'bandas:', params.bandas?.length, 'eventos:', params.eventos?.length, 'bloques:', params.bloques?.length);
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
@@ -46,6 +47,7 @@ export default function usePdfHorario() {
     setGenerando(true);
     setError(null);
     try {
+      console.log('PDF params:', { bandas: params.bandas?.length, eventos: params.eventos?.length, bloques: params.bloques?.length });
       const doc = crearDoc(params);
       const blob = await pdf(doc).toBlob();
       const nombre = `horario_${(params.descripcion || 'horario').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;

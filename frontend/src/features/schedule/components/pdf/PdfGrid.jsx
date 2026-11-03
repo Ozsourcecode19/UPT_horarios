@@ -15,28 +15,31 @@ const DIAS = [
 const styles = StyleSheet.create({
   table: {
     width: '100%',
-    borderCollapse: 'collapse',
+    borderWidth: 1,
+    borderColor: '#64748b',
   },
   headerRow: {
     flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
     borderBottomWidth: 1,
     borderBottomColor: '#64748b',
-    backgroundColor: '#f1f5f9',
   },
   headerCell: {
     fontSize: 7,
     fontWeight: 'bold',
     color: '#475569',
-    padding: '2px 3px',
+    padding: '3px 2px',
     textAlign: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#cbd5e1',
   },
   headerHora: {
     width: '11%',
+    borderRightWidth: 1,
+    borderRightColor: '#cbd5e1',
   },
   headerDia: {
     width: '17.8%',
+    borderRightWidth: 1,
+    borderRightColor: '#cbd5e1',
   },
   row: {
     flexDirection: 'row',
@@ -55,13 +58,13 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: '#cbd5e1',
     backgroundColor: '#f8fafc',
+    minHeight: 14,
   },
   cellDia: {
     width: '17.8%',
     padding: '1px',
     borderRightWidth: 1,
     borderRightColor: '#cbd5e1',
-    position: 'relative',
     minHeight: 14,
   },
   descanso: {
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     minHeight: 6,
+    alignItems: 'center',
   },
   descansoText: {
     fontSize: 6,
