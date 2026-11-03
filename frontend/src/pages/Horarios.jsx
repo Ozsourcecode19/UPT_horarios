@@ -23,6 +23,7 @@ import {
   Toast, DemoBanner, GeneratingOverlay, EventRenderer, PrintHeader,
   usePrintMultiEntity, PrintMultiSection,
 } from '../features/horarios';
+import usePdfHorario from '../features/schedule/hooks/usePdfHorario.jsx';
 
 const Horarios = () => {
   const [turnoActivo, setTurnoActivo] = useState('TODOS');
@@ -388,6 +389,8 @@ const Horarios = () => {
     showToast,
   });
 
+  const { generando: generandoPdf, generarYDescargar: descargarPdf } = usePdfHorario();
+
   // E23 — Colocar una clase de la bandeja: resuelve el bloque destino y la
   // asigna; si la clase nunca tuvo aula, se abre el editor para elegirla.
   const abrirDesdeBandeja = useCallback((clase, { dia, iniMin } = {}) => {
@@ -580,6 +583,17 @@ const Horarios = () => {
         exportarDeshabilitado={listadoHorarios.length === 0}
         onImprimir={() => window.print()}
         imprimirDeshabilitado={listadoHorarios.length === 0}
+        onDescargarPdf={() => descargarPdf({
+          selectedPeriodo,
+          descripcion: itemSeleccionado?.nombre || 'Horario',
+          ventanaGrilla,
+          bandas,
+          eventos: listadoHorarios,
+          bloques,
+          contextoVista: filterType,
+        })}
+        descargarPdfDeshabilitado={listadoHorarios.length === 0 || generandoPdf}
+        generandoPdf={generandoPdf}
         onImprimirTodos={(tipo) => {
           if (tipo) {
             setPrintMenuOpen(false);

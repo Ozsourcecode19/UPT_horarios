@@ -36,6 +36,9 @@ const ToolbarHorarios = ({
   exportarDeshabilitado = false,
   onImprimir,
   imprimirDeshabilitado = false,
+  onDescargarPdf,
+  descargarPdfDeshabilitado = false,
+  generandoPdf = false,
   onImprimirTodos,
   printMenuOpen = false,
   onPrintMenuEnter,
@@ -182,6 +185,22 @@ const ToolbarHorarios = ({
             <span className="hidden xl:inline">Imprimir</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onDescargarPdf}
+          disabled={descargarPdfDeshabilitado}
+          title="Descargar horario como PDF"
+          aria-label="Descargar horario como PDF"
+          className="flex items-center justify-center gap-2 h-10 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all hover:-translate-y-0.5 shadow-md shadow-blue-500/10 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {generandoPdf ? (
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          <span className="hidden xl:inline">{generandoPdf ? 'Generando...' : 'PDF'}</span>
+        </button>
 
         <div className="relative" onMouseEnter={onPrintMenuEnter} onMouseLeave={onPrintMenuLeave}>
           <button
