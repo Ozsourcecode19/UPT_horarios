@@ -145,26 +145,57 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
         classroom_map[ci] = aula.id
         aulas_creadas += 1
 
-    # 4. Grupos (groups)
+    # 4. Grupos (groups) — intentar v314 primero, luego v324 clases
     grupos_creados = 0
-    for gi, g in enumerate(rf.parse_groups()):
-        grupo = models.Grupo(
-            nombre=g.name[:50],
-            trayecto_id=trayecto.id,
-            sede_id=sede.id,
-            cantidad_alumnos=0,
-            periodo_id=periodo.id,
-            division="MATUTINO",
-            activo=True,
-        )
-        db.add(grupo)
-        db.flush()
-        group_map[gi] = grupo.id
-        grupos_creados += 1
+    # Intentar parse_groups (v314)
+    try:
+        groups_list = rf.parse_groups()
+    except Exception:
+        groups_list = []
+    if not groups_list:
+        # Fallback: usar clases v324 como grupos
+        try:
+            classes_list = rf.parse_classes()
+        except Exception:
+            classes_list = []
+        for ci, c in enumerate(classes_list):
+            grupo = models.Grupo(
+                nombre=c.name[:50],
+                trayecto_id=trayecto.id,
+                sede_id=sede.id,
+                cantidad_alumnos=0,
+                periodo_id=periodo.id,
+                division="MATUTINO",
+                activo=True,
+            )
+            db.add(grupo)
+            db.flush()
+            group_map[ci] = grupo.id
+            grupos_creados += 1
+    else:
+        for gi, g in enumerate(groups_list):
+            grupo = models.Grupo(
+                nombre=g.name[:50],
+                trayecto_id=trayecto.id,
+                sede_id=sede.id,
+                cantidad_alumnos=0,
+                periodo_id=periodo.id,
+                division="MATUTINO",
+                activo=True,
+            )
+            db.add(grupo)
+            db.flush()
+            group_map[gi] = grupo.id
+            grupos_creados += 1
 
     # 5. Lecciones (lessons)
     lecciones_creadas = 0
-    for les in rf.parse():
+    try:
+        lessons_list = rf.parse()
+    except Exception as e:
+        logger.warning(f"No se pudieron parsear lecciones: {e}")
+        lessons_list = []
+    for les in lessons_list:
         # Map subject_idx -> materia_id
         materia_id = subject_map.get(les.subject_idx)
         if materia_id is None:
