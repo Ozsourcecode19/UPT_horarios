@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import RoleGate from './RoleGate';
 import Login from '../pages/Login';
+import Presentacion from '../pages/Presentacion';
 import Dashboard from '../pages/Dashboard';
 import Docentes from '../pages/Docentes';
 import DocenteDisponibilidadPage from '../pages/DocenteDisponibilidadPage';
@@ -16,6 +17,7 @@ import Periodos from '../pages/Periodos';
 import Settings from '../pages/Settings';
 import Lecciones from '../pages/Lecciones';
 import BloquesHorarios from '../pages/BloquesHorarios';
+import ImportarRoz from '../pages/ImportarRoz';
 import MainLayout from '../components/layout/MainLayout';
 
 const AppRouter = () => {
@@ -23,6 +25,8 @@ const AppRouter = () => {
     <Routes>
       {/* Rutas Públicas */}
       <Route path="/login" element={<Login />} />
+      <Route path="/presentacion" element={<Presentacion />} />
+      <Route path="/inicio" element={<Navigate to="/presentacion" replace />} />
 
       {/* Rutas Protegidas (Usan el MainLayout) */}
       <Route element={<ProtectedRoute />}>
@@ -43,6 +47,7 @@ const AppRouter = () => {
             <Route path="/periodos" element={<Periodos />} />
             <Route path="/bloques" element={<BloquesHorarios />} />
             <Route path="/horarios" element={<Horarios />} />
+            <Route path="/importar-roz" element={<ImportarRoz />} />
             <Route path="/configuracion" element={<Settings />} />
           </Route>
         </Route>

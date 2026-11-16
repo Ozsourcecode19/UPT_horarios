@@ -27,6 +27,7 @@ import {
   School,
   Database,
   FolderTree,
+  Upload,
 } from 'lucide-react';
 
 export const NAVIGATION = [
@@ -58,6 +59,7 @@ export const NAVIGATION = [
       { label: 'Carreras', path: '/carreras', icon: School, roles: ['ADMIN', 'JEFE-PNF'] },
       { label: 'Trayectos Académicos', path: '/trayectos', icon: Layers, roles: ['ADMIN'] },
       { label: 'Secciones y Clases', path: '/lecciones', icon: FolderTree, roles: '*' },
+      { label: 'Importar .roz', path: '/importar-roz', icon: Upload, roles: ['ADMIN', 'JEFE-PNF'] },
     ],
   },
   {

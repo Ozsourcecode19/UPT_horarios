@@ -18,6 +18,14 @@ const ScheduleService = {
     return response.data;
   },
 
+  // Genera horario con CP-SAT (asc-re)
+  generateScheduleCpsat: async (periodoId, timeLimit = 60) => {
+    const response = await apiClient.post('/schedules/generate-cpsat', null, {
+      params: { periodo_id: periodoId, time_limit: timeLimit }
+    });
+    return response.data;
+  },
+
   // Obtiene el checklist de prerequisitos para la generación de un periodo
   getPreGenerationCheck: async (periodoId) => {
     const response = await apiClient.get('/schedules/pre-generation-check', {

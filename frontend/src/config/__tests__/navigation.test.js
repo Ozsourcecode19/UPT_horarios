@@ -23,6 +23,7 @@ const RUTAS_ESPERADAS = [
   { path: '/trayectos', roles: ['ADMIN'] },
   { path: '/lecciones', roles: '*' },
   { path: '/horarios', roles: '*' },
+  { path: '/importar-roz', roles: ['ADMIN', 'JEFE-PNF'] },
   { path: '/configuracion', roles: ['ADMIN'] },
 ];
 
