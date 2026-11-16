@@ -15,7 +15,7 @@ from routers import (
     usuarios, sedes, carreras, periodos_academicos, trayectos_academicos,
     grupos, docentes, materias, aulas, disponibilidades_docentes,
     habilitaciones_docentes, configuraciones, bloques_horarios,
-    lecciones, horarios_generados, schedules, auth, database
+    lecciones, horarios_generados, schedules, auth, database, importacion_roz
 )
 from config.startup import inicializar_base
 from services.respaldos import respaldo_automatico
@@ -79,6 +79,7 @@ app.include_router(horarios_generados.router, prefix="/api", tags=["Horarios Gen
 app.include_router(schedules.router, prefix="/api", tags=["Operaciones de Horario"])
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(database.router, prefix="/api", tags=["Base de Datos"])
+app.include_router(importacion_roz.router, prefix="/api", tags=["Importacion"])
 
 @app.get("/")
 def read_root():
