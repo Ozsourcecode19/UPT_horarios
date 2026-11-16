@@ -115,6 +115,10 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
         parts = t.name.split(" ", 1)
         nombre = parts[0] if parts else t.name
         apellido = parts[1] if len(parts) > 1 else ""
+        existing = db.query(models.Docente).filter_by(nombre=nombre, apellido=apellido).first()
+        if existing:
+            teacher_map[ti] = existing.id
+            continue
         docente = models.Docente(
             nombre=nombre,
             apellido=apellido,
@@ -128,12 +132,14 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
         teacher_map[ti] = docente.id
         docentes_creados += 1
 
-    # 3. Aulas (classrooms)
+    # 3. Aulas (classrooms) — reutilizar si ya existe (sede_id, nombre)
     aulas_creadas = 0
     for ci, c in enumerate(rf.parse_classrooms()):
         cap = None
-        if c.trailing and len(c.trailing) >= 2:
-            pass  # capacity not in trailing; use None
+        existing = db.query(models.Aula).filter_by(sede_id=sede.id, nombre=c.name).first()
+        if existing:
+            classroom_map[ci] = existing.id
+            continue
         aula = models.Aula(
             nombre=c.name,
             sede_id=sede.id,
@@ -160,6 +166,10 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
         except Exception:
             classes_list = []
         for ci, c in enumerate(classes_list):
+            existing = db.query(models.Grupo).filter_by(nombre=c.name[:50], trayecto_id=trayecto.id, sede_id=sede.id).first()
+            if existing:
+                group_map[ci] = existing.id
+                continue
             grupo = models.Grupo(
                 nombre=c.name[:50],
                 trayecto_id=trayecto.id,
@@ -175,6 +185,10 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
             grupos_creados += 1
     else:
         for gi, g in enumerate(groups_list):
+            existing = db.query(models.Grupo).filter_by(nombre=g.name[:50], trayecto_id=trayecto.id, sede_id=sede.id).first()
+            if existing:
+                group_map[gi] = existing.id
+                continue
             grupo = models.Grupo(
                 nombre=g.name[:50],
                 trayecto_id=trayecto.id,
