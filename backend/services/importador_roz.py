@@ -95,10 +95,15 @@ def importar_roz(db: Session, roz_path: str) -> Dict[str, Any]:
     # 1. Materias (subjects)
     materias_creadas = 0
     for si, subj in enumerate(rf.parse_subjects()):
+        # Ensure unique codigo
+        codigo = subj.short[:20] if subj.short else f"MAT{si}"
+        existing = db.query(models.Materia).filter_by(codigo=codigo).first()
+        if existing:
+            codigo = f"{codigo}_{si}"
         materia = models.Materia(
             nombre=subj.name,
-            codigo=subj.short[:20] if subj.short else f"MAT{si}",
-            color_hex=subj.trailing[:7] if False else "#3B82F6",
+            codigo=codigo,
+            color_hex="#3B82F6",
             carga_horaria_estandar=4,
             activa=True,
         )
