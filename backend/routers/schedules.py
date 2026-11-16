@@ -9,6 +9,7 @@ from config.database import get_db, SessionLocal
 from core.security import get_current_active_user, require_role
 from services.scheduler import or_tools_adapter
 from services.scheduler import status_tracker
+from services.scheduler import asc_cpsat_adapter
 from services.validation import schedule_validation
 from schemas.horario_generado import ScheduleMoveRequest 
 
@@ -65,6 +66,25 @@ def generate_schedule(periodo_id: int, background_tasks: BackgroundTasks, db: Se
     except Exception as e:
         # Manejo de error si no se puede iniciar la generación
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al iniciar la generación: {str(e)}")
+
+
+# Endpoint para generar horarios con CP-SAT (asc-re)
+@router.post("/generate-cpsat", summary="Generar horarios con CP-SAT (asc-re)", dependencies=[Depends(require_role(["ADMIN", "JEFE-PNF"]))])
+def generate_schedule_cpsat(periodo_id: int, time_limit: float = 60.0, db: Session = Depends(get_db)):
+    """
+    Genera un horario para el periodo academico usando el modelo CP-SAT
+    derivado de aSc Timetables (asc-re). Ejecuta de forma sincrona.
+    """
+    try:
+        status, solver, x, lessons = asc_cpsat_adapter.solve_periodo(db, periodo_id, time_limit)
+        return {
+            "periodo_id": periodo_id,
+            "status": str(status),
+            "lessons": len(lessons),
+            "message": f"Generacion CP-SAT completada: {len(lessons)} lecciones.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error CP-SAT: {str(e)}")
 
 
 # Endpoint para consultar el estado de la generación de horarios en segundo plano
