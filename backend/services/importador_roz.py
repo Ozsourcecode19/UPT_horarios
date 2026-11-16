@@ -10,11 +10,7 @@ import sys
 import os
 from typing import Dict, Any
 
-# Asegurar que ascroz sea importable
-_ASC_RE = os.environ.get("ASC_RE_PATH", "/home/oz/Documentos/aSc timettables port/asc-re".replace("timettables", "timetables"))
-if _ASC_RE not in sys.path:
-    sys.path.insert(0, _ASC_RE)
-
+# ascroz esta copiado en backend/ascroz (autocontenido)
 from ascroz.reader import RozFile
 from sqlalchemy.orm import Session
 import models
