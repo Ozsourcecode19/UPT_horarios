@@ -229,7 +229,7 @@ const MainLayout = () => {
       {/* Sidebar */}
       <aside className={`no-print
         fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/60
-        transition-all duration-300 ease-in-out flex flex-col
+        transition-all duration-300 ease-in-out flex flex-col overflow-x-hidden
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         ${colapsado ? 'lg:w-20' : ''}
       `}>
@@ -277,7 +277,7 @@ const MainLayout = () => {
         )}
 
         {/* Navigation por secciones (flujo de trabajo) */}
-        <nav className={`flex-1 py-6 overflow-y-auto space-y-6 px-4 ${colapsado ? 'lg:px-2' : ''}`} aria-label="Navegación principal">
+        <nav className={`flex-1 py-6 overflow-y-auto overflow-x-hidden space-y-6 px-4 ${colapsado ? 'lg:px-2' : ''}`} aria-label="Navegación principal">
           {navigationFiltrada.map((section) => {
             const abierta = colapsado || seccionesAbiertas.has(section.seccion);
             return (
