@@ -69,6 +69,8 @@ La UPT Bolívar necesita generar horarios académicos semanales para sus Program
 | RF-12 | Filtros de horario por aula, docente o grupo. | Fase 4 |
 | RF-13 | Generación automática de horarios con OR-Tools CP-SAT (`POST /api/schedules/generate`, 202 Accepted). | Fase 5 |
 | RF-14 | Modo Demo / fallback local cuando el backend no está disponible. | Fase 2–4 |
+| RF-15 | Importación de archivos `.roz` (aSc Timetables 2017): parsea el binario y crea materias, docentes, aulas, grupos y lecciones en UPT (`POST /api/importacion/roz`). | Fase 6 |
+| RF-16 | Generación de horarios con CP-SAT asc-re (`POST /api/schedules/generate-cpsat`): adapter alternativo con H1-H3, H5, H7, H8, H9 + salas greedy. | Fase 6 |
 
 ### 2.2 Requisitos no funcionales
 
@@ -363,7 +365,13 @@ backend/
 ├── routers/                    # Endpoints HTTP (1 por dominio) + schedules + auth
 ├── services/
 │   ├── scheduler/or_tools_adapter.py   # Generación con OR-Tools CP-SAT
+│   ├── scheduler/asc_cpsat_adapter.py  # Generación CP-SAT asc-re (H1-H9 + salas greedy)
+│   ├── importador_roz.py       # Importador de archivos .roz (aSc Timetables 2017)
 │   └── validation/schedule_validation.py  # Validación de movimientos manuales
+├── ascroz/                     # Parser .roz copiado de asc-re (v314+v324, copia estática)
+│   ├── reader.py               # RozFile: parse de todas las secciones
+│   ├── cpsat_model.py          # Modelo CP-SAT original (asc-re)
+│   └── tests/test_golden.py    # Golden tests (round-trip)
 └── alembic/                    # Migraciones de base de datos
 ```
 
@@ -435,6 +443,8 @@ sequenceDiagram
 | POST | `/schedules/validate-move` | ADMIN/JEFE-PNF | Valida movimiento drag & drop. |
 | PUT/DELETE/GET | `/schedules/{horario_id}` y `/schedules/` | Escritura: ADMIN/JEFE-PNF; Lectura: autenticados | Gestión manual de horarios generados. |
 | CRUD | `/configuraciones/` | Escritura: ADMIN; Lectura: autenticados | Parámetros del sistema (solver). |
+| POST | `/importacion/roz` | ADMIN/JEFE-PNF | Importación de archivos `.roz` (aSc Timetables 2017): parsea el binario y crea materias, docentes, aulas, grupos y lecciones. Retorna conteos de entidades creadas. |
+| POST | `/schedules/generate-cpsat?periodo_id=&time_limit=` | ADMIN/JEFE-PNF | Generación síncrona con CP-SAT asc-re (H1-H3, H5, H7, H8, H9 + salas greedy). time_limit default 60s. |
 
 ### 5.4 Autenticación y autorización
 
@@ -533,7 +543,8 @@ frontend/
 │   │   ├── bloques/              # Bloques Horarios: hooks, utils, componentes
 │   │   └── aulas/                # Aulas+Sedes: hooks, utils, schemas, componentes (E22)
 │   ├── pages/                  # Login, Dashboard, Docentes, Materias, Aulas,
-│   │                           # Lecciones, Horarios, BloquesHorarios, Settings, Configuracion
+│   │                           # Lecciones, Horarios, BloquesHorarios, Settings, Configuracion,
+│   │                           # ImportarRoz
 │   ├── routes/                 # AppRouter.jsx + ProtectedRoute.jsx
 │   ├── hooks/                  # useAuth.js, useSchedule.js, useGenerationPolling.js
 │   ├── context/AuthContext.jsx
@@ -554,6 +565,7 @@ frontend/
 | `/docentes` | Docentes (3 tabs: CRUD, Disponibilidad, Habilitaciones) | Sí |
 | `/materias`, `/aulas`, `/lecciones` | CRUDs | Sí |
 | `/horarios` | Grilla nativa por bandas de bloque + generación | Sí |
+| `/importar-roz` | Importación de archivos .roz (aSc Timetables 2017) | Sí (ADMIN/JEFE-PNF) |
 | `/configuracion` | Settings (placeholder) | Sí |
 
 ### 6.3 Patrón de datos (TanStack Query + Modo Demo)

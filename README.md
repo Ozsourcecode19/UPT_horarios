@@ -11,6 +11,16 @@ Sistema de Gestión y Generación de Horarios Académicos.
 - Informe Técnico MVP Horarios web upt-1.pdf (Arquitectura Base)
 - Informe Técnico v2.0_ Sistema de Horarios.pdf (Restricciones Críticas & Seguridad)
 
+## Importación de archivos .roz (aSc Timetables 2017)
+
+UPT soporta la importación de archivos `.roz` generados por aSc Timetables 2017 para poblar
+materias, docentes, aulas, grupos y lecciones automáticamente. Ver `docs/importacion_roz.md`
+para la guía completa.
+
+- **Endpoint:** `POST /api/importacion/roz` (rol ADMIN/JEFE-PNF)
+- **UI:** DATOS → Importar .roz
+- **Generación CP-SAT alternativa:** `POST /api/schedules/generate-cpsat` (adapter asc-re)
+
 ## Instalación Rápida
 
 ### Backend
