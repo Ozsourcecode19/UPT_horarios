@@ -1,12 +1,16 @@
 import { useState, useEffect, Component } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '../../api/client';
 import {
   Calendar, LogOut, Menu, X, AlertTriangle, RefreshCw, PanelLeftClose, PanelLeftOpen,
+  ChevronDown, ChevronRight, Search,
 } from 'lucide-react';
 import { NAVIGATION, getRouteMeta, isRoleAllowed } from '../../config/navigation';
 import { LS_KEYS } from '../../constants';
 import ThemeToggle from './ThemeToggle';
+import CommandPalette from './CommandPalette';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -45,13 +49,14 @@ class ErrorBoundary extends Component {
 // como `title` para el tooltip nativo del navegador.
 // ⚠️ El colapso SOLO aplica en lg+: en móvil el drawer siempre va desplegado,
 // así que las etiquetas se ocultan con `lg:hidden` (no con `hidden`).
-const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick, colapsado }) => (
+const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick, colapsado, badge }) => (
   <Link
     to={path}
     onClick={onClick}
     title={colapsado ? label : undefined}
     aria-label={colapsado ? label : undefined}
-    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+    aria-current={active ? 'page' : undefined}
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
       colapsado ? 'lg:justify-center lg:px-0' : ''
     } ${sub ? 'ml-4 py-2.5 text-sm' : ''} ${
       active
@@ -61,12 +66,25 @@ const SidebarItem = ({ icon: Icon, label, path, active, sub, onClick, colapsado 
   >
     <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
     <span className={colapsado ? 'lg:hidden' : ''}>{label}</span>
+    {!colapsado && badge != null && badge > 0 && (
+      <span className="ml-auto text-[10px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">
+        {badge > 99 ? '99+' : badge}
+      </span>
+    )}
   </Link>
 );
 
 const MainLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
+
+  const { data: leccionesData } = useQuery({
+    queryKey: ['badge-lecciones-total'],
+    queryFn: async () => (await apiClient.get('/lecciones/', { params: { limit: 1 } })).data,
+    enabled: !!user,
+    staleTime: 60000,
+  });
+  const leccionesTotal = leccionesData?.total ?? 0;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // E24: sidebar colapsado a iconos (solo escritorio, lg+). Persistido.
   const [colapsado, setColapsado] = useState(() => {
@@ -79,21 +97,106 @@ const MainLayout = () => {
     catch { /* sin localStorage */ }
   }, [colapsado]);
 
+  // Acordeones por sección (persistidos).
+  const [seccionesAbiertas, setSeccionesAbiertas] = useState(() => {
+    try {
+      const raw = localStorage.getItem('sidebar_secciones');
+      return raw ? new Set(JSON.parse(raw)) : new Set(NAVIGATION.map((s) => s.seccion));
+    } catch {
+      return new Set(NAVIGATION.map((s) => s.seccion));
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('sidebar_secciones', JSON.stringify([...seccionesAbiertas])); }
+    catch { /* sin localStorage */ }
+  }, [seccionesAbiertas]);
+
+  const toggleSeccion = (seccion) => {
+    setSeccionesAbiertas((prev) => {
+      const next = new Set(prev);
+      if (next.has(seccion)) next.delete(seccion);
+      else next.add(seccion);
+      return next;
+    });
+  };
+
+  // Auto-expandir la sección de la ruta activa.
+  useEffect(() => {
+    const seccionActiva = NAVIGATION.find((s) =>
+      s.items.some((it) =>
+        location.pathname === it.path ||
+        location.pathname.startsWith(it.path + '/') ||
+        it.children?.some((c) => location.pathname === c.path),
+      ),
+    );
+    if (seccionActiva) {
+      setSeccionesAbiertas((prev) => {
+        if (prev.has(seccionActiva.seccion)) return prev;
+        const next = new Set(prev);
+        next.add(seccionActiva.seccion);
+        return next;
+      });
+    }
+  }, [location.pathname]);
+
   const closeSidebar = () => setSidebarOpen(false);
+
+  // Cerrar el drawer móvil con Escape (accesibilidad).
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const alTeclar = (evento) => {
+      if (evento.key === 'Escape') closeSidebar();
+    };
+    window.addEventListener('keydown', alTeclar);
+    return () => window.removeEventListener('keydown', alTeclar);
+  }, [sidebarOpen]);
+
+  // Búsqueda en el sidebar.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Filtrado por rol: cada ítem e hijo declara los roles que pueden verlo
   const navigation = NAVIGATION
     .map(section => ({
       ...section,
       items: section.items
-        .filter(item => isRoleAllowed(item.roles, user?.role))
+        .filter(item => !item.hidden && isRoleAllowed(item.roles, user?.role))
         .map(item => ({
           ...item,
-          children: item.children?.filter(child => isRoleAllowed(child.roles, user?.role)),
-        }))
-        .filter(item => !item.children || item.children.length > 0),
+          children: item.children?.filter(child => !child.hidden && isRoleAllowed(child.roles, user?.role)),
+        })),
     }))
     .filter(section => section.items.length > 0);
+
+  const q = searchQuery.trim().toLowerCase();
+  const navigationFiltrada = navigation
+    .map((section) => {
+      const items = section.items
+        .map((item) => {
+          const itemMatch = !q || item.label.toLowerCase().includes(q);
+          const children = q
+            ? item.children?.filter((c) => c.label.toLowerCase().includes(q))
+            : item.children;
+          const hasMatch = itemMatch || (children && children.length > 0);
+          if (!hasMatch) return null;
+          return { ...item, children: q ? children : item.children };
+        })
+        .filter(Boolean);
+      return { ...section, items };
+    })
+    .filter((section) => section.items.length > 0);
 
   const isItemActive = (item) => {
     if (item.children) {
@@ -131,7 +234,7 @@ const MainLayout = () => {
         ${colapsado ? 'lg:w-20' : ''}
       `}>
         {/* Logo area */}
-        <div className={`h-20 flex items-center justify-between border-b border-slate-100 px-6 ${colapsado ? 'lg:px-3' : ''}`}>
+        <div className={`h-20 flex border-b border-slate-100 ${colapsado ? 'lg:flex-col lg:items-center lg:justify-center lg:gap-1 lg:px-2' : 'items-center justify-between px-6'}`}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Calendar className="w-6 h-6 text-white" />
@@ -156,18 +259,46 @@ const MainLayout = () => {
           </div>
         </div>
 
+        {/* Búsqueda (solo expandido) */}
+        {!colapsado && (
+          <div className="px-4 mb-2">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar... (Ctrl+K)"
+                aria-label="Buscar en el menú"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Navigation por secciones (flujo de trabajo) */}
-        <nav className={`flex-1 py-6 overflow-y-auto space-y-6 px-4 ${colapsado ? 'lg:px-2' : ''}`}>
-          {navigation.map((section) => (
+        <nav className={`flex-1 py-6 overflow-y-auto space-y-6 px-4 ${colapsado ? 'lg:px-2' : ''}`} aria-label="Navegación principal">
+          {navigationFiltrada.map((section) => {
+            const abierta = colapsado || seccionesAbiertas.has(section.seccion);
+            return (
             <div key={section.seccion}>
-              <p className={`px-4 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 ${colapsado ? 'lg:hidden' : ''}`}>
-                {section.seccion}
-              </p>
+              {!colapsado && (
+                <button
+                  type="button"
+                  onClick={() => toggleSeccion(section.seccion)}
+                  aria-expanded={abierta}
+                  className="w-full px-4 mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  <span>{section.seccion}</span>
+                  {abierta ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </button>
+              )}
               <div
                 className={`mx-2 mb-2 border-t border-slate-100 ${colapsado ? 'lg:block' : 'hidden'}`}
                 title={section.seccion}
                 aria-hidden="true"
               />
+              {abierta && (
               <div className="space-y-1">
                 {section.items.map((item) => (
                   <div key={item.path} className={colapsado ? 'group' : ''}>
@@ -176,6 +307,7 @@ const MainLayout = () => {
                       colapsado={colapsado}
                       active={isItemActive(item)}
                       onClick={closeSidebar}
+                      badge={item.path === '/lecciones' ? leccionesTotal : undefined}
                     />
                     {item.children && (
                       <>
@@ -222,8 +354,10 @@ const MainLayout = () => {
                   </div>
                 ))}
               </div>
+              )}
             </div>
-          ))}
+          );
+        })}
         </nav>
 
         {/* User area */}
@@ -289,6 +423,7 @@ const MainLayout = () => {
           </ErrorBoundary>
         </div>
       </main>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 };

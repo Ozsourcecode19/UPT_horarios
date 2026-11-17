@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   MSG_BACKEND_NO_DISPONIBLE,
@@ -61,9 +61,14 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-slate-950 transition-colors">
       <div className="bg-white dark:bg-slate-900 p-8 rounded-lg shadow-lg dark:shadow-black/40 w-full max-w-md border border-transparent dark:border-slate-700/60">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-slate-100">
+        <h2 className="text-2xl font-bold mb-2 text-center text-gray-800 dark:text-slate-100">
           Acceso al Sistema de Horarios
         </h2>
+        <p className="mb-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          <Link to="/presentacion" className="text-blue-600 dark:text-blue-400 hover:underline">
+            Conocer el sistema
+          </Link>
+        </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>

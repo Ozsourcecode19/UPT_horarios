@@ -1,4 +1,5 @@
 import { Plus, AlertTriangle, Sparkles, RefreshCw } from 'lucide-react';
+import EstructuraTabs from '../components/estructura/EstructuraTabs';
 import {
   useMateriasCrud,
   Toast,
@@ -66,6 +67,9 @@ const Materias = () => {
           </button>
         </div>
       </div>
+
+      {/* Pestañas de navegación */}
+      <EstructuraTabs />
 
       <MateriasStatsCards materias={statsSource} />
 

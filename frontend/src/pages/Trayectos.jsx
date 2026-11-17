@@ -8,6 +8,7 @@ import useCanWrite from '../hooks/useCanWrite';
 import useDebounce from '../hooks/useDebounce';
 import { DEBOUNCE_DELAY } from '../constants';
 import Pagination from '../components/ui/Pagination';
+import EstructuraTabs from '../components/estructura/EstructuraTabs';
 import {
   useTrayectosCrud, calcularEstadisticas,
   Toast, TrayectosStatsCards, TrayectosFilterBar,
@@ -84,6 +85,9 @@ const Trayectos = () => {
           )}
         </div>
       </div>
+
+      {/* Pestañas de navegación */}
+      <EstructuraTabs />
 
       {/* Tarjetas de estadísticas */}
       <TrayectosStatsCards

@@ -1,4 +1,5 @@
 import { Plus, AlertTriangle, Sparkles, RefreshCw } from 'lucide-react';
+import EstructuraTabs from '../components/estructura/EstructuraTabs';
 import {
   useCarrerasCrud,
   Toast,
@@ -67,6 +68,9 @@ const Carreras = () => {
           </button>
         </div>
       </div>
+
+      {/* Pestañas de navegación */}
+      <EstructuraTabs />
 
       <CarrerasStatsCards carreras={statsSource} trayectos={listadoTrayectos} />
 
