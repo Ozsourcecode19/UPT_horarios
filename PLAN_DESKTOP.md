@@ -286,7 +286,7 @@ del usuario):
   4. *Email del admin*: el seed de F2 creaba `admin@localhost`, que no pasa el validador de
      `schemas/usuario.py` (exige TLD con punto) → `GET /api/usuarios/` devolvía **500**
      (ResponseValidationError) — destapado por el testeo manual del usuario en la app. Fix:
-     `admin@uptbolivar.edu.ve` + reparación en sitio de BDs antiguas en `_seed_admin` (conserva el
+     `admin@example.com` + reparación en sitio de BDs antiguas en `_seed_admin` (conserva el
      hash) + tests (+1 → 126).
 - **Artefactos finales** en `desktop/src-tauri/target/release/bundle/`: `.deb` **118 MB** y
   `AppImage` **195 MB** (ambos con el sidecar completo en `usr/lib/UPT Horarios/binarios/`).

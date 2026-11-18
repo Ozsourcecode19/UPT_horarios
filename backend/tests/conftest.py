@@ -88,7 +88,7 @@ def seed_base_data(db) -> BaseData:
         anio_academico=2026,
         estado="ACTIVO",
     )
-    docente = models.Docente(nombre="Ana", apellido="Perez", email="ana@upt.edu.ve")
+    docente = models.Docente(nombre="Ana", apellido="Perez", email="ana@example.com")
     materia = models.Materia(nombre="Matematica", codigo="MAT1", color_hex="#3B82F6")
     db.add_all([sede, sede2, carrera, periodo, docente, materia])
     db.commit()

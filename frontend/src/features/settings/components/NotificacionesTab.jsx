@@ -62,7 +62,7 @@ export default function NotificacionesTab({ notifForm, setNotifForm, notifSaving
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Usuario / Email remitente</label>
-                <input type="text" value={notifForm.smtp_username} onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_username: e.target.value }))} disabled={!isAdmin} className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500" placeholder="correo@upt.edu.ve" />
+                <input type="text" value={notifForm.smtp_username} onChange={(e) => setNotifForm(prev => ({ ...prev, smtp_username: e.target.value }))} disabled={!isAdmin} className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed placeholder-slate-400 dark:placeholder-slate-500" placeholder="correo@example.com" />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Contraseña SMTP</label>

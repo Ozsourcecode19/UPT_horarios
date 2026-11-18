@@ -28,11 +28,11 @@ export const MOCK_LECCIONES = [
 
 // Reutilizar mock data para dependencias si el servidor falla
 export const MOCK_DOCENTES = [
-  { id: 101, nombre: "Luis Alberto", apellido: "Mendoza", email: "l.mendoza@upt.edu.ve", carga_maxima: 20, sede_principal_id: 1, activo: true },
-  { id: 102, nombre: "María Gabriela", apellido: "Rodríguez", email: "m.rodriguez@upt.edu.ve", carga_maxima: 36, sede_principal_id: 2, activo: true },
-  { id: 103, nombre: "Carlos Eduardo", apellido: "Gómez", email: "c.gomez@upt.edu.ve", carga_maxima: 12, sede_principal_id: 1, activo: false },
-  { id: 104, nombre: "Ana Julia", apellido: "Sánchez", email: "a.sanchez@upt.edu.ve", carga_maxima: 40, sede_principal_id: 3, activo: true },
-  { id: 105, nombre: "Francisco José", apellido: "Torres", email: "f.torres@upt.edu.ve", carga_maxima: 16, sede_principal_id: 2, activo: true },
+  { id: 101, nombre: "Luis Alberto", apellido: "Mendoza", email: "l.mendoza@example.com", carga_maxima: 20, sede_principal_id: 1, activo: true },
+  { id: 102, nombre: "María Gabriela", apellido: "Rodríguez", email: "m.rodriguez@example.com", carga_maxima: 36, sede_principal_id: 2, activo: true },
+  { id: 103, nombre: "Carlos Eduardo", apellido: "Gómez", email: "c.gomez@example.com", carga_maxima: 12, sede_principal_id: 1, activo: false },
+  { id: 104, nombre: "Ana Julia", apellido: "Sánchez", email: "a.sanchez@example.com", carga_maxima: 40, sede_principal_id: 3, activo: true },
+  { id: 105, nombre: "Francisco José", apellido: "Torres", email: "f.torres@example.com", carga_maxima: 16, sede_principal_id: 2, activo: true },
 ];
 
 export const MOCK_SEDES = [

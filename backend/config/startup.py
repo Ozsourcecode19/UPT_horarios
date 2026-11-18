@@ -38,7 +38,7 @@ USUARIO_ADMIN_POR_DEFECTO = "admin"
 # Email inicial: debe pasar EMAIL_PATTERN de schemas/usuario.py (exige un TLD
 # con punto — "admin@localhost" hacía fallar GET /api/usuarios/ con un 500 de
 # serialización; bug de esta línea destapado al probar la app de escritorio).
-EMAIL_ADMIN_POR_DEFECTO = "admin@uptbolivar.edu.ve"
+EMAIL_ADMIN_POR_DEFECTO = "admin@example.com"
 
 # Claves fijas sembradas: (clave, valor, tipo_dato, descripción).
 _CONFIG_SEED = [

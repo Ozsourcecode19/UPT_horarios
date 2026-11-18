@@ -21,11 +21,25 @@ docs/archive/
 node_modules/
 frontend/node_modules/
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # OS / editores
 .DS_Store
 *.swp
 .idea/
 .vscode/
+
+# Builds / caches
+dist/
+frontend/dist/
+frontend/storybook-static/
+desktop/src-tauri/binarios/
+
+# Backups locales de BD
+database/bakup/
 
 # Logs
 *.log

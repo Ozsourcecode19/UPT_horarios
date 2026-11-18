@@ -153,7 +153,7 @@ def test_unqualified_teacher(data, db_session):
 
 def test_conflict_teacher(data, db_session):
     # Otro docente y otro grupo, misma sede, para aislar el cruce de DOCENTE
-    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@upt.edu.ve")
+    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@example.com")
     materia2 = models.Materia(nombre="Fisica", codigo="FIS1", color_hex="#22C55E")
     grupo2 = models.Grupo(
         nombre="G2", trayecto_id=data.trayecto.id, sede_id=data.sede.id, periodo_id=data.periodo.id
@@ -180,7 +180,7 @@ def test_conflict_teacher(data, db_session):
 
 
 def test_conflict_group(data, db_session):
-    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@upt.edu.ve")
+    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@example.com")
     materia2 = models.Materia(nombre="Fisica", codigo="FIS1", color_hex="#22C55E")
     db_session.add_all([docente2, materia2])
     db_session.commit()
@@ -199,7 +199,7 @@ def test_conflict_group(data, db_session):
 
 
 def test_conflict_room(data, db_session):
-    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@upt.edu.ve")
+    docente2 = models.Docente(nombre="Luis", apellido="Gomez", email="luis@example.com")
     materia2 = models.Materia(nombre="Fisica", codigo="FIS1", color_hex="#22C55E")
     grupo2 = models.Grupo(
         nombre="G2", trayecto_id=data.trayecto.id, sede_id=data.sede.id, periodo_id=data.periodo.id

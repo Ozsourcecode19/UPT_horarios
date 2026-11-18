@@ -54,7 +54,7 @@ describe('docenteSchema', () => {
     const result = docenteSchema.safeParse({
       nombre: 'Luis',
       apellido: 'Mendoza',
-      email: 'luis@upt.edu.ve',
+      email: 'luis@example.com',
       carga_maxima: 20,
       sede_principal_id: 1,
       activo: true,

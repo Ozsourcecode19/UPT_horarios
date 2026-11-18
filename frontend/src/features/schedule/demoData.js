@@ -15,10 +15,10 @@ export const MOCK_AULAS = [
 ];
 
 export const MOCK_DOCENTES = [
-  { id: 101, nombre: "Luis Alberto", apellido: "Mendoza", email: "l.mendoza@upt.edu.ve" },
-  { id: 102, nombre: "María Gabriela", apellido: "Rodríguez", email: "m.rodriguez@upt.edu.ve" },
-  { id: 103, nombre: "Carlos Eduardo", apellido: "Gómez", email: "c.gomez@upt.edu.ve" },
-  { id: 104, nombre: "Ana Julia", apellido: "Sánchez", email: "a.sanchez@upt.edu.ve" }
+  { id: 101, nombre: "Luis Alberto", apellido: "Mendoza", email: "l.mendoza@example.com" },
+  { id: 102, nombre: "María Gabriela", apellido: "Rodríguez", email: "m.rodriguez@example.com" },
+  { id: 103, nombre: "Carlos Eduardo", apellido: "Gómez", email: "c.gomez@example.com" },
+  { id: 104, nombre: "Ana Julia", apellido: "Sánchez", email: "a.sanchez@example.com" }
 ];
 
 export const MOCK_GRUPOS = [

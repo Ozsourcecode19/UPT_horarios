@@ -20,7 +20,7 @@ def _base(db):
         fecha_inicio=date(2026, 8, 10), fecha_fin=date(2026, 11, 10),
         anio_academico=2026, estado="ACTIVO",
     )
-    docente = models.Docente(nombre="Ana", apellido="Perez", email="ana@upt.edu.ve")
+    docente = models.Docente(nombre="Ana", apellido="Perez", email="ana@example.com")
     materia = models.Materia(nombre="Matematica", codigo="MAT1", color_hex="#3B82F6")
     db.add_all([sede, carrera, periodo, docente, materia])
     db.commit()

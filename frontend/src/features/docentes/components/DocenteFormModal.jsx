@@ -118,7 +118,7 @@ const DocenteFormModal = ({
                 type="email"
                 {...register('email')}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-medium"
-                placeholder="ejemplo@upt.edu.ve"
+                placeholder="ejemplo@example.com"
               />
               {errors.email && <span className="text-xs text-red-500 font-medium mt-1 block">{errors.email.message}</span>}
             </div>

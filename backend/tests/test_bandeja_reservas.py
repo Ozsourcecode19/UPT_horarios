@@ -265,7 +265,7 @@ def test_modo_libre_no_relaja_la_extension_de_la_sesion(data, db_session):
 
 def _crear_usuario(db, username, rol):
     usuario = models.Usuario(
-        username=username, email=f"{username}@upt.edu.ve",
+        username=username, email=f"{username}@example.com",
         password_hash=security.get_password_hash("clave"), rol=rol, activo=True,
     )
     db.add(usuario)

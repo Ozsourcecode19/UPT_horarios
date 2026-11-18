@@ -38,7 +38,7 @@ def engine_archivo(tmp_path):
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     db = Session()
-    _crear_usuario(db, "admin_respaldo", "admin@upt.edu.ve", "ADMIN")
+    _crear_usuario(db, "admin_respaldo", "admin@example.com", "ADMIN")
     # Como en una BD de escritorio real (sembrada por config/startup.py).
     db.add(models.Configuracion(
         clave="version_sistema", valor="2.1.1", tipo_dato="string",
@@ -124,7 +124,7 @@ def test_requiere_rol_admin(cliente, engine_archivo):
     client = cliente["client"]
     Session = sessionmaker(bind=engine_archivo, autoflush=False, autocommit=False)
     db = Session()
-    _crear_usuario(db, "lector_respaldo", "lector@upt.edu.ve", "LECTOR")
+    _crear_usuario(db, "lector_respaldo", "lector@example.com", "LECTOR")
     db.close()
     headers = {
         "Authorization": f"Bearer {security.create_access_token({'sub': 'lector_respaldo'})}"

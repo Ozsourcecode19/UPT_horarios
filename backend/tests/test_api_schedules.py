@@ -16,7 +16,7 @@ from services.scheduler import status_tracker
 def _crear_usuario_admin(db):
     usuario = models.Usuario(
         username="admin_test",
-        email="admin@upt.edu.ve",
+        email="admin@example.com",
         password_hash=security.get_password_hash("clave"),
         rol="ADMIN",
         activo=True,

@@ -31,24 +31,24 @@ SELECT setval('usuarios_id_seq', 100);
 -- ============================================================
 -- Sede 1: Casco Histórico (id=1)
 INSERT INTO docentes (id, nombre, apellido, email, carga_maxima, sede_principal_id, activo) VALUES
-(1, 'María', 'González', 'maria.gonzalez@upt.edu.ve', 20, 1, true),
-(2, 'Carlos', 'Rodríguez', 'carlos.rodriguez@upt.edu.ve', 20, 1, true),
-(3, 'Ana', 'Martínez', 'ana.martinez@upt.edu.ve', 20, 1, true),
-(4, 'Pedro', 'López', 'pedro.lopez@upt.edu.ve', 20, 1, true);
+(1, 'María', 'González', 'maria.gonzalez@example.com', 20, 1, true),
+(2, 'Carlos', 'Rodríguez', 'carlos.rodriguez@example.com', 20, 1, true),
+(3, 'Ana', 'Martínez', 'ana.martinez@example.com', 20, 1, true),
+(4, 'Pedro', 'López', 'pedro.lopez@example.com', 20, 1, true);
 
 -- Sede 2: Germania (id=2)
 INSERT INTO docentes (id, nombre, apellido, email, carga_maxima, sede_principal_id, activo) VALUES
-(5, 'Laura', 'Fernández', 'laura.fernandez@upt.edu.ve', 20, 2, true),
-(6, 'Miguel', 'Sánchez', 'miguel.sanchez@upt.edu.ve', 20, 2, true),
-(7, 'Carmen', 'Torres', 'carmen.torres@upt.edu.ve', 20, 2, true),
-(8, 'Jorge', 'Ramírez', 'jorge.ramirez@upt.edu.ve', 20, 2, true);
+(5, 'Laura', 'Fernández', 'laura.fernandez@example.com', 20, 2, true),
+(6, 'Miguel', 'Sánchez', 'miguel.sanchez@example.com', 20, 2, true),
+(7, 'Carmen', 'Torres', 'carmen.torres@example.com', 20, 2, true),
+(8, 'Jorge', 'Ramírez', 'jorge.ramirez@example.com', 20, 2, true);
 
 -- Sede 3: Aldea Angostura (id=3)
 INSERT INTO docentes (id, nombre, apellido, email, carga_maxima, sede_principal_id, activo) VALUES
-(9, 'Rosa', 'Hernández', 'rosa.hernandez@upt.edu.ve', 20, 3, true),
-(10, 'Francisco', 'Díaz', 'francisco.diaz@upt.edu.ve', 20, 3, true),
-(11, 'Patricia', 'Morales', 'patricia.morales@upt.edu.ve', 20, 3, true),
-(12, 'Antonio', 'Castro', 'antonio.castro@upt.edu.ve', 20, 3, true);
+(9, 'Rosa', 'Hernández', 'rosa.hernandez@example.com', 20, 3, true),
+(10, 'Francisco', 'Díaz', 'francisco.diaz@example.com', 20, 3, true),
+(11, 'Patricia', 'Morales', 'patricia.morales@example.com', 20, 3, true),
+(12, 'Antonio', 'Castro', 'antonio.castro@example.com', 20, 3, true);
 
 -- ============================================================
 -- 3. Materias (15) — 5 por carrera (INF, HSL, MI)

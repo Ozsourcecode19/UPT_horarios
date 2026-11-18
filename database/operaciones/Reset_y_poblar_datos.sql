@@ -38,8 +38,8 @@ TRUNCATE TABLE usuarios RESTART IDENTITY CASCADE; -- Asumiendo que no hay FKs ha
 
 -- Usuarios (mínimo para crear horarios)
 INSERT INTO usuarios (username, email, password_hash, rol, activo) VALUES
-('admin', 'admin@upt.edu.ve', '$2b$12$dummy_hash_para_prueba_no_utilizable_en_prod', 'ADMIN', TRUE),
-('docente1', 'juan.perez@upt.edu.ve', '$2b$12$dummy_hash_para_prueba_no_utilizable_en_prod', 'DOCENTE', TRUE);
+('admin', 'admin@example.com', '$2b$12$dummy_hash_para_prueba_no_utilizable_en_prod', 'ADMIN', TRUE),
+('docente1', 'juan.perez@example.com', '$2b$12$dummy_hash_para_prueba_no_utilizable_en_prod', 'DOCENTE', TRUE);
 
 -- Sedes
 INSERT INTO sedes (nombre, codigo, direccion, activa) VALUES
@@ -72,9 +72,9 @@ INSERT INTO grupos (nombre, trayecto_id, sede_id, cantidad_alumnos, periodo_id, 
 
 -- Docentes
 INSERT INTO docentes (nombre, apellido, email, carga_maxima, sede_principal_id, usuario_id, activo) VALUES
-('Juan', 'Pérez', 'juan.perez@upt.edu.ve', 20, 1, 2, TRUE), -- Asociado al usuario 'docente1'
-('María', 'González', 'maria.gonzalez@upt.edu.ve', 18, 1, NULL, TRUE),
-('Carlos', 'Rodríguez', 'carlos.rodriguez@upt.edu.ve', 22, 1, NULL, TRUE);
+('Juan', 'Pérez', 'juan.perez@example.com', 20, 1, 2, TRUE), -- Asociado al usuario 'docente1'
+('María', 'González', 'maria.gonzalez@example.com', 18, 1, NULL, TRUE),
+('Carlos', 'Rodríguez', 'carlos.rodriguez@example.com', 22, 1, NULL, TRUE);
 
 -- Materias
 INSERT INTO materias (nombre, codigo, color_hex, carga_horaria_estandar, activa) VALUES

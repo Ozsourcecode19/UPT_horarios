@@ -70,7 +70,7 @@ export default function UserFormModal({ isOpen, editingUser, onSave, onClose }) 
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Email *</label>
-                <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} className={inputClass} placeholder="juan@upt.edu.ve" />
+                <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} className={inputClass} placeholder="juan@example.com" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
