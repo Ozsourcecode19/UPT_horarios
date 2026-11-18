@@ -40,6 +40,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Copia la plantilla y ajusta:
+```bash
+cp backend/.env.example backend/.env
+```
+
 Crea `backend/.env` (o exporta variables) con al menos:
 
 ```env
