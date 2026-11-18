@@ -50,7 +50,7 @@
 
 ### Contexto de la Sesión Anterior (2026-10-17) — Sesiones de N bloques × M sesiones/semana
 
-> Feature completa (rama `feature/clase-bloques-sesiones`; plan en `PLAN_CLASE_BLOQUES_SESIONES.md` en la raíz del repo). Cada **Clase** (`lecciones`) define **N = `bloques_por_sesion`** (sesión = run de N bloques contiguos por aparición) y **M = `sesiones_semana`** (M sesiones/semana, uniformes). Verificación final: backend **87 pytest ✅**, frontend **395 vitest ✅**, `pnpm build` ✅, `import main` ✅.
+> Feature completa (rama `feature/clase-bloques-sesiones`; plan archivado en `docs/archive/PLAN_CLASE_BLOQUES_SESIONES.md`). Cada **Clase** (`lecciones`) define **N = `bloques_por_sesion`** (sesión = run de N bloques contiguos por aparición) y **M = `sesiones_semana`** (M sesiones/semana, uniformes). Verificación final: backend **87 pytest ✅**, frontend **395 vitest ✅**, `pnpm build` ✅, `import main` ✅.
 
 1. **Helpers puros (`features/schedule/utils/sesiones.ts`):**
    - `resolverRun(bloqueInicial, n, bloques, sedeId)` → `{bloques, inicioAjustado}` o `null`: intenta el run hacia abajo y, si no cabe, **hacia arriba** ajustando el inicio (R7); exige contener el bloque inicial y filtra `activo`/sede/día.
