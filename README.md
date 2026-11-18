@@ -1,5 +1,10 @@
 # Sistema de Horarios UPT Bolívar
 
+[![CI](https://github.com/Ozsourcecode19/UPT_horarios/actions/workflows/desktop-release.yml/badge.svg)](https://github.com/Ozsourcecode19/UPT_horarios/actions/workflows/desktop-release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
+[![Node 18+](https://img.shields.io/badge/node-18%2B-green.svg)](https://nodejs.org/)
+
 Sistema de gestión y generación de horarios académicos (PNF) con solver CP-SAT
 (Google OR-Tools). Monorepo: `backend/` (FastAPI), `frontend/` (React 18 + Vite),
 `database/` (PostgreSQL).
