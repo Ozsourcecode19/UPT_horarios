@@ -1,0 +1,52 @@
+THIRD-PARTY NOTICES
+
+Este proyecto ("Sistema de Horarios UPT Bolivar") se distribuye bajo la licencia MIT
+(ver LICENSE). Incorpora y/o depende de los siguientes componentes de terceros,
+cuyas licencias se respetan y se incluyen (o referencian) en sus paquetes:
+
+Backend (Python)
+
+- FastAPI - MIT - Framework web
+- Starlette - BSD-3-Clause - Base de FastAPI
+- Pydantic - MIT - Validacion de schemas
+- SQLAlchemy - MIT - ORM
+- Uvicorn - BSD-3-Clause - Servidor ASGI
+- python-jose / PyJWT - MIT - JWT
+- passlib / bcrypt - BSD / Apache-2.0 - Hashing de contrasenas
+- Google OR-Tools (CP-SAT) - Apache-2.0 - Solver de horarios
+- psycopg (psycopg2/psycopg3) - LGPL-3.0 - Driver PostgreSQL (libreria, no se modifica)
+- aiosqlite - MIT - Soporte SQLite (escritorio)
+- PyInstaller - GPL-2.0 (con excepcion) - Solo herramienta de build; el binario generado no hereda la GPL gracias a la excepcion del bootloader
+
+Frontend (Node)
+
+- React - MIT
+- Vite - MIT
+- Tailwind CSS - MIT
+- TanStack Query - MIT
+- React Hook Form - MIT
+- Zod - MIT
+- FullCalendar (core + timeGrid) - MIT (funcionalidades premium no usadas)
+- jsPDF + jspdf-autotable - MIT
+- Axios - MIT
+
+Escritorio (Tauri / Rust)
+
+- Tauri (core + CLI) - MIT / Apache-2.0
+- Rust (toolchain) - MIT / Apache-2.0
+- WebView (WebKitGTK / Edge WebView2) - LGPL / propietaria del SO - Provista por el sistema operativo
+
+Datos y assets
+
+- Iconos e imagenes del proyecto: propios (ver desktop/src-tauri/icons/).
+- Datos de prueba (seed): propios.
+
+Aviso
+
+Las licencias completas de cada dependencia se encuentran en sus respectivos
+paquetes (backend/.venv/lib/python*/site-packages/*/LICENSE*,
+frontend/node_modules/*/LICENSE, etc.) y en los manifests
+(backend/requirements.txt, frontend/package.json, desktop/src-tauri/Cargo.toml).
+Este NOTICE es informativo y no sustituye los textos legales originales.
+
+Para dudas de uso comercial o redistribucion, consultar el area legal de la UPT.
