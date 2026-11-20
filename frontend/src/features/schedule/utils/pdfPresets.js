@@ -11,6 +11,13 @@ export const PDF_PRESETS_DEFAULT = {
   mostrarHora: true,
   colorBordes: [100, 116, 139],
   mostrarDescansos: true,
+  campos: {
+    docente: true,
+    aula: true,
+    hora: true,
+    turno: true,
+    periodo: true,
+  },
 };
 
 const PAPELES = ['A4', 'A3', 'Letter'];
@@ -25,6 +32,10 @@ export function normalizarPresets(raw) {
   if (!Array.isArray(base.colorBordes) || base.colorBordes.length !== 3) {
     base.colorBordes = [...PDF_PRESETS_DEFAULT.colorBordes];
   }
+  base.campos = { ...PDF_PRESETS_DEFAULT.campos, ...(base.campos || {}) };
+  base.mostrarDocente = base.campos.docente ?? base.mostrarDocente;
+  base.mostrarAula = base.campos.aula ?? base.mostrarAula;
+  base.mostrarHora = base.campos.hora ?? base.mostrarHora;
   return base;
 }
 

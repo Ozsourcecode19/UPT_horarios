@@ -1,10 +1,14 @@
 // src/features/schedule/components/pdf/PdfPreviewModal.jsx
 // Modal de vista previa del PDF de horarios.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ModalShell from '../../../../components/ui/ModalShell';
-import { X, Download } from 'lucide-react';
+import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
 
 export default function PdfPreviewModal({ blobUrl, generando, error, onDescargar, onCerrar }) {
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    setZoom(1);
+  }, [blobUrl]);
   useEffect(() => {
     return () => {
       // Revocar el blob URL al desmontar
@@ -16,9 +20,18 @@ export default function PdfPreviewModal({ blobUrl, generando, error, onDescargar
       header={(
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-lg font-bold text-slate-800">Vista previa del PDF</h3>
-          <button onClick={onCerrar} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setZoom(z => Math.max(0.5, z - 0.1))} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors" aria-label="Alejar">
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs text-slate-500 w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button type="button" onClick={() => setZoom(z => Math.min(2, z + 0.1))} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors" aria-label="Acercar">
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button onClick={onCerrar} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       )}
       footer={(
@@ -51,11 +64,14 @@ export default function PdfPreviewModal({ blobUrl, generando, error, onDescargar
         </div>
       )}
       {blobUrl && (
-        <iframe
-          src={blobUrl}
-          title="Vista previa PDF"
-          className="w-full h-[60vh] border border-slate-200 rounded-xl"
-        />
+        <div className="overflow-auto border border-slate-200 rounded-xl" style={{ height: '60vh' }}>
+          <iframe
+            src={blobUrl}
+            title="Vista previa PDF"
+            className="border-0"
+            style={{ width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+          />
+        </div>
       )}
     </ModalShell>
   );
