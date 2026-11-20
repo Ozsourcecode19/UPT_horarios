@@ -148,7 +148,7 @@ export default function usePdfHorario(configImpresion = null, layoutImpresion = 
     });
 
     // Construir filas de la tabla
-    const margen = bloqueTabla.x;
+    const margen = cfg.margen;
     // Calcular alto por fila para que la tabla ocupe toda la altura disponible
     const startY = bloqueTabla.y;
     const marginBottom = margen;
@@ -161,7 +161,7 @@ export default function usePdfHorario(configImpresion = null, layoutImpresion = 
     }
     const alturaDescansos = numDescansos * 6;
     const alturaBandas = alturaDisponible - alturaDescansos;
-    const altoPorFila = Math.max(8, alturaBandas / Math.max(bandas.length, 1));
+    const altoPorFila = Math.max(8, (alturaBandas / Math.max(bandas.length, 1)) * cfg.escala);
 
     const head = [['Hora', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes']];
     const body = [];
@@ -250,7 +250,7 @@ export default function usePdfHorario(configImpresion = null, layoutImpresion = 
       }]);
     }
 
-    const anchoDisponible = bloqueTabla.w;
+    const anchoDisponible = pageWidth - margen * 2;
     const escalaFuente = cfg.escala;
     autoTable(doc, {
       startY: startY,
