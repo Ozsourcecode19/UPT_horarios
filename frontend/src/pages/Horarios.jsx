@@ -26,7 +26,7 @@ import {
 import usePdfHorario from '../features/schedule/hooks/usePdfHorario.jsx';
 import { leerPresets, guardarPresets, normalizarPresets } from '../features/schedule/utils/pdfPresets';
 import { leerLayout, guardarLayout, normalizarLayout } from '../features/schedule/utils/pdfLayout';
-import EditorLienzo from '../components/schedule/EditorLienzo';
+import EditorLienzoDrag from '../components/schedule/EditorLienzoDrag';
 import OpcionesImpresionModal from '../components/schedule/OpcionesImpresionModal';
 import PdfPreviewModal from '../features/schedule/components/pdf/PdfPreviewModal.jsx';
 
@@ -619,7 +619,7 @@ const Horarios = () => {
         }}
       />
 
-      <EditorLienzo
+      <EditorLienzoDrag
         isOpen={mostrarEditorLienzo}
         onClose={() => setMostrarEditorLienzo(false)}
         layout={layoutPdf}
