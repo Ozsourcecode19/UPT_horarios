@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { agruparSesiones } from '../utils/sesiones';
 import { normalizarPresets, leerPresets } from '../utils/pdfPresets';
+import { normalizarLayout, leerLayout } from '../utils/pdfLayout';
 import { TURNOS_LABELS } from '../../../constants';
 import { formatHora12 } from '../../../utils/timeFormat';
 
@@ -36,17 +37,23 @@ function cargarImagenBase64(url) {
     .catch(() => null);
 }
 
-export default function usePdfHorario(configImpresion = null) {
+export default function usePdfHorario(configImpresion = null, layoutImpresion = null) {
   const cfgInicial = normalizarPresets(configImpresion || leerPresets());
+  const layoutInicial = normalizarLayout(layoutImpresion || leerLayout());
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
   const [config, setConfig] = useState(cfgInicial);
+  const [layout, setLayout] = useState(layoutInicial);
 
   useEffect(() => {
     setConfig(normalizarPresets(configImpresion || leerPresets()));
   }, [configImpresion]);
+
+  useEffect(() => {
+    setLayout(normalizarLayout(layoutImpresion || leerLayout()));
+  }, [layoutImpresion]);
   const logoRef = useRef(null);
 
   useEffect(() => {
@@ -61,6 +68,9 @@ export default function usePdfHorario(configImpresion = null) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const cfg = normalizarPresets(params.cfg || config);
+    const lay = normalizarLayout(params.layout || layout);
+    const bloqueHeader = lay.blocks.header;
+    const bloqueTabla = lay.blocks.table;
     const bandas = Array.isArray(params.bandas) ? params.bandas : [];
     const eventos = Array.isArray(params.eventos) ? params.eventos : [];
     const bloques = Array.isArray(params.bloques) ? params.bloques : [];
@@ -74,7 +84,7 @@ export default function usePdfHorario(configImpresion = null) {
     // Logo (todas las páginas)
     if (logo) {
       try {
-        doc.addImage(logo, 'PNG', 10, 8, 12, 12);
+        doc.addImage(logo, 'PNG', bloqueHeader.x, bloqueHeader.y, 12, 12);
       } catch (e) {
         // Si falla, continuar sin logo
       }
@@ -83,23 +93,23 @@ export default function usePdfHorario(configImpresion = null) {
     // Título
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(descripcion, 26, 15);
+    doc.text(descripcion, bloqueHeader.x + 16, bloqueHeader.y + 7);
 
     // Periodo
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(periodo, 26, 22);
+    doc.text(periodo, bloqueHeader.x + 16, bloqueHeader.y + 14);
 
-    // Fecha (esquina derecha)
+    // Fecha (esquina derecha del header)
     const fecha = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
     doc.setFontSize(8);
-    doc.text(fecha, pageWidth - 14, 15, { align: 'right' });
+    doc.text(fecha, bloqueHeader.x + bloqueHeader.w - 4, bloqueHeader.y + 7, { align: 'right' });
 
     // Subtítulo adaptativo
     const subtitulo = construirSubtitulo(contextoVista, itemSeleccionado, ventanaGrilla);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
-    doc.text(subtitulo, 26, 28);
+    doc.text(subtitulo, bloqueHeader.x + 16, bloqueHeader.y + 20);
     doc.setFont('helvetica', 'normal');
 
     // Agrupar sesiones multibloque
@@ -138,9 +148,9 @@ export default function usePdfHorario(configImpresion = null) {
     });
 
     // Construir filas de la tabla
-    const margen = cfg.margen;
+    const margen = bloqueTabla.x;
     // Calcular alto por fila para que la tabla ocupe toda la altura disponible
-    const startY = margen + 22;
+    const startY = bloqueTabla.y;
     const marginBottom = margen;
     const headerHeight = 10; // altura estimada del header de la tabla
     const alturaDisponible = pageHeight - startY - headerHeight - marginBottom;
@@ -240,7 +250,7 @@ export default function usePdfHorario(configImpresion = null) {
       }]);
     }
 
-    const anchoDisponible = pageWidth - margen * 2;
+    const anchoDisponible = bloqueTabla.w;
     const escalaFuente = cfg.escala;
     autoTable(doc, {
       startY: startY,
@@ -286,6 +296,7 @@ export default function usePdfHorario(configImpresion = null) {
         dibujarPagina(doc, {
           ...params,
           cfg: config,
+          layout: layout,
           descripcion: sec.descripcion || params.descripcion,
           eventos: sec.eventos || [],
           bandas: sec.bandas || [],
@@ -296,11 +307,11 @@ export default function usePdfHorario(configImpresion = null) {
         });
       });
     } else {
-      dibujarPagina(doc, { ...params, cfg: config, logoBase64: logo });
+      dibujarPagina(doc, { ...params, cfg: config, layout: layout, logoBase64: logo });
     }
 
     return doc;
-  }, [logoBase64, config]);
+  }, [logoBase64, config, layout]);
 
   const generarBlob = useCallback(async (params) => {
     setGenerando(true);

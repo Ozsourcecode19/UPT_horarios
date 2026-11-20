@@ -25,6 +25,8 @@ import {
 } from '../features/horarios';
 import usePdfHorario from '../features/schedule/hooks/usePdfHorario.jsx';
 import { leerPresets, guardarPresets, normalizarPresets } from '../features/schedule/utils/pdfPresets';
+import { leerLayout, guardarLayout, normalizarLayout } from '../features/schedule/utils/pdfLayout';
+import EditorLienzo from '../components/schedule/EditorLienzo';
 import OpcionesImpresionModal from '../components/schedule/OpcionesImpresionModal';
 import PdfPreviewModal from '../features/schedule/components/pdf/PdfPreviewModal.jsx';
 
@@ -407,10 +409,12 @@ const Horarios = () => {
   });
 
   const [configPdf, setConfigPdf] = useState(leerPresets());
-  const { generando: generandoPdf, blobUrl: pdfBlobUrl, generarBlob: generarPdfPreview, descargarPdf, limpiarPreview: limpiarPdfPreview } = usePdfHorario(configPdf);
+  const [layoutPdf, setLayoutPdf] = useState(leerLayout());
+  const { generando: generandoPdf, blobUrl: pdfBlobUrl, generarBlob: generarPdfPreview, descargarPdf, limpiarPreview: limpiarPdfPreview } = usePdfHorario(configPdf, layoutPdf);
   const [mostrarPreviewPdf, setMostrarPreviewPdf] = useState(false);
   const [pdfParams, setPdfParams] = useState(null);
   const [mostrarOpcionesPdf, setMostrarOpcionesPdf] = useState(false);
+  const [mostrarEditorLienzo, setMostrarEditorLienzo] = useState(false);
 
   // Cuando se calculan las secciones del PDF Todos, generar el preview
   useEffect(() => {
@@ -614,6 +618,16 @@ const Horarios = () => {
           setConfigPdf(normalizarPresets(data));
         }}
       />
+
+      <EditorLienzo
+        isOpen={mostrarEditorLienzo}
+        onClose={() => setMostrarEditorLienzo(false)}
+        layout={layoutPdf}
+        onSave={(data) => {
+          guardarLayout(data);
+          setLayoutPdf(normalizarLayout(data));
+        }}
+      />
       <GeneratingOverlay isGenerating={isGenerating} genStatusText={genStatusText} />
 
       {/* E24: la toolbar del área de trabajo. Reemplaza al bloque grande de
@@ -683,13 +697,20 @@ const Horarios = () => {
       />
 
       <div className="no-print"><FlowStepper preCheck={preCheck} demoMode={demoMode} /></div>
-      <div className="no-print flex justify-end">
+      <div className="no-print flex justify-end gap-2">
         <button
           type="button"
           onClick={() => setMostrarOpcionesPdf(true)}
           className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700"
         >
           Opciones de impresión
+        </button>
+        <button
+          type="button"
+          onClick={() => setMostrarEditorLienzo(true)}
+          className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700"
+        >
+          Editar diseño
         </button>
       </div>
 

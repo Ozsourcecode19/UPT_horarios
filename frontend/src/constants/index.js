@@ -67,6 +67,7 @@ export const LS_KEYS = {
   // E24: sidebar global colapsado a iconos (solo escritorio).
   sidebarColapsado: 'sidebar_colapsado',
   pdfPresets: 'pdf_presets',
+  pdfLayout: 'pdf_layout',
 };
 
 /** Prefijo para claves de datos demo por feature. */
