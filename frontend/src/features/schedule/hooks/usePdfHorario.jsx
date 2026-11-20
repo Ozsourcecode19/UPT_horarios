@@ -285,7 +285,8 @@ export default function usePdfHorario(configImpresion = null, layoutImpresion = 
   };
 
   const generarPdf = useCallback((params) => {
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const cfgDoc = normalizarPresets(config);
+    const doc = new jsPDF({ orientation: cfgDoc.orientacion, unit: 'mm', format: cfgDoc.papel.toLowerCase() });
 
     const secciones = Array.isArray(params.secciones) ? params.secciones : null;
     const logo = logoRef.current;
