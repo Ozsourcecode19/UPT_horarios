@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { agruparSesiones } from '../utils/sesiones';
+import { normalizarPresets, leerPresets } from '../utils/pdfPresets';
 import { TURNOS_LABELS } from '../../../constants';
 import { formatHora12 } from '../../../utils/timeFormat';
 
@@ -35,11 +36,17 @@ function cargarImagenBase64(url) {
     .catch(() => null);
 }
 
-export default function usePdfHorario() {
+export default function usePdfHorario(configImpresion = null) {
+  const cfgInicial = normalizarPresets(configImpresion || leerPresets());
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
+  const [config, setConfig] = useState(cfgInicial);
+
+  useEffect(() => {
+    setConfig(normalizarPresets(configImpresion || leerPresets()));
+  }, [configImpresion]);
   const logoRef = useRef(null);
 
   useEffect(() => {
@@ -53,6 +60,7 @@ export default function usePdfHorario() {
   const dibujarPagina = (doc, params) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const cfg = normalizarPresets(params.cfg || config);
     const bandas = Array.isArray(params.bandas) ? params.bandas : [];
     const eventos = Array.isArray(params.eventos) ? params.eventos : [];
     const bloques = Array.isArray(params.bloques) ? params.bloques : [];
@@ -130,9 +138,10 @@ export default function usePdfHorario() {
     });
 
     // Construir filas de la tabla
+    const margen = cfg.margen;
     // Calcular alto por fila para que la tabla ocupe toda la altura disponible
-    const startY = 32;
-    const marginBottom = 10;
+    const startY = margen + 22;
+    const marginBottom = margen;
     const headerHeight = 10; // altura estimada del header de la tabla
     const alturaDisponible = pageHeight - startY - headerHeight - marginBottom;
     let numDescansos = 0;
@@ -150,7 +159,7 @@ export default function usePdfHorario() {
     bandas.forEach((banda, i) => {
       const siguiente = bandas[i + 1];
       const hueco = siguiente ? siguiente.iniMin - banda.finMin : 0;
-      if (siguiente && hueco > 0 && hueco >= 30) {
+      if (siguiente && hueco > 0 && hueco >= 30 && cfg.mostrarDescansos) {
         body.push([{
           content: `Descanso - ${Math.floor(banda.finMin / 60)}:${String(banda.finMin % 60).padStart(2, '0')} a ${Math.floor(siguiente.iniMin / 60)}:${String(siguiente.iniMin % 60).padStart(2, '0')}`,
           colSpan: 6,
@@ -159,7 +168,7 @@ export default function usePdfHorario() {
         return;
       }
 
-      const row = [banda.etiqueta];
+      const row = [cfg.mostrarHora ? banda.etiqueta : ''];
       for (let d = 1; d <= 5; d++) {
         const key = `${d}|${banda.iniMin}`;
         if (celdasCubiertas.has(key)) {
@@ -181,8 +190,8 @@ export default function usePdfHorario() {
             return `cont. ${materia}`;
           }
           const materia = ev.extendedProps?.materia || ev.title || '';
-          const docente = ev.extendedProps?.docente || '';
-          const aula = ev.extendedProps?.aula || '';
+          const docente = cfg.mostrarDocente ? (ev.extendedProps?.docente || '') : '';
+          const aula = cfg.mostrarAula ? (ev.extendedProps?.aula || '') : '';
           const sessionTotal = info?.total || 1;
           const x2 = sessionTotal > 1 ? ` (x${sessionTotal})` : '';
           return `${materia}${x2}\n${docente}\n${aula}`;
@@ -231,15 +240,17 @@ export default function usePdfHorario() {
       }]);
     }
 
+    const anchoDisponible = pageWidth - margen * 2;
+    const escalaFuente = cfg.escala;
     autoTable(doc, {
-      startY: 32,
+      startY: startY,
       head: head,
       body: body,
-      tableWidth: 277,
+      tableWidth: anchoDisponible,
       styles: {
-        fontSize: 7,
-        cellPadding: 1,
-        lineColor: [100, 116, 139],
+        fontSize: 7 * escalaFuente,
+        cellPadding: 1 * escalaFuente,
+        lineColor: cfg.colorBordes,
         lineWidth: 0.3,
         valign: 'middle',
         halign: 'center',
@@ -248,17 +259,17 @@ export default function usePdfHorario() {
         fillColor: [241, 245, 249],
         textColor: [71, 85, 105],
         fontStyle: 'bold',
-        fontSize: 7.5,
+        fontSize: 7.5 * escalaFuente,
       },
       columnStyles: {
-        0: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
-        1: { cellWidth: 51, halign: 'center' },
-        2: { cellWidth: 51, halign: 'center' },
-        3: { cellWidth: 51, halign: 'center' },
-        4: { cellWidth: 51, halign: 'center' },
-        5: { cellWidth: 51, halign: 'center' },
+        0: { cellWidth: Math.max(18, 22 * escalaFuente), halign: 'center', fontStyle: 'bold' },
+        1: { cellWidth: (anchoDisponible - Math.max(18, 22 * escalaFuente)) / 5, halign: 'center' },
+        2: { cellWidth: (anchoDisponible - Math.max(18, 22 * escalaFuente)) / 5, halign: 'center' },
+        3: { cellWidth: (anchoDisponible - Math.max(18, 22 * escalaFuente)) / 5, halign: 'center' },
+        4: { cellWidth: (anchoDisponible - Math.max(18, 22 * escalaFuente)) / 5, halign: 'center' },
+        5: { cellWidth: (anchoDisponible - Math.max(18, 22 * escalaFuente)) / 5, halign: 'center' },
       },
-      margin: { left: 10, right: 10 },
+      margin: { left: margen, right: margen },
       theme: 'grid',
     });
   };
@@ -274,6 +285,7 @@ export default function usePdfHorario() {
         if (i > 0) doc.addPage();
         dibujarPagina(doc, {
           ...params,
+          cfg: config,
           descripcion: sec.descripcion || params.descripcion,
           eventos: sec.eventos || [],
           bandas: sec.bandas || [],
@@ -284,11 +296,11 @@ export default function usePdfHorario() {
         });
       });
     } else {
-      dibujarPagina(doc, { ...params, logoBase64: logo });
+      dibujarPagina(doc, { ...params, cfg: config, logoBase64: logo });
     }
 
     return doc;
-  }, [logoBase64]);
+  }, [logoBase64, config]);
 
   const generarBlob = useCallback(async (params) => {
     setGenerando(true);

@@ -66,6 +66,7 @@ export const LS_KEYS = {
   authReturnUrl: 'auth_return_url',
   // E24: sidebar global colapsado a iconos (solo escritorio).
   sidebarColapsado: 'sidebar_colapsado',
+  pdfPresets: 'pdf_presets',
 };
 
 /** Prefijo para claves de datos demo por feature. */
