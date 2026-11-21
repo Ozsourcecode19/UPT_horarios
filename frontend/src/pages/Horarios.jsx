@@ -730,18 +730,6 @@ const Horarios = () => {
       )}
 
       {/* Área de impresión multi-entidad (oculta en pantalla, visible solo al imprimir) */}
-      {printMode && seccionesPrint.length > 0 && (
-        <div className="print-multi-area" ref={printAreaRef}>
-          <PrintMultiSection
-            secciones={seccionesPrint}
-            tipoEntidad={printMode}
-            selectedPeriodo={selectedPeriodo}
-            bloques={bloques}
-            onEventoClick={handleEventClick}
-          />
-        </div>
-      )}
-
       {/* Impresión individual: fallback multi-sección para impresión cuando excede 1 página */}
       {exceedsSinglePage && !printMode && seccionesPrintIndividual.length > 0 && (
         <div className="print-multi-area">
