@@ -600,6 +600,12 @@ table.grilla-bloques {
 
 .bandeja-chip-arrastrable:active {
   cursor: grabbing;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  transform: scale(0.98);
+}
+
+.bandeja-chip-arrastrable:active {
+  cursor: grabbing;
 }
 
 .bandeja-chip:hover {
@@ -687,6 +693,8 @@ table.grilla-bloques {
 .conflicto-badge-libre {
   background-color: #fef3c7 !important;
   color: #92400e !important;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px #f59e0b;
 }
 
 @media (min-width: 1024px) {
@@ -1706,6 +1714,7 @@ table.grilla-bloques {
   .dark .conflicto-badge-libre {
     background-color: rgb(245 158 11 / .16) !important;
     color: #fcd34d !important;
+    box-shadow: 0 0 0 1px #f59e0b;
   }
 }
 
