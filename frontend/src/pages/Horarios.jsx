@@ -904,6 +904,7 @@ const Horarios = () => {
               sinColocar={sinColocar}
               reservadas={reservadas}
               conflictos={conflictos}
+              sedes={sedes}
               puedeEscribir={puedeEscribir}
               modoLibre={modoLibre}
               demoMode={demoMode}

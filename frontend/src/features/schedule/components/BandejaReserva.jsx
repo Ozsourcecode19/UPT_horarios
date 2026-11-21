@@ -87,6 +87,7 @@ const BandejaReserva = ({
   sinColocar = [],
   reservadas = [],
   conflictos = [],
+  sedes = [],
   puedeEscribir = false,
   modoLibre = false,
   demoMode = false,
@@ -216,7 +217,10 @@ const BandejaReserva = ({
             Sede
             <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="bandeja-filtro mt-1 w-full text-xs px-2 py-1 border rounded-md">
               <option value="TODAS">Todas</option>
-              {sedesDisponibles.map(s => <option key={s} value={s}>Sede {s}</option>)}
+              {sedesDisponibles.map(s => {
+              const sede = (sedes || []).find(x => String(x.id) === String(s));
+              return <option key={s} value={s}>{sede?.nombre || `Sede ${s}`}</option>;
+            })}
             </select>
           </label>
         </div>
