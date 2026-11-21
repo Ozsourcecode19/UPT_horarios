@@ -15,6 +15,9 @@ const ETIQUETA_TIPO = {
   aula: 'Aula',
 };
 
+const DIAS_NOMBRES = ['', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
+const minutosAHora = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+
 /** Los turnos llegan con el valor de BD (MATUTINO/VESPERTINO/NOCTURNO). */
 const ETIQUETA_TURNO = TURNOS_LABELS;
 
@@ -24,6 +27,7 @@ const PanelVerificacion = ({
   reservadas = 0,
   turnosSinCobertura = [],
   className = '',
+  onConflictClick,
 }) => {
   const totalConflictos = conflictos.length;
   const todoOk = totalConflictos === 0 && sinColocar === 0 && turnosSinCobertura.length === 0;
@@ -45,12 +49,20 @@ const PanelVerificacion = ({
           </p>
           <div className="space-y-1 max-h-40 overflow-y-auto">
             {conflictos.map((c, i) => (
-              <div key={`${c.tipo}-${c.id}-${c.dia}-${c.iniMin}-${i}`} className="px-2 py-1.5 rounded-lg bg-red-50 text-xs">
+              <button
+                key={`${c.tipo}-${c.id}-${c.dia}-${c.iniMin}-${i}`}
+                type="button"
+                onClick={() => onConflictClick?.(c)}
+                className="w-full text-left px-2 py-1.5 rounded-lg bg-red-50 text-xs hover:bg-red-100 transition-colors"
+              >
                 <p className="font-semibold text-red-700">
                   {c.etiqueta || `${ETIQUETA_TIPO[c.tipo] || c.tipo} ocupado`}
                 </p>
+                <p className="text-red-500 mt-0.5">
+                  {DIAS_NOMBRES[c.dia] || 'Día'} {minutosAHora(c.iniMin)}
+                </p>
                 {c.detalle && <p className="text-red-600 mt-0.5">{c.detalle}</p>}
-              </div>
+              </button>
             ))}
           </div>
         </div>

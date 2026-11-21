@@ -888,6 +888,7 @@ const Horarios = () => {
             sinColocar={sinColocar.length}
             reservadas={reservadas.length}
             turnosSinCobertura={preCheck?.turnos_sin_cobertura || []}
+            onConflictClick={(c) => { dock.setPestana('aulas'); setCeldaActiva({ dia: c.dia, iniMin: c.iniMin }); }}
           />
         )}
       </DockHorario>
