@@ -561,15 +561,9 @@ const Horarios = () => {
     bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios, onClaseBandeja,
   }), [bloques, aulas, showToast, guardarAsignacionManual, listadoHorarios, onClaseBandeja]);
 
-  // Función para imprimir multi-entidad
+  // Función para generar PDF multi-entidad (unificado con presets)
   const handlePrintMultiEntity = (tipo) => {
-    setPrintMode(tipo);
-    // Esperar a que se renderice el componente y luego imprimir
-    setTimeout(() => {
-      window.print();
-      // Limpiar el modo de impresión después de imprimir
-      setTimeout(() => setPrintMode(null), 500);
-    }, 100);
+    setPdfTodosTipo(tipo);
   };
 
   // Hover controlado para el dropdown de impresión
