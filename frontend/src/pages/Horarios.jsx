@@ -437,6 +437,25 @@ const Horarios = () => {
   const [mostrarOpcionesPdf, setMostrarOpcionesPdf] = useState(false);
   const [mostrarEditorLienzo, setMostrarEditorLienzo] = useState(false);
   const [conflictoActivo, setConflictoActivo] = useState(null);
+
+  // Limpia el resaltado cuando el conflicto se resuelve o cambia la vista.
+  useEffect(() => {
+    if (!conflictoActivo) return;
+    const sigue = conflictos.some(c =>
+      Number(c.dia) === Number(conflictoActivo.dia) &&
+      Number(c.iniMin) === Number(conflictoActivo.iniMin) &&
+      c.tipo === conflictoActivo.tipo &&
+      String(c.id) === String(conflictoActivo.id)
+    );
+    if (!sigue) {
+      setConflictoActivo(null);
+      showToast?.('Conflicto resuelto', 'success');
+    }
+  }, [conflictos, conflictoActivo, showToast]);
+
+  useEffect(() => {
+    setConflictoActivo(null);
+  }, [filterType, filterValue, turnoActivo]);
   const [zoomGrilla, setZoomGrilla] = useState(() => {
     try { return Number(localStorage.getItem('grid_zoom')) || 1; }
     catch { return 1; }
@@ -913,6 +932,7 @@ const Horarios = () => {
             reservadas={reservadas.length}
             turnosSinCobertura={preCheck?.turnos_sin_cobertura || []}
             onConflictClick={(c) => irAConflicto(c)}
+            onClearResaltado={() => setConflictoActivo(null)}
           />
         )}
       </DockHorario>

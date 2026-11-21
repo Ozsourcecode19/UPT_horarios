@@ -28,6 +28,7 @@ const PanelVerificacion = ({
   turnosSinCobertura = [],
   className = '',
   onConflictClick,
+  onClearResaltado,
 }) => {
   const totalConflictos = conflictos.length;
   const todoOk = totalConflictos === 0 && sinColocar === 0 && turnosSinCobertura.length === 0;
@@ -64,6 +65,15 @@ const PanelVerificacion = ({
                 {c.detalle && <p className="text-red-600 mt-0.5">{c.detalle}</p>}
               </button>
             ))}
+            {onClearResaltado && (
+              <button
+                type="button"
+                onClick={onClearResaltado}
+                className="mt-1 w-full text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Quitar resaltado
+              </button>
+            )}
           </div>
         </div>
       )}
