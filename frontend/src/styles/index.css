@@ -1710,3 +1710,12 @@ table.grilla-bloques {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+/* Zoom de grilla (solo pantalla) */
+.grid-zoom {
+  transform: scale(var(--grid-zoom, 1));
+  transform-origin: top left;
+}
+@media print {
+  .grid-zoom { transform: none; }
+}

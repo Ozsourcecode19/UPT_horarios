@@ -415,6 +415,15 @@ const Horarios = () => {
   const [pdfParams, setPdfParams] = useState(null);
   const [mostrarOpcionesPdf, setMostrarOpcionesPdf] = useState(false);
   const [mostrarEditorLienzo, setMostrarEditorLienzo] = useState(false);
+  const [zoomGrilla, setZoomGrilla] = useState(() => {
+    try { return Number(localStorage.getItem('grid_zoom')) || 1; }
+    catch { return 1; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('grid_zoom', String(zoomGrilla)); }
+    catch { /* sin localStorage */ }
+  }, [zoomGrilla]);
 
   // Cuando se calculan las secciones del PDF Todos, generar el preview
   useEffect(() => {
@@ -782,15 +791,22 @@ const Horarios = () => {
           <div className="print-area flex-1 min-h-0 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 overflow-hidden" style={{ '--alto-banda': altoBandaPrint }}>
             <PrintHeader selectedPeriodo={selectedPeriodo} descripcionFiltro={descripcionFiltro} filterType={filterType} itemSeleccionado={itemSeleccionado} ventanaGrilla={ventanaGrilla} sedesInfo={sedesDelFiltro} />
             <AvisoCoberturaVentana bandas={bandas} ventana={ventanaGrilla} configs={configuraciones} />
-            <GridSemanalBloques
-              eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
-              bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
-              demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
-              onEventoClick={handleEventClick}
-              onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
-              onDropEnCelda={onDropEnCelda}
-              renderEventContent={EventRenderer}
-            />
+            <div className="no-print flex items-center gap-2 mb-2">
+              <button type="button" onClick={() => setZoomGrilla(z => Math.max(0.8, +(z - 0.1).toFixed(1)))} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg">−</button>
+              <span className="text-xs text-slate-500">{Math.round(zoomGrilla * 100)}%</span>
+              <button type="button" onClick={() => setZoomGrilla(z => Math.min(1.4, +(z + 0.1).toFixed(1)))} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg">+</button>
+            </div>
+            <div className="overflow-auto grid-zoom" style={{ '--grid-zoom': zoomGrilla }}>
+              <GridSemanalBloques
+                eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
+                bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
+                demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
+                onEventoClick={handleEventClick}
+                onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
+                onDropEnCelda={onDropEnCelda}
+                renderEventContent={EventRenderer}
+              />
+            </div>
           </div>
         )}
 
@@ -821,16 +837,23 @@ const Horarios = () => {
               </span>
             </div>
             <AvisoCoberturaVentana bandas={bandasActivas} ventana={ventanaActiva} configs={configuraciones} />
+            <div className="no-print flex items-center gap-2 mb-2">
+              <button type="button" onClick={() => setZoomGrilla(z => Math.max(0.8, +(z - 0.1).toFixed(1)))} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg">−</button>
+              <span className="text-xs text-slate-500">{Math.round(zoomGrilla * 100)}%</span>
+              <button type="button" onClick={() => setZoomGrilla(z => Math.min(1.4, +(z + 0.1).toFixed(1)))} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg">+</button>
+            </div>
             <div className="flex-1 min-h-0 overflow-auto" style={{ '--alto-banda': altoBandaPrint }}>
-              <GridSemanalBloques
-                eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
-                bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
-                demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
-                onEventoClick={handleEventClick}
-                onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
-                onDropEnCelda={onDropEnCelda}
-                renderEventContent={EventRenderer}
-              />
+              <div className="grid-zoom" style={{ '--grid-zoom': zoomGrilla }}>
+                <GridSemanalBloques
+                  eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
+                  bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
+                  demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
+                  onEventoClick={handleEventClick}
+                  onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
+                  onDropEnCelda={onDropEnCelda}
+                  renderEventContent={EventRenderer}
+                />
+              </div>
             </div>
           </div>
         )}
