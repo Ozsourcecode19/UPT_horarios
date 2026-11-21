@@ -90,7 +90,7 @@ const DockHorario = ({
       onDrop={handleDrop}
     >
       {/* Barra del dock: pestañas + plegar */}
-      <div className={`flex items-center gap-1 p-1.5 m-2 rounded-2xl ${sobre ? 'bg-indigo-50' : 'bg-slate-100'}`}>
+      <div className={`flex flex-wrap items-center gap-1 p-1.5 m-2 rounded-2xl ${sobre ? 'bg-indigo-50' : 'bg-slate-100'}`}>
         {PESTANAS.map(({ id, etiqueta, Icono }) => {
           const activa = pestana === id;
           const contador = id === 'bandeja' ? contadorBandeja : id === 'verificacion' ? contadorConflictos : 0;
@@ -100,7 +100,7 @@ const DockHorario = ({
               type="button"
               onClick={() => onCambiarPestana?.(id)}
               aria-pressed={activa}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl text-xs font-semibold transition-all ${
                 activa ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
