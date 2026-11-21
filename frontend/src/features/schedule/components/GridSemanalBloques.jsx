@@ -42,6 +42,7 @@ const GridSemanalBloques = ({
   onDeleteEvento,    // ({horario, esSpan})
   modoLibre = false, // E23: los conflictos se avisan pero no bloquean
   onCeldaActiva,  // E24: ({dia, iniMin} | null) celda bajo el puntero (aulas libres)
+  conflictoResaltado = null,
 }) => {
   const [drag, setDrag] = useState(null); // {id, esSpan}
   const [celdaHover, setCeldaHover] = useState(null);
@@ -324,7 +325,7 @@ const GridSemanalBloques = ({
                       tabIndex={0}
                       className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto} ${
                         enModoMover ? (seleccion.celdaKey === key ? 'celda-origen' : 'celda-destino') : ''
-                      }`}
+                      } ${conflictoResaltado && Number(conflictoResaltado.dia) === Number(dia) && Number(conflictoResaltado.iniMin) === Number(fila.banda.iniMin) ? 'celda-conflicto-activo' : ''}`}
                       onClick={() => {
                         // Tap-to-move: solo en táctiles con una clase seleccionada
                         if (!enModoMover) return;

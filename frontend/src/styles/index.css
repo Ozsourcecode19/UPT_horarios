@@ -1732,3 +1732,10 @@ table.grilla-bloques {
 @media print {
   .grid-zoom { transform: none; }
 }
+
+/* Celda con conflicto seleccionado desde el dock */
+.grilla-bloques td.celda-conflicto-activo {
+  outline: 3px solid #dc2626 !important;
+  outline-offset: -3px;
+  background-color: #fef2f2 !important;
+}

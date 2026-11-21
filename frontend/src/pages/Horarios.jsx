@@ -415,6 +415,7 @@ const Horarios = () => {
   const [pdfParams, setPdfParams] = useState(null);
   const [mostrarOpcionesPdf, setMostrarOpcionesPdf] = useState(false);
   const [mostrarEditorLienzo, setMostrarEditorLienzo] = useState(false);
+  const [conflictoActivo, setConflictoActivo] = useState(null);
   const [zoomGrilla, setZoomGrilla] = useState(() => {
     try { return Number(localStorage.getItem('grid_zoom')) || 1; }
     catch { return 1; }
@@ -783,6 +784,7 @@ const Horarios = () => {
                 eventos={listadoHorarios} todosLosEventos={listadoHorariosRaw}
                 bandas={bandas} bloques={bloques} isLoading={isHorariosLoading}
                 demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
+                conflictoResaltado={conflictoActivo}
                 onEventoClick={handleEventClick}
                 onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
                 onDropEnCelda={onDropEnCelda}
@@ -830,6 +832,7 @@ const Horarios = () => {
                   eventos={eventosActivos} todosLosEventos={listadoHorariosRaw}
                   bandas={bandasActivas} bloques={bloques} isLoading={isHorariosLoading}
                   demoMode={demoMode} contextoVista={filterType} modoLibre={modoLibre}
+                  conflictoResaltado={conflictoActivo}
                   onEventoClick={handleEventClick}
                   onDeleteEvento={({ horario, esSpan, sesionTotal }) => setConfirmEliminar({ horario, esSpan, sesionTotal })}
                   onDropEnCelda={onDropEnCelda}
@@ -888,7 +891,7 @@ const Horarios = () => {
             sinColocar={sinColocar.length}
             reservadas={reservadas.length}
             turnosSinCobertura={preCheck?.turnos_sin_cobertura || []}
-            onConflictClick={(c) => { dock.setPestana('aulas'); setCeldaActiva({ dia: c.dia, iniMin: c.iniMin }); }}
+            onConflictClick={(c) => setConflictoActivo({ dia: c.dia, iniMin: c.iniMin, tipo: c.tipo, id: c.id })}
           />
         )}
       </DockHorario>
