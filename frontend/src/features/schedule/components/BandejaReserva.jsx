@@ -146,6 +146,10 @@ const BandejaReserva = ({
         <span className="bandeja-contador" title="Clases fuera de la grilla">{total}</span>
       </div>
 
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {total} clases fuera de la grilla.
+      </div>
+
       {demoMode && (
         <p className="bandeja-vacio">
           La bandeja no está disponible en Modo Demo (no hay servidor al que reservar las clases).
