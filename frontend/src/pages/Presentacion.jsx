@@ -201,6 +201,19 @@ const Presentacion = () => {
           </ol>
         </section>
 
+        {/* Atajos de teclado */}
+        <section className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl p-6 sm:p-8">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Atajos de teclado</h2>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300">
+              <li className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">Ctrl/Cmd + K</kbd> Abrir búsqueda global</li>
+              <li className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">Enter / Espacio</kbd> Seleccionar o mover clase en la grilla</li>
+              <li className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">Esc</kbd> Cerrar menú, modal o paleta</li>
+              <li className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">Tab</kbd> Navegar con foco visible</li>
+            </ul>
+          </div>
+        </section>
+
         {/* Destacados */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl p-6 sm:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
