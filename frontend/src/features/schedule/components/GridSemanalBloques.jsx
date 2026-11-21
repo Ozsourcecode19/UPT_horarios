@@ -323,6 +323,11 @@ const GridSemanalBloques = ({
                       key={dia}
                       rowSpan={rowSpan}
                       tabIndex={0}
+                      ref={(el) => {
+                        if (el && conflictoResaltado && Number(conflictoResaltado.dia) === Number(dia) && Number(conflictoResaltado.iniMin) === Number(fila.banda.iniMin)) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                        }
+                      }}
                       className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto} ${
                         enModoMover ? (seleccion.celdaKey === key ? 'celda-origen' : 'celda-destino') : ''
                       } ${conflictoResaltado && Number(conflictoResaltado.dia) === Number(dia) && Number(conflictoResaltado.iniMin) === Number(fila.banda.iniMin) ? 'celda-conflicto-activo' : ''}`}

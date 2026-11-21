@@ -227,6 +227,27 @@ const Horarios = () => {
     return agruparBandasPorTurno(bandas, configuraciones);
   }, [exceedsSinglePage, bandas, configuraciones]);
 
+  const irAConflicto = useCallback((c) => {
+    const tipo = c.tipo === 'docente' ? 'docente' : c.tipo === 'grupo' ? 'grupo' : 'aula';
+    const id = String(c.id);
+    setFilterType(tipo);
+    setFilterValue(id);
+    const entidad = tipo === 'docente'
+      ? docentes.find(d => String(d.id) === id)
+      : tipo === 'grupo'
+        ? grupos.find(g => String(g.id) === id)
+        : aulas.find(a => String(a.id) === id);
+    const nombre = tipo === 'docente'
+      ? `${entidad?.apellido || ''}, ${entidad?.nombre || ''}`.trim()
+      : (entidad?.nombre || `#${id}`);
+    abrirPestana(tipo, id, nombre);
+    setConflictoActivo({ dia: c.dia, iniMin: c.iniMin, tipo: c.tipo, id: c.id });
+    if (exceedsSinglePage && Array.isArray(turnosDisponibles)) {
+      const turno = turnosDisponibles.find(t => (t.bandas || []).some(b => Number(b.iniMin) === Number(c.iniMin)));
+      if (turno) setTurnoActivo(turno.nombre);
+    }
+  }, [docentes, grupos, aulas, abrirPestana, exceedsSinglePage, turnosDisponibles]);
+
   const { bandasActivas, eventosActivos, ventanaActiva } = useMemo(() => {
     if (!exceedsSinglePage) {
       return { bandasActivas: bandas, eventosActivos: listadoHorarios, ventanaActiva: ventanaGrilla };
@@ -891,7 +912,7 @@ const Horarios = () => {
             sinColocar={sinColocar.length}
             reservadas={reservadas.length}
             turnosSinCobertura={preCheck?.turnos_sin_cobertura || []}
-            onConflictClick={(c) => setConflictoActivo({ dia: c.dia, iniMin: c.iniMin, tipo: c.tipo, id: c.id })}
+            onConflictClick={(c) => irAConflicto(c)}
           />
         )}
       </DockHorario>
