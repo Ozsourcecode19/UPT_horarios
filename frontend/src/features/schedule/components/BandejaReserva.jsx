@@ -91,15 +91,29 @@ const BandejaReserva = ({
   className = '',
 }) => {
   const [filtro, setFiltro] = useState('');
+  const [turnoFiltro, setTurnoFiltro] = useState('TODOS');
+  const [sedeFiltro, setSedeFiltro] = useState('TODAS');
   const [sobre, setSobre] = useState(false); // hay un arrastre válido sobre el panel
 
   // En Modo Demo no hay servidor: la bandeja no puede apartar/devolver clases.
   const editable = puedeEscribir && !demoMode;
 
-  const sinColocarFiltradas = useMemo(() => filtrarClases(sinColocar, filtro), [sinColocar, filtro]);
-  const reservadasFiltradas = useMemo(() => filtrarClases(reservadas, filtro), [reservadas, filtro]);
+  const sinColocarFiltradas = useMemo(() => {
+    let lista = filtrarClases(sinColocar, filtro);
+    if (turnoFiltro !== 'TODOS') lista = lista.filter(c => (c.division || '') === turnoFiltro);
+    if (sedeFiltro !== 'TODAS') lista = lista.filter(c => String(c.sede_id) === String(sedeFiltro));
+    return lista;
+  }, [sinColocar, filtro, turnoFiltro, sedeFiltro]);
+
+  const reservadasFiltradas = useMemo(() => {
+    let lista = filtrarClases(reservadas, filtro);
+    if (turnoFiltro !== 'TODOS') lista = lista.filter(c => (c.division || '') === turnoFiltro);
+    if (sedeFiltro !== 'TODAS') lista = lista.filter(c => String(c.sede_id) === String(sedeFiltro));
+    return lista;
+  }, [reservadas, filtro, turnoFiltro, sedeFiltro]);
 
   const total = sinColocar.length + reservadas.length;
+  const sedesDisponibles = useMemo(() => [...new Set([...sinColocar, ...reservadas].map(c => c.sede_id).filter(Boolean))], [sinColocar, reservadas]);
 
   // Drop target: aquí se arrastran las clases de la grilla para apartarlas.
   const handleDrop = (e) => {
@@ -177,6 +191,19 @@ const BandejaReserva = ({
           placeholder="Buscar clase..."
           className="bandeja-buscador-input"
         />
+      </div>
+
+      <div className="flex gap-2">
+        <select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value)} className="flex-1 text-xs px-2 py-1 border rounded-md">
+          <option value="TODOS">Todos los turnos</option>
+          <option value="MATUTINO">Mañana</option>
+          <option value="VESPERTINO">Tarde</option>
+          <option value="NOCTURNO">Noche</option>
+        </select>
+        <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="flex-1 text-xs px-2 py-1 border rounded-md">
+          <option value="TODAS">Todas las sedes</option>
+          {sedesDisponibles.map(s => <option key={s} value={s}>Sede {s}</option>)}
+        </select>
       </div>
 
       {isLoading && <p className="bandeja-vacio">Cargando bandeja...</p>}
