@@ -256,7 +256,7 @@ const MainLayout = () => {
             >
               {colapsado ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
             </button>
-            <button onClick={closeSidebar} className="lg:hidden text-slate-400 hover:text-slate-600">
+            <button onClick={closeSidebar} aria-label="Cerrar menú" className="lg:hidden text-slate-400 hover:text-slate-600">
               <X className="w-6 h-6" />
             </button>
           </div>
