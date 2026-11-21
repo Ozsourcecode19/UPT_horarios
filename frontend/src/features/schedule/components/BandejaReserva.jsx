@@ -201,17 +201,23 @@ const BandejaReserva = ({
         />
       </div>
 
-      <div className="flex gap-2">
-        <select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value)} className="bandeja-filtro flex-1 text-xs px-2 py-1 border rounded-md">
-          <option value="TODOS">Todos los turnos</option>
-          <option value="MATUTINO">Mañana</option>
-          <option value="VESPERTINO">Tarde</option>
-          <option value="NOCTURNO">Noche</option>
-        </select>
-        <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="bandeja-filtro flex-1 text-xs px-2 py-1 border rounded-md">
-          <option value="TODAS">Todas las sedes</option>
-          {sedesDisponibles.map(s => <option key={s} value={s}>Sede {s}</option>)}
-        </select>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <label className="flex-1 min-w-[120px] text-xs text-slate-500">
+          Turno
+          <select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value)} className="bandeja-filtro mt-1 w-full text-xs px-2 py-1 border rounded-md">
+            <option value="TODOS">Todos</option>
+            <option value="MATUTINO">Mañana</option>
+            <option value="VESPERTINO">Tarde</option>
+            <option value="NOCTURNO">Noche</option>
+          </select>
+        </label>
+        <label className="flex-1 min-w-[120px] text-xs text-slate-500">
+          Sede
+          <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="bandeja-filtro mt-1 w-full text-xs px-2 py-1 border rounded-md">
+            <option value="TODAS">Todas</option>
+            {sedesDisponibles.map(s => <option key={s} value={s}>Sede {s}</option>)}
+          </select>
+        </label>
       </div>
 
       {isLoading && <p className="bandeja-vacio">Cargando bandeja...</p>}
