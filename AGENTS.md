@@ -74,3 +74,12 @@ Sistema de gestión y generación de horarios académicos (PNF). Monorepo: `back
 - **Terminología de UI (2026-10-16):** en textos visibles (toasts, labels, modales, validaciones zod, mensajes HTTP) se usa **Unidad Curricular** (no "Materia"), **Clase** (no "Lección"), **Sección** (no "Grupo") y turnos **Mañana/Tarde/Noche**. Los identificadores NO cambian: tablas/columnas/rutas `materias`/`materia_id`/`/materias`, `lecciones`/`leccion_id`/`/lecciones`, `grupos`/`grupo_id`, valores de `division` `MATUTINO/VESPERTINO/NOCTURNO` y claves `ventana_*`. Mostrar turnos con `TURNOS_LABELS` (`frontend/src/constants/index.js`; el backend tiene su copia en `services/validation/schedule_validation.py`). Al agregar cadenas nuevas, respetar esta terminología.
 - Backend: schemas Pydantic v2 (`model_dump()` en los CRUD), herencia de `Base` en `config/database.py`.
 - Frontend: JSX sin TypeScript, formularios con `react-hook-form` + `zod`, toasts de feedback en español (`constants/messages.js`), UI en español.
+
+## Añadidos recientes (2026-11)
+
+- **Vista pública**: `/presentacion` (y `/inicio`) sin login; `Presentacion.jsx`.
+- **Sidebar**: acordeones por sección, búsqueda + Command Palette (Ctrl+K), badges (lecciones), `aria-current`, `overflow-x-hidden` en modo compacto, scroll solo vertical.
+- **Navegación**: grupo `DATOS` reordenado (Opción B), `Carreras` y `Trayectos` unidos en "Estructura Académica" con tabs; `Disponibilidad/Habilitaciones` y `Unidades Curriculares` ocultos del sidebar (acceso por tabs).
+- **PDF**: presets (papel, orientación, márgenes, escala, campos), editor de diseño (sliders + drag & drop con `react-rnd`), previsualización con zoom.
+- **Herramientas UI**: Storybook (`pnpm storybook`/`build-storybook`), Playwright (`pnpm test:e2e`, navegador Firefox), axe-core (`*.a11y.test.jsx`).
+- **Tests**: 659 frontend (56 archivos). Conteo actualizado.

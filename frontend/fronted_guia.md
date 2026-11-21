@@ -1178,3 +1178,13 @@ queryClient.invalidateQueries({ queryKey: ['entity-name'] });
 - Antes había un único mensaje para todo, y un backend inaccesible se reportaba como
   "credenciales inválidas": el usuario perseguía la contraseña equivocada.
 - Tests: `src/context/__tests__/AuthContext.test.jsx` y `src/pages/__tests__/login.test.jsx`.
+
+## 8. Herramientas de UI y mejoras recientes (2026-11)
+
+- **Storybook**: `pnpm storybook` (dev) / `pnpm build-storybook` (build). Stories en `src/**/*.stories.jsx`.
+- **Playwright**: `pnpm test:e2e` (requiere navegador instalado; Firefox disponible en esta máquina).
+- **axe-core**: tests `*.a11y.test.jsx` con `jest-axe`.
+- **Vista pública**: `/presentacion` y `/inicio` (sin login).
+- **Sidebar**: acordeones, búsqueda, Command Palette (Ctrl+K), badges, `overflow-x-hidden` en compacto.
+- **Navegación**: `Estructura Académica` agrupa Carreras/Trayectos/Unidades Curriculares con tabs por rol.
+- **PDF**: presets + editor de diseño (sliders y drag & drop) unificado con jsPDF.
