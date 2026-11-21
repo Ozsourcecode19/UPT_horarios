@@ -43,3 +43,8 @@ database/bakup/
 
 # Logs
 *.log
+
+# Capturas y reportes de prueba
+screenshots/
+playwright-report/
+test-results/
