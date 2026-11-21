@@ -313,6 +313,7 @@ const GridSemanalBloques = ({
                     <td
                       key={dia}
                       rowSpan={rowSpan}
+                      tabIndex={0}
                       className={`celda-dia ${esHover ? 'celda-hover' : ''} ${drag ? 'celda-droppable' : ''} ${claseConflicto} ${
                         enModoMover ? (seleccion.celdaKey === key ? 'celda-origen' : 'celda-destino') : ''
                       }`}
@@ -323,6 +324,16 @@ const GridSemanalBloques = ({
                         if (r.accion === TAP.MOVER) {
                           onDropEnCelda?.(r.payload);
                           setSeleccion(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && enModoMover) {
+                          e.preventDefault();
+                          const r = resolverTap({ seleccion, target: { tipo: 'celda', dia, iniMin: fila.banda.iniMin } });
+                          if (r.accion === TAP.MOVER) {
+                            onDropEnCelda?.(r.payload);
+                            setSeleccion(null);
+                          }
                         }
                       }}
                       onDragOver={(e) => {
