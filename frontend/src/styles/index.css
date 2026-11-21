@@ -549,12 +549,20 @@ table.grilla-bloques {
 
 .bandeja-filtro {
   position: relative;
-  z-index: 2;
+  z-index: 0;
+  min-width: 0;
+  flex: 1 1 0;
 }
 
-/* Durante el arrastre, los filtros no capturan el drop */
+.bandeja-chip-arrastrable {
+  position: relative;
+  z-index: 1;
+}
+
+/* Durante el arrastre, los filtros no capturan el drop y se atenúan */
 .bandeja-reserva-sobre .bandeja-filtro {
   pointer-events: none;
+  opacity: 0.4;
 }
 
 .bandeja-buscador-input {
