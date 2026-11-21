@@ -552,6 +552,11 @@ table.grilla-bloques {
   z-index: 2;
 }
 
+/* Durante el arrastre, los filtros no capturan el drop */
+.bandeja-reserva-sobre .bandeja-filtro {
+  pointer-events: none;
+}
+
 .bandeja-buscador-input {
   flex: 1;
   min-width: 0;

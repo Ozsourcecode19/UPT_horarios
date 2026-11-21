@@ -157,6 +157,7 @@ const BandejaReserva = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onDragEnd={() => setSobre(false)}
       aria-label="Bandeja de reserva"
     >
       <div className="bandeja-reserva-header">
