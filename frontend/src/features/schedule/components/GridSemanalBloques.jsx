@@ -9,7 +9,7 @@
 //   2º toque en la celda destino mueve vía onDropEnCelda → validate-move)
 // - La página resuelve celda→bloque EXACTO y valida
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { horaAMinutos } from '../utils/schedule';
 import { formatHora12 } from '../../../utils/timeFormat';
@@ -48,6 +48,14 @@ const GridSemanalBloques = ({
   // Tap-to-move (táctiles): clase seleccionada como origen del movimiento
   const [seleccion, setSeleccion] = useState(null);
   const isTouch = useIsTouch();
+  const longPressTimer = useRef(null);
+  const touchStart = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
 
   // Detección de sesiones: runs contiguos por lección+día (genérico a N bloques)
   const infoSpanPorId = useMemo(() => agruparSesiones(eventos, bloques), [eventos, bloques]);
@@ -379,6 +387,51 @@ const GridSemanalBloques = ({
                                 e.preventDefault();
                                 e.currentTarget.click();
                               }
+                            }}
+                            onTouchStart={(e) => {
+                              if (!isTouch) return;
+                              const t = e.touches[0];
+                              touchStart.current = { x: t.clientX, y: t.clientY };
+                              const target = {
+                                tipo: 'tarjeta',
+                                horarioId: String(objetivo.id),
+                                esSpan: !!info?.esSesion,
+                                sesionTotal: info?.total || 1,
+                                celdaKey: key,
+                                clickInfo: {
+                                  id: String(objetivo.id),
+                                  start: new Date(objetivo.start),
+                                  end: new Date(objetivo.end),
+                                  extendedProps: objetivo.extendedProps,
+                                },
+                                titulo: ev.extendedProps?.materia || ev.title,
+                              };
+                              longPressTimer.current = setTimeout(() => {
+                                setSeleccion((prev) => {
+                                  if (!prev) return target;
+                                  if (String(prev.horarioId) === String(target.horarioId)) return null;
+                                  return target;
+                                });
+                                longPressTimer.current = null;
+                              }, 400);
+                            }}
+                            onTouchMove={(e) => {
+                              if (!touchStart.current || !longPressTimer.current) return;
+                              const t = e.touches[0];
+                              const dx = Math.abs(t.clientX - touchStart.current.x);
+                              const dy = Math.abs(t.clientY - touchStart.current.y);
+                              if (dx > 10 || dy > 10) {
+                                clearTimeout(longPressTimer.current);
+                                longPressTimer.current = null;
+                                if (dx > 30 && dx > dy) setSeleccion(null);
+                              }
+                            }}
+                            onTouchEnd={() => {
+                              if (longPressTimer.current) {
+                                clearTimeout(longPressTimer.current);
+                                longPressTimer.current = null;
+                              }
+                              touchStart.current = null;
                             }}
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));
