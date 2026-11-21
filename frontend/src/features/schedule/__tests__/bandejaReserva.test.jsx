@@ -233,6 +233,7 @@ describe('BandejaReserva — remap dark en index.css', () => {
     'bandeja-chip-arrastrable',
     'bandeja-chip-color',
     'bandeja-filtro',
+    'bandeja-filtros-wrapper',
   ];
 
   const clasesRenderizadas = (raiz) => {

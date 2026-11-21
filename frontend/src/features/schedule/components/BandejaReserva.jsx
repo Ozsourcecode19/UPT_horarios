@@ -191,7 +191,7 @@ const BandejaReserva = ({
         </label>
       )}
 
-      <div className="space-y-2">
+      <div className="bandeja-filtros-wrapper space-y-2">
         <div className="bandeja-buscador">
           <Search className="w-3.5 h-3.5 text-slate-400" />
           <input

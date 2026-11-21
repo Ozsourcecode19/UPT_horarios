@@ -487,6 +487,7 @@ table.grilla-bloques {
   .bandeja-en-dock .bandeja-reserva-header,
   .bandeja-en-dock .bandeja-modo-libre,
   .bandeja-en-dock .bandeja-buscador,
+  .bandeja-en-dock .bandeja-filtros-wrapper,
   .bandeja-en-dock .bandeja-vacio {
     grid-column: 1 / -1;
   }
