@@ -11,6 +11,7 @@ import { NAVIGATION, getRouteMeta, isRoleAllowed } from '../../config/navigation
 import { LS_KEYS } from '../../constants';
 import ThemeToggle from './ThemeToggle';
 import CommandPalette from './CommandPalette';
+import SkipLink from './SkipLink';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -217,7 +218,9 @@ const MainLayout = () => {
   const sectionLabel = routeMeta?.seccion || 'INICIO';
 
   return (
-    <div className="h-screen overflow-hidden print:h-auto print:overflow-visible bg-slate-50 flex">
+    <>
+      <SkipLink />
+      <div className="h-screen overflow-hidden print:h-auto print:overflow-visible bg-slate-50 flex">
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -388,7 +391,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main id="contenido-principal" className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <header className="no-print h-20 shrink-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/60 flex items-center justify-between px-6 lg:px-10 z-30">
           <div className="flex items-center gap-4">
@@ -425,6 +428,7 @@ const MainLayout = () => {
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
+    </>
   );
 };
 

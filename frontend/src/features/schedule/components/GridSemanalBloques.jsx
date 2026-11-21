@@ -239,7 +239,7 @@ const GridSemanalBloques = ({
         </div>
       )}
       <p className="grilla-hint no-print">Desliza para ver todos los días →</p>
-      <table className="grilla-bloques">
+      <table className="grilla-bloques" role="grid" aria-label="Horario semanal por bloques">
         <thead>
           <tr>
             <th className="col-hora">Hora</th>
