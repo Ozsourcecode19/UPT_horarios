@@ -362,6 +362,13 @@ const GridSemanalBloques = ({
                               '--sesion-total': sessionTotal,
                             }}
                             draggable
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.currentTarget.click();
+                              }
+                            }}
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', String(objetivo.id));
                               // Marca explícita del arrastre de la grilla: en `dragover`
