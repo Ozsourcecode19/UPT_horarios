@@ -239,6 +239,11 @@ const GridSemanalBloques = ({
         </div>
       )}
       <p className="grilla-hint no-print">Desliza para ver todos los días →</p>
+      {enModoMover && (
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          Clase seleccionada: {seleccion.titulo || 'Clase'}. Lista para mover.
+        </div>
+      )}
       <table className="grilla-bloques" role="grid" aria-label="Horario semanal por bloques">
         <thead>
           <tr>
