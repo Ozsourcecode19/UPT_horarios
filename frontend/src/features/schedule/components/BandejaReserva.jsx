@@ -201,13 +201,13 @@ const BandejaReserva = ({
       </div>
 
       <div className="flex gap-2">
-        <select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value)} className="flex-1 text-xs px-2 py-1 border rounded-md">
+        <select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value)} className="bandeja-filtro flex-1 text-xs px-2 py-1 border rounded-md">
           <option value="TODOS">Todos los turnos</option>
           <option value="MATUTINO">Mañana</option>
           <option value="VESPERTINO">Tarde</option>
           <option value="NOCTURNO">Noche</option>
         </select>
-        <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="flex-1 text-xs px-2 py-1 border rounded-md">
+        <select value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)} className="bandeja-filtro flex-1 text-xs px-2 py-1 border rounded-md">
           <option value="TODAS">Todas las sedes</option>
           {sedesDisponibles.map(s => <option key={s} value={s}>Sede {s}</option>)}
         </select>

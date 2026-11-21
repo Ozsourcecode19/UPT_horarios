@@ -543,6 +543,13 @@ table.grilla-bloques {
   background-color: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
+  position: relative;
+  z-index: 2;
+}
+
+.bandeja-filtro {
+  position: relative;
+  z-index: 2;
 }
 
 .bandeja-buscador-input {
@@ -596,6 +603,8 @@ table.grilla-bloques {
 
 .bandeja-chip-arrastrable {
   cursor: grab;
+  position: relative;
+  z-index: 0;
 }
 
 .bandeja-chip-arrastrable:active {
