@@ -760,6 +760,10 @@ table.grilla-bloques {
   color: #cbd5e1;
 }
 
+.evento-card {
+  touch-action: manipulation;
+}
+
 .evento-card .ev-x2 {
   font-style: normal;
   font-weight: 800;
