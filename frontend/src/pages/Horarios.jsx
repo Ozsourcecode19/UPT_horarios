@@ -903,6 +903,7 @@ const Horarios = () => {
             <BandejaReserva
               sinColocar={sinColocar}
               reservadas={reservadas}
+              conflictos={conflictos}
               puedeEscribir={puedeEscribir}
               modoLibre={modoLibre}
               demoMode={demoMode}

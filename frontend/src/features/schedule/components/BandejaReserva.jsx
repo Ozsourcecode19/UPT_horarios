@@ -11,6 +11,7 @@
 // una clase aquí, su sesión se aparta (reserva) y la celda queda libre.
 
 import { useMemo, useState } from 'react';
+import { horaAMinutos } from '../utils/schedule';
 import { Inbox, RotateCcw, Search, ShieldAlert, PackageOpen } from 'lucide-react';
 import {
   TIPO_DND_BANDEJA,
@@ -22,7 +23,7 @@ import {
   textoChipBandeja,
 } from '../utils/bandeja';
 
-const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar }) => {
+const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar, conflicto }) => {
   const esReservada = origen === 'RESERVADA';
   return (
     <div
@@ -34,7 +35,7 @@ const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar }) => {
       }}
       onClick={() => onSeleccionar?.(clase)}
       className={`bandeja-chip ${esReservada ? 'bandeja-chip-reservada' : ''} ${puedeEscribir ? 'bandeja-chip-arrastrable' : ''}`}
-      title={puedeEscribir ? 'Arrastra a la grilla para colocarla (clic para elegir día y hora)' : 'Clic para elegir día y hora'}
+      title={conflicto ? `Conflicto: ${conflicto.etiqueta} - ${conflicto.detalle}` : (puedeEscribir ? 'Arrastra a la grilla para colocarla (clic para elegir día y hora)' : 'Clic para elegir día y hora')}
     >
       <div className="flex items-start gap-2">
         <span className="bandeja-chip-color" style={{ backgroundColor: clase.color_hex || '#3B82F6' }} />
@@ -54,6 +55,11 @@ const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar }) => {
       <div className="flex items-center gap-1 mt-2">
         {clase.bloques_por_sesion > 1 && (
           <span className="bandeja-chip-badge">×{clase.bloques_por_sesion}</span>
+        )}
+        {conflicto && (
+          <span className="bandeja-chip-badge" style={{ backgroundColor: '#fef3c7', color: '#92400e' }} title={conflicto.detalle}>
+            ⚠ Conflicto
+          </span>
         )}
         {esReservada ? (
           <button
@@ -80,6 +86,7 @@ const Chip = ({ clase, origen, puedeEscribir, onSeleccionar, onLiberar }) => {
 const BandejaReserva = ({
   sinColocar = [],
   reservadas = [],
+  conflictos = [],
   puedeEscribir = false,
   modoLibre = false,
   demoMode = false,
@@ -218,7 +225,15 @@ const BandejaReserva = ({
         <section className="bandeja-seccion">
           <h4 className="bandeja-seccion-titulo">En reserva ({reservadasFiltradas.length})</h4>
           <div className="bandeja-lista">
-            {reservadasFiltradas.map(clase => (
+            {reservadasFiltradas.map(clase => {
+              const conflicto = (conflictos || []).find(c =>
+                Number(c.dia) === Number(clase.dia_semana) &&
+                Number(c.iniMin) === horaAMinutos(clase.hora_inicio) &&
+                (Number(c.id) === Number(clase.docente_id) ||
+                 Number(c.id) === Number(clase.grupo_id) ||
+                 Number(c.id) === Number(clase.aula_id))
+              );
+              return (
               <Chip
                 key={`res-${clase.leccion_id}-${clase.dia_semana}-${clase.hora_inicio}`}
                 clase={clase}
@@ -226,8 +241,10 @@ const BandejaReserva = ({
                 puedeEscribir={editable}
                 onSeleccionar={onSeleccionar}
                 onLiberar={onLiberar}
+                conflicto={conflicto}
               />
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
