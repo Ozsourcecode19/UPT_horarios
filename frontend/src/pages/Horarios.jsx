@@ -717,7 +717,9 @@ const Horarios = () => {
         onDescargarPdf={() => {
           const params = {
             selectedPeriodo,
-            descripcion: itemSeleccionado?.nombre || 'Horario',
+            descripcion: (filterType === 'docente' && itemSeleccionado)
+              ? `${itemSeleccionado.apellido || ''}, ${itemSeleccionado.nombre || ''}`.trim()
+              : (itemSeleccionado?.nombre || 'Horario'),
             ventanaGrilla,
             bandas,
             eventos: listadoHorarios,
