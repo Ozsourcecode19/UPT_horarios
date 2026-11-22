@@ -199,11 +199,16 @@ const Horarios = () => {
   // Filtro de turno en vistas densas (docente/aula): reduce la grilla a un solo turno.
   const bloquesFiltradosPorTurno = useMemo(() => {
     if (filterType === 'grupo' || turnoFiltro === 'TODOS') return bloques;
+    const ventana = resolveVentanaTurno(turnoFiltro, configuraciones);
+    if (!ventana) return bloques;
+    const iniVentana = horaAMinutos(ventana.inicio);
+    const finVentana = horaAMinutos(ventana.fin);
     return bloques.filter(b => {
-      const div = (b.division || '').toUpperCase();
-      return div === turnoFiltro;
+      const ini = horaAMinutos(b.hora_inicio);
+      const fin = horaAMinutos(b.hora_fin);
+      return ini >= iniVentana && fin <= finVentana;
     });
-  }, [bloques, filterType, turnoFiltro]);
+  }, [bloques, filterType, turnoFiltro, configuraciones]);
 
   const bandas = useMemo(
     () => construirBandasEje(bloquesFiltradosPorTurno, sedesEje, ventanaGrilla),
