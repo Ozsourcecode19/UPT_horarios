@@ -1246,12 +1246,16 @@ table.grilla-bloques {
   border-color: #334155;
 }
 
+.dark .grilla-bloques th.col-hora {
+  background-color: #0f172a !important;
+}
+
 .dark .grilla-bloques td {
   border-color: #334155;
 }
 
 .dark .grilla-bloques td.celda-hora {
-  background-color: #0f172a;
+  background-color: #0f172a !important;
   color: #cbd5e1;
 }
 
@@ -1761,9 +1765,18 @@ table.grilla-bloques {
   .grid-zoom { transform: none; }
 }
 
-/* Celda con conflicto seleccionado desde el dock */
-.grilla-bloques td.celda-conflicto-activo {
-  outline: 3px solid #dc2626 !important;
-  outline-offset: -3px;
-  background-color: #fef2f2 !important;
+/* Animación de entrada suave para hero/landing (respeta prefers-reduced-motion) */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade-up-delay-1 { animation-delay: 0.1s; }
+.animate-fade-up-delay-2 { animation-delay: 0.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-up-delay-1,
+  .animate-fade-up-delay-2 { animation: none; }
 }
